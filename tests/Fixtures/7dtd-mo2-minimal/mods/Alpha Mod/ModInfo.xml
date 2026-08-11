@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xml fixtureAttribute="preserve">
+  <Name value="Alpha Mod" />
+  <DisplayName value="Alpha Display" />
+  <Version value="1.2.3" />
+  <Description value="Synthetic alpha mod." />
+  <Author value="Fixture Author" />
+  <Website value="https://example.test/alpha" />
+  <UnknownElement unknown="keep">unknown value</UnknownElement>
+</xml>
