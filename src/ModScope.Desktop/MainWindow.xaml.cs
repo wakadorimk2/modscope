@@ -233,7 +233,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Browser_NavigationCompleted(
+    private async void Browser_NavigationCompleted(
         object? sender,
         CoreWebView2NavigationCompletedEventArgs e)
     {
@@ -253,9 +253,11 @@ public partial class MainWindow : Window
                         QueryDiagnosticSeverity.Warning,
                         e.WebErrorStatus.ToString())
                 }));
+            SendState();
+            return;
         }
 
-        SendState();
+        await ObservePageAsync(null);
     }
 
     private void Browser_DocumentTitleChanged(object? sender, object e)

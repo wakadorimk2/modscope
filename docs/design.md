@@ -853,3 +853,21 @@ pwsh -NoProfile -File scripts/build.ps1
 
 scriptはnpm ci、frontend check、frontend build、dotnet buildを順に実行します。
 node_modules、frontend dist、生成済みDesktop assetsはGit管理対象外です。
+
+## 25. Conclusion-first Web UI
+
+2026-08-12のUI整理では、通常画面から開発者向けの配線を隠します。
+
+- Browser chromeはURL、戻る、進む、reloadを表示します。
+- NavigateとObserveの明示ボタンは通常画面から削除します。
+- Browser navigation完了後にDesktop hostがObserveを自動実行します。
+- Local contextはidentity確認手順ではなく、結論カードとして先に表示します。
+- installedとnot installedは結論カードで表示します。
+- unresolvedとunknownは認識失敗カードとして表示します。
+- 認識失敗時だけlocal MOD選択とnot installed確認を表示します。
+- raw observationはPage detailsへ折りたたみます。
+- fixture、explicit MO2 source path、手動ObserveはDeveloper toolsへ移します。
+
+この変更はfrontendのpresentationとDesktop hostのnavigation integrationに限定します。
+MO2自動検出、page identity自動認識、Profile切替、overlap判定は追加しません。
+既存のQuery model、Desktop contract、read-only境界を維持します。
