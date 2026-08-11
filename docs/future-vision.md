@@ -397,3 +397,24 @@ ModScopeは、次の状態を目指します。
 - evidenceとinferenceを混ぜないか
 - GUIの認知負荷を増やさないか
 - 将来のsemantic analysis、runtime comparison、Game Adapterを妨げないか
+
+## 16. Web UI vertical slice
+
+現在のWeb UIは、.NET / C#のpresentation adapterです。
+
+- Browser WebView2は外部Web pageを表示します。
+- App WebView2はSvelte frontendを表示します。
+- Desktop hostはWebMessage JSON contractを検証します。
+- frontendはQuery projectionだけを表示します。
+- frontendはMO2 source、LocalModSnapshot、filesystemへ直接アクセスしません。
+
+左右2面は、Local contextとInspectorの情報設計を検証するための暫定surfaceです。
+情報モデルが安定した後に、Local contextをdrawerまたはoverlayへ折り畳みます。
+
+v0.1では、次を保留します。
+
+- frontend routerとadvanced tab management
+- Compare、Settings、downloads
+- AI chat、MCP、Codex automation
+- MO2 write
+- browser syncとChromium bundling

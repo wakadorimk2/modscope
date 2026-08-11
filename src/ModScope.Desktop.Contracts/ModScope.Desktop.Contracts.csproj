@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>ModScope.Desktop.Contracts</RootNamespace>
+    <AssemblyName>ModScope.Desktop.Contracts</AssemblyName>
+  </PropertyGroup>
+
+</Project>

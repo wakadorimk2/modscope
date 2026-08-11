@@ -16,7 +16,7 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 
 ## 現在のフェーズ
 
-明示的な実装依頼により、現在はLocal Knowledge基盤とGUI縦切りの実装フェーズです。
+明示的な実装依頼により、現在はLocal Knowledge基盤とWeb UI縦切りの実装フェーズです。
 
 今回の実装で変更できる範囲は、次のとおりです。
 
@@ -28,9 +28,13 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 - `src/ModScope.LocalKnowledge/`
 - `src/ModScope.Query/`
 - `src/ModScope.Desktop/`
+- `src/ModScope.Desktop.Contracts/`
+- `src/ModScope.Web/`
 - `tests/ModScope.LocalKnowledge.Tests/`
 - `tests/ModScope.Query.Tests/`
+- `tests/ModScope.Desktop.Contracts.Tests/`
 - `tests/Fixtures/`
+- `scripts/`
 
 今回の実装では、次の対象を作成しません。
 
@@ -40,8 +44,15 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 - Site Adapter
 - 完全なsemantic conflict判定
 
-C# / .NET 8のcore/queryライブラリ、WPF / .NET 10のDesktopアプリ、xUnitテストを使用します。
+C# / .NET 8のcore/query/contractsライブラリ、WPF / .NET 10のDesktop host、Svelte / TypeScript / ViteのWeb frontend、xUnitテストを使用します。
 匿名synthetic fixtureを検証の基準にします。
+
+Web frontendはpresentation layerです。
+Web frontendはMO2 integration、filesystem access、profile parsing、Local Mod Knowledge、XML解析を実装しません。
+.NET / C#側がsource of truthです。
+Desktop hostはWebView2 host、native bridge、Query projectionだけを担当します。
+Browser WebView2へLocal context、MO2 path、LocalModSnapshotを注入しません。
+frontend buildは'scripts/build.ps1'で実行します。
 
 v0.1は、旧来の「source snapshotとAI用indexだけ」の縛りでは定義しません。現在の製品仮説は、7DTD + MO2のLocal Mod Knowledgeと、最小のBrowse → Recognize → Local awareness → Inspectの縦切りです。
 
