@@ -4,9 +4,10 @@
 
 この文書は、ModScopeの製品定義、現在のアーキテクチャ、責務境界、v0.1の範囲を定義します。
 
-現在のリポジトリはLocal Knowledge基盤の実装フェーズです。
-初回実装は、C# / .NET 8のクラスライブラリとxUnitテストで構成します。
-GUI、Browser engine、CLI、MO2 writeは初回実装に含めません。
+現在のリポジトリはLocal Knowledge基盤とGUI縦切りの実装フェーズです。
+Local KnowledgeとQueryはC# / .NET 8で実装します。
+DesktopはWPF / .NET 10で実装します。
+独自Browser engine、CLI、MO2 writeは実装しません。
 
 v0.1は、AI用index単体ではありません。7DTD + MO2のLocal Mod Knowledgeと、最小のBrowse → Recognize → Local awareness → Inspectを検証するvertical sliceです。
 
@@ -520,13 +521,14 @@ Write planeは、将来必要性が確認できた場合だけ追加します。
 - Config XMLの軽量な構造化
 - XML patch operation、target XML、XPath、attributeのraw保持と候補化
 - forward indexとreverse indexの最小形
-- 既存Web engine上の最小Browse surface
+- WPF + WebView2上の最小Browse surface
 - URL、title、基本page contentのpage observation
 - ユーザーによるMOD identity confirmation
 - installed、not installed、active profile、known versionなどのLocal context
 - Inspectorによるlocal metadata、files、XML reference、diagnosticの確認
 - unknown、unresolved、not assessedの明示
-- 将来のGUI、Codex、external agentが利用できるneutral read modelの境界
+- Query layerが提供するneutral read model
+- page observation、手動MOD identity confirmation、Local context、Inspectorの縦切り
 
 ### 15.2 含めないもの
 
@@ -616,6 +618,23 @@ Python、TypeScript、Browser先行の実装は今回の代替案として採用
 匿名fixtureでは、実MO2環境と7DTD MODの形式差を完全には検証できません。
 実データによるread-only検証は、初回実装後の未確定事項として残します。
 
+### 18.2 GUI縦切りの決定
+
+2026-08-11の明示的な実装依頼により、最小GUI縦切りを開始します。
+
+- `ModScope.Query`はLocal KnowledgeをDesktop向けread modelへ投影します。
+- `ModScope.Desktop`はWPF / .NET 10を使用します。
+- WebView2は既存のbrowser runtimeを利用します。
+- WebView2とLocal contextは左右に配置します。
+- page scriptへlocal MOD情報を注入しません。
+- page observationはObserve操作で取得します。
+- MOD identityはユーザーが確認します。
+- page observationはv0.1ではメモリ上のbounded previewだけを保持します。
+- MO2 sourceはread-onlyです。
+
+GUIは`LocalModSnapshot`を直接読みません。
+GUIはQuery layerのprojectionだけを読みます。
+
 ## 19. Risksとunknowns
 
 - URL、title、基本page contentだけでMOD identityを有用に候補化できるか
@@ -691,7 +710,7 @@ Browser、Local Mod Knowledge、context projection、analysis、mutationを分�
 
 ### Phase 1：v0.1の最小Browser-first vertical slice
 
-1 profileをread-onlyで読み取ります。Local Mod Knowledgeを生成します。既存Web engine上でpage observationを取得し、ユーザー確認したMOD identityとLocal contextを結びます。Inspectorで根拠を開きます。
+1 profileをread-onlyで読み取ります。Local Mod Knowledgeを生成します。WPF + WebView2上でpage observationを取得し、ユーザー確認したMOD identityとLocal contextを結びます。Inspectorで根拠を開きます。WebView2はbrowser engineの実装資産ではなく、Browsing Layerのhostです。
 
 ### Phase 2：structured Local Mod Knowledge
 
@@ -738,6 +757,8 @@ Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡
 - active profile、enabled状態、priority、known versionを根拠付きで返せる
 - 情報不足をunknownまたはnot assessedとして返せる
 - Inspectorからlocal metadata、files、XML reference、diagnosticへ進める
+- WPF + WebView2のDesktop appでBrowse、Observe、identity confirmation、Local context、Inspectorを実行できる
+- GUIがQuery layerのprojectionだけを利用する
 - MO2 sourceを変更しない
 - Codex、特定Site Adapter、特定agent backendへ依存しない
 

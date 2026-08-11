@@ -316,9 +316,9 @@ Write planeが追加されても、ModScopeはMod Managerにはなりません�
 
 source boundary、page observation、MOD identity confirmation、Local context、evidence modelを定義します。
 
-### Phase 1：v0.1 Browser-first vertical slice
+### Phase 1：v0.1 Browser-first vertical slice（実装中）
 
-7DTD + MO2の1 profileをread-onlyで読み取ります。既存Web engine上でpage observationを取得します。ユーザー確認したMOD identityとcurrent profileを照合します。Inspectorで根拠を表示します。
+7DTD + MO2の1 profileをread-onlyで読み取ります。WPF + WebView2上でpage observationを取得します。ユーザー確認したMOD identityとcurrent profileを照合します。Inspectorで根拠を表示します。
 
 v0.1は、site固有Adapter、複数game、完全なsemantic conflict、RuntimeOCD、MO2 write、特定agent backendを含めません。
 
