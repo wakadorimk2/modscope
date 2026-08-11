@@ -29,8 +29,10 @@ public static class BridgeProtocol
         "browser.observe",
         "knowledge.useFixture",
         "knowledge.loadSource",
+        "knowledge.switchProfile",
         "identity.confirm",
-        "inspector.open"
+        "inspector.open",
+        "layout.setContextVisible"
     };
 
     public static JsonSerializerOptions JsonOptions { get; } = new()
@@ -179,6 +181,10 @@ public sealed record ConfirmIdentityPayload(
 
 public sealed record InspectorOpenPayload(string ModKey);
 
+public sealed record SwitchProfilePayload(string ProfileName);
+
+public sealed record SetContextVisiblePayload(bool Visible);
+
 public sealed record BridgeErrorPayload(string Code, string Message);
 
 public sealed record BrowserUiState(
@@ -234,9 +240,12 @@ public sealed record ModCandidateUiState(
     EvidenceReferenceUiState? PriorityEvidence,
     IReadOnlyList<DiagnosticUiState> Diagnostics);
 
+public sealed record ProfileUiState(string Name);
+
 public sealed record KnowledgeUiState(
     KnowledgeSessionUiState? Session,
-    IReadOnlyList<ModCandidateUiState> Candidates);
+    IReadOnlyList<ModCandidateUiState> Candidates,
+    IReadOnlyList<ProfileUiState> Profiles);
 
 public sealed record IdentityUiState(
     string CandidateIdentity,
@@ -316,6 +325,8 @@ public sealed record InspectorUiState(
     IReadOnlyList<DiagnosticUiState> Diagnostics,
     SourceReferenceUiState Source);
 
+public sealed record LayoutUiState(bool ContextVisible);
+
 public sealed record UiState(
     BrowserUiState Browser,
     PageObservationUiState? Observation,
@@ -323,5 +334,6 @@ public sealed record UiState(
     IdentityUiState Identity,
     LocalContextUiState? LocalContext,
     InspectorUiState? Inspector,
+    LayoutUiState Layout,
     string StatusMessage,
     IReadOnlyList<DiagnosticUiState> Diagnostics);

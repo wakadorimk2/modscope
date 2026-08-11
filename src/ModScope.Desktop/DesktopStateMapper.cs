@@ -10,9 +10,11 @@ internal static class DesktopStateMapper
         PageObservation? observation,
         KnowledgeSessionReadModel? session,
         IReadOnlyList<ModCandidateSummary> candidates,
+        IReadOnlyList<ProfileSummaryReadModel> profiles,
         IdentityUiState identity,
         LocalContextReadModel? localContext,
         InspectorReadModel? inspector,
+        LayoutUiState layout,
         string statusMessage)
     {
         return new UiState(
@@ -20,10 +22,12 @@ internal static class DesktopStateMapper
             observation is null ? null : PageObservation(observation),
             new KnowledgeUiState(
                 session is null ? null : KnowledgeSession(session),
-                candidates.Select(Candidate).ToList().AsReadOnly()),
+                candidates.Select(Candidate).ToList().AsReadOnly(),
+                profiles.Select(Profile).ToList().AsReadOnly()),
             identity,
             localContext is null ? null : LocalContext(localContext),
             inspector is null ? null : Inspector(inspector),
+            layout,
             statusMessage,
             session is null ? Array.Empty<DiagnosticUiState>() : Diagnostics(session.Diagnostics));
     }
@@ -65,6 +69,11 @@ internal static class DesktopStateMapper
             Source(value.Source),
             value.PriorityEvidence is null ? null : Evidence(value.PriorityEvidence),
             Diagnostics(value.Diagnostics));
+    }
+
+    private static ProfileUiState Profile(ProfileSummaryReadModel value)
+    {
+        return new ProfileUiState(value.ProfileName);
     }
 
     private static LocalContextUiState LocalContext(LocalContextReadModel value)

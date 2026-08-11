@@ -408,8 +408,16 @@ ModScopeは、次の状態を目指します。
 - frontendはQuery projectionだけを表示します。
 - frontendはMO2 source、LocalModSnapshot、filesystemへ直接アクセスしません。
 
-左右2面は、Local contextとInspectorの情報設計を検証するための暫定surfaceです。
-情報モデルが安定した後に、Local contextをdrawerまたはoverlayへ折り畳みます。
+現在のUIは、Global Browser chromeを上段に置き、Browser ContentとContextを下段に分ける3面構成です。
+
+- Toolbar WebView2はURL、navigation、explicit instance内のProfile dropdown、Context toggleを表示します。
+- Browser WebView2は外部Web pageだけを表示します。
+- Context WebView2はLocal context、例外確認、Developer tools、Inspectorを表示します。
+
+ToolbarとContextは、同じSvelte bundleを別surfaceとして読み込みます。
+Desktop hostは両方へ同じstate、error、ready messageをbroadcastします。
+この構成は情報設計の検証用です。
+将来はContextをdrawerまたはoverlayへ折り畳みます。
 
 v0.1では、次を保留します。
 
@@ -427,6 +435,9 @@ v0.1では、次を保留します。
 - identity確認は通常工程ではなく、認識失敗時の例外導線です。
 - Developer toolsはfixtureと明示sourceを検証するために残しますが、初期状態では閉じます。
 - Browser navigation完了後のObserveはDesktop hostが実行します。
+- Profile dropdownは、明示されたinstance rootの`profiles`直下にあるprofileだけをread-onlyで切り替えます。
+- Profile switch後はsession、candidates、profile nameを更新し、page observationは維持します。
 
-この段階では、MO2 profile自動検出、page identity自動認識、Profile切替を実装しません。
-Queryと契約を拡張した後に、起動時のLocal context自動更新とProfile選択を検討します。
+この段階では、MO2 profile自動検出、global path探索、page identity自動認識を実装しません。
+Profile切替はexplicit instance内に限定します。
+起動時のMO2自動検出とpage identity自動認識は、Queryと認識境界を拡張した後に検討します。

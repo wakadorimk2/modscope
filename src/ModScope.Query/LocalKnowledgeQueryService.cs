@@ -10,6 +10,12 @@ public interface ILocalKnowledgeQuery
 
     IReadOnlyList<ModCandidateSummary> GetModCandidates();
 
+    IReadOnlyList<ProfileSummaryReadModel> GetProfiles();
+
+    KnowledgeSessionReadModel SwitchProfile(
+        string profileName,
+        CancellationToken cancellationToken = default);
+
     LocalContextReadModel ConfirmIdentity(IdentityConfirmation confirmation);
 
     InspectorReadModel GetInspector(string modKey);
@@ -19,6 +25,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
 {
     private readonly IMo2SnapshotReader _snapshotReader;
     private LocalModSnapshot? _snapshot;
+    private Mo2SourceInput? _source;
+    private IReadOnlyList<Mo2ProfileDefinition> _profiles = Array.Empty<Mo2ProfileDefinition>();
 
     public LocalKnowledgeQueryService(IMo2SnapshotReader snapshotReader)
     {
@@ -35,23 +43,14 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
-        _snapshot = _snapshotReader.Read(
-            new Mo2SourceDefinition(
-                source.InstanceName,
-                source.ProfileName,
-                source.InstanceRootPath,
-                source.ProfilePath,
-                source.ModsPath),
-            cancellationToken);
+        var definition = ToDefinition(source);
+        var snapshot = _snapshotReader.Read(definition, cancellationToken);
+        var profiles = _snapshotReader.ListProfiles(definition, cancellationToken);
 
-        return new KnowledgeSessionReadModel(
-            _snapshot.SnapshotId,
-            _snapshot.InstanceName,
-            _snapshot.ProfileName,
-            _snapshot.CreatedAtUtc,
-            _snapshot.ParserVersion,
-            _snapshot.SchemaVersion,
-            QueryProjection.Diagnostics(_snapshot.Diagnostics));
+        _source = source;
+        _snapshot = snapshot;
+        _profiles = profiles;
+        return ToSession(snapshot);
     }
 
     public IReadOnlyList<ModCandidateSummary> GetModCandidates()
@@ -67,6 +66,42 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
                     string.Equals(entry.NormalizedModName, mod.DirectoryName, StringComparison.OrdinalIgnoreCase))))
             .ToList()
             .AsReadOnly();
+    }
+
+    public IReadOnlyList<ProfileSummaryReadModel> GetProfiles()
+    {
+        return _profiles
+            .Select(profile => new ProfileSummaryReadModel(profile.Name))
+            .ToList()
+            .AsReadOnly();
+    }
+
+    public KnowledgeSessionReadModel SwitchProfile(
+        string profileName,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
+        var source = _source ?? throw new InvalidOperationException(
+            "Load an explicit MO2 source before switching profiles.");
+        var profile = _profiles.FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, profileName.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (profile is null)
+        {
+            throw new ArgumentException(
+                $"The profile '{profileName}' is not available in the explicit instance.",
+                nameof(profileName));
+        }
+
+        var nextSource = source with
+        {
+            ProfileName = profile.Name,
+            ProfilePath = profile.ProfilePath
+        };
+        var snapshot = _snapshotReader.Read(ToDefinition(nextSource), cancellationToken);
+
+        _source = nextSource;
+        _snapshot = snapshot;
+        return ToSession(snapshot);
     }
 
     public LocalContextReadModel ConfirmIdentity(IdentityConfirmation confirmation)
@@ -198,6 +233,28 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
     {
         return _snapshot ?? throw new InvalidOperationException(
             "Load an explicit MO2 source before requesting Local Knowledge.");
+    }
+
+    private static Mo2SourceDefinition ToDefinition(Mo2SourceInput source)
+    {
+        return new Mo2SourceDefinition(
+            source.InstanceName,
+            source.ProfileName,
+            source.InstanceRootPath,
+            source.ProfilePath,
+            source.ModsPath);
+    }
+
+    private static KnowledgeSessionReadModel ToSession(LocalModSnapshot snapshot)
+    {
+        return new KnowledgeSessionReadModel(
+            snapshot.SnapshotId,
+            snapshot.InstanceName,
+            snapshot.ProfileName,
+            snapshot.CreatedAtUtc,
+            snapshot.ParserVersion,
+            snapshot.SchemaVersion,
+            QueryProjection.Diagnostics(snapshot.Diagnostics));
     }
 
     private static LocalContextReadModel BuildUnresolvedContext(

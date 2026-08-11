@@ -114,6 +114,8 @@ public sealed record KnowledgeSessionReadModel(
     int SchemaVersion,
     IReadOnlyList<DiagnosticReadModel> Diagnostics);
 
+public sealed record ProfileSummaryReadModel(string ProfileName);
+
 public sealed record ModCandidateSummary(
     string ModKey,
     string DirectoryName,

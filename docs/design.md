@@ -130,7 +130,7 @@ MODの発見と評価は、MOD一覧から始まるとは限りません。ラ�
 - v0.1での完全なsemantic conflict判定
 - v0.1でのRuntimeOCD連携
 - v0.1でのMO2 write
-- v0.1での複数profile管理
+- explicit instance外のprofile探索
 - v0.1での複数Site Adapter
 
 ## 6. Conceptual architecture
@@ -537,7 +537,7 @@ Write planeは、将来必要性が確認できた場合だけ追加します。
 - 完全なsemantic conflict判定
 - RuntimeOCD連携
 - MO2へのwrite
-- 複数profile管理
+- global MO2 profile自動探索
 - 常時表示の高密度Mod一覧
 - 特定AI製品への専用統合
 - agent Web backendの固定
@@ -786,19 +786,27 @@ Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡
 - Contracts projectはQuery projectを参照しません。
 - Desktop hostだけがQuery modelをUI contractへ変換します。
 
-### 24.2 Two WebView2 surfaces
+### 24.2 Three WebView2 surfaces
 
-Desktopは2つのWebView2を左右に配置します。
+Desktopは3つのWebView2を、Global Browser chrome + Content / Contextとして配置します。
 
+- Toolbar WebView2：全幅のURL、navigation、profile、Context toggle
 - Browser WebView2：ユーザーが閲覧する外部Web page
-- App WebView2：ModScope.Webのbrowser chrome、Local context、Inspector
+- Context WebView2：Local context、例外確認、Developer tools、Inspector
+
+ToolbarとContextは、同じfrontend bundleをsurface query付きで読み込みます。
+Toolbarは`?surface=toolbar`を使用します。
+Contextは`?surface=context`を使用します。
 
 任意サイトをfrontendのiframeへ移しません。
 Browser WebView2へWPF panelを重ねません。
 WPFはwindow、WebView2 host、native bridgeに限定します。
 
-2面構成は情報設計を検証する暫定surfaceです。
-Local contextは将来drawerまたはoverlayへ折り畳めるようにします。
+BrowserとContextの初期比率は`3*:2*`です。
+Context columnは、ToolbarのContext buttonまたはCtrl/Cmd+Iで非表示にできます。
+非表示中もContext WebView2のstateとInspector stateを破棄しません。
+2面構成から3面構成への変更は、Global Browser chromeの視線移動を検証する暫定surfaceです。
+将来はContextをdrawerまたはoverlayへ折り畳める構造へ進めます。
 
 ### 24.3 Bridge contract
 
@@ -817,10 +825,13 @@ frontendからhostへ送るcommandは次です。
 - browser.observe
 - knowledge.useFixture
 - knowledge.loadSource
+- knowledge.switchProfile
 - identity.confirm
 - inspector.open
+- layout.setContextVisible
 
 hostからfrontendへ送るmessageは、state、error、readyです。
+ToolbarとContextの両方へ同じmessageをbroadcastします。
 stateはUI stateの完全なsnapshotです。
 
 Hostは次を検証します。
@@ -835,6 +846,13 @@ Hostは次を検証します。
 Browser WebView2へlocal context、absolute MO2 path、LocalModSnapshotを送信しません。
 Observeは固定scriptでbody textをbounded previewとして取得します。
 Inspectorはinspector.open commandの後に取得します。
+
+Profile catalogは、ユーザーが明示したinstance rootの`profiles`直下だけを読み取ります。
+`modlist.txt`を持つ通常directoryだけを候補にします。
+reparse pointとglobal MO2 default pathは読み取りません。
+`profiles` directoryがない場合は、現在のexplicit profileだけを候補にします。
+Profile switchは新しいsnapshotをread-onlyで生成します。
+Profile pathの絶対値はfrontendへ送信しません。
 
 ### 24.4 Frontend build
 
@@ -868,6 +886,6 @@ node_modules、frontend dist、生成済みDesktop assetsはGit管理対象外�
 - raw observationはPage detailsへ折りたたみます。
 - fixture、explicit MO2 source path、手動ObserveはDeveloper toolsへ移します。
 
-この変更はfrontendのpresentationとDesktop hostのnavigation integrationに限定します。
-MO2自動検出、page identity自動認識、Profile切替、overlap判定は追加しません。
-既存のQuery model、Desktop contract、read-only境界を維持します。
+通常画面のProfile dropdownは、explicit instance内のread-only profile switchだけを実行します。
+MO2自動検出、global path探索、page identity自動認識、overlap判定は追加しません。
+既存のQuery modelとread-only境界を維持し、profile catalogとlayout stateを明示的なread modelへ追加します。

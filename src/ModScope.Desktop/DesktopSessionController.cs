@@ -10,11 +10,13 @@ public sealed class DesktopSessionController
     private KnowledgeSessionReadModel? _session;
     private PageObservation? _observation;
     private IReadOnlyList<ModCandidateSummary> _candidates = Array.Empty<ModCandidateSummary>();
+    private IReadOnlyList<ProfileSummaryReadModel> _profiles = Array.Empty<ProfileSummaryReadModel>();
     private LocalContextReadModel? _localContext;
     private InspectorReadModel? _inspector;
     private string _candidateIdentity = string.Empty;
     private string? _selectedLocalModKey;
     private string _statusMessage = "Load a source and observe the current page.";
+    private bool _contextVisible = true;
 
     public DesktopSessionController()
         : this(LocalKnowledgeQueryService.CreateDefault())
@@ -43,11 +45,30 @@ public sealed class DesktopSessionController
         ArgumentNullException.ThrowIfNull(source);
         _session = _query.Load(source);
         _candidates = _query.GetModCandidates();
+        _profiles = _query.GetProfiles();
         _candidateIdentity = string.Empty;
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
         _statusMessage = $"Loaded {_candidates.Count} MOD records. Confirm the page identity.";
+    }
+
+    public void SwitchProfile(string profileName)
+    {
+        var session = _query.SwitchProfile(profileName);
+        _session = session;
+        _candidates = _query.GetModCandidates();
+        _profiles = _query.GetProfiles();
+        _candidateIdentity = string.Empty;
+        _selectedLocalModKey = null;
+        _localContext = null;
+        _inspector = null;
+        _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
+    }
+
+    public void SetContextVisible(bool visible)
+    {
+        _contextVisible = visible;
     }
 
     public void SetObservation(PageObservation observation)
@@ -112,9 +133,11 @@ public sealed class DesktopSessionController
             _observation,
             _session,
             _candidates,
+            _profiles,
             new IdentityUiState(_candidateIdentity, _selectedLocalModKey),
             _localContext,
             _inspector,
+            new LayoutUiState(_contextVisible),
             _statusMessage);
     }
 }

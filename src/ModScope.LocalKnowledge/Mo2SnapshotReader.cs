@@ -247,6 +247,51 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         return entries.AsReadOnly();
     }
 
+    public IReadOnlyList<Mo2ProfileDefinition> ListProfiles(
+        Mo2SourceDefinition source,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var paths = ValidateSource(source);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var profilesPath = Path.Combine(paths.InstanceRootPath, "profiles");
+        var profiles = new List<Mo2ProfileDefinition>();
+
+        var profilesDirectory = new DirectoryInfo(profilesPath);
+        if (profilesDirectory.Exists
+            && !profilesDirectory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            foreach (var directory in profilesDirectory
+                .EnumerateDirectories("*", SearchOption.TopDirectoryOnly))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                {
+                    continue;
+                }
+
+                if (File.Exists(Path.Combine(directory.FullName, "modlist.txt")))
+                {
+                    profiles.Add(new Mo2ProfileDefinition(directory.Name, directory.FullName));
+                }
+            }
+        }
+
+        if (profiles.Count == 0
+            || !profiles.Any(profile =>
+                string.Equals(profile.Name, source.ProfileName, StringComparison.OrdinalIgnoreCase)))
+        {
+            profiles.Add(new Mo2ProfileDefinition(source.ProfileName, paths.ProfilePath));
+        }
+
+        return CollectionHelpers.ReadOnly(
+            profiles
+                .GroupBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase));
+    }
+
     private static IReadOnlyList<DirectoryInfo> EnumerateModDirectories(
         string modsPath,
         List<Diagnostic> diagnostics)

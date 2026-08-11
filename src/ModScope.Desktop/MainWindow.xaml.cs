@@ -11,7 +11,8 @@ public partial class MainWindow : Window
 {
     private const string AppHostName = "appassets.modscope";
     private readonly DesktopSessionController _controller = new();
-    private bool _appShellReady;
+    private bool _toolbarReady;
+    private bool _contextReady;
 
     public MainWindow()
     {
@@ -24,13 +25,17 @@ public partial class MainWindow : Window
         try
         {
             await Browser.EnsureCoreWebView2Async();
-            await AppShell.EnsureCoreWebView2Async();
+            await ToolbarShell.EnsureCoreWebView2Async();
+            await ContextWebView.EnsureCoreWebView2Async();
 
             Browser.NavigationCompleted += Browser_NavigationCompleted;
             Browser.CoreWebView2.DocumentTitleChanged += Browser_DocumentTitleChanged;
-            AppShell.NavigationStarting += AppShell_NavigationStarting;
-            AppShell.NavigationCompleted += AppShell_NavigationCompleted;
-            AppShell.CoreWebView2.WebMessageReceived += AppShell_WebMessageReceived;
+            ToolbarShell.NavigationStarting += AppShell_NavigationStarting;
+            ToolbarShell.NavigationCompleted += AppShell_NavigationCompleted;
+            ToolbarShell.CoreWebView2.WebMessageReceived += AppShell_WebMessageReceived;
+            ContextWebView.NavigationStarting += AppShell_NavigationStarting;
+            ContextWebView.NavigationCompleted += AppShell_NavigationCompleted;
+            ContextWebView.CoreWebView2.WebMessageReceived += AppShell_WebMessageReceived;
 
             var webAssetsPath = Path.Combine(AppContext.BaseDirectory, "WebAssets");
             if (!Directory.Exists(webAssetsPath))
@@ -39,11 +44,8 @@ public partial class MainWindow : Window
                     $"The Web UI assets are missing: {webAssetsPath}. Run scripts/build.ps1.");
             }
 
-            AppShell.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                AppHostName,
-                webAssetsPath,
-                CoreWebView2HostResourceAccessKind.DenyCors);
-            AppShell.Source = new Uri($"https://{AppHostName}/index.html");
+            ConfigureFrontend(ToolbarShell, webAssetsPath, "toolbar");
+            ConfigureFrontend(ContextWebView, webAssetsPath, "context");
 
             var demoPage = Path.Combine(AppContext.BaseDirectory, "Fixtures", "alpha-mod.html");
             Browser.Source = File.Exists(demoPage)
@@ -53,11 +55,23 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             _controller.SetStatus("WebView2 initialization failed.");
-            if (AppShell.CoreWebView2 is not null)
+            if (ToolbarShell.CoreWebView2 is not null || ContextWebView.CoreWebView2 is not null)
             {
                 SendError("browser.initialization.failed", exception.Message);
             }
         }
+    }
+
+    private static void ConfigureFrontend(
+        Microsoft.Web.WebView2.Wpf.WebView2 webView,
+        string webAssetsPath,
+        string surface)
+    {
+        webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+            AppHostName,
+            webAssetsPath,
+            CoreWebView2HostResourceAccessKind.DenyCors);
+        webView.Source = new Uri($"https://{AppHostName}/index.html?surface={surface}");
     }
 
     private void AppShell_NavigationStarting(
@@ -74,14 +88,28 @@ public partial class MainWindow : Window
         object? sender,
         CoreWebView2NavigationCompletedEventArgs e)
     {
+        var webView = sender as Microsoft.Web.WebView2.Wpf.WebView2;
+        if (webView is null)
+        {
+            return;
+        }
+
         if (!e.IsSuccess)
         {
             SendError("frontend.navigation.failed", e.WebErrorStatus.ToString());
             return;
         }
 
-        _appShellReady = true;
-        SendMessage("ready", new { });
+        if (ReferenceEquals(webView, ToolbarShell))
+        {
+            _toolbarReady = true;
+        }
+        else if (ReferenceEquals(webView, ContextWebView))
+        {
+            _contextReady = true;
+        }
+
+        SendMessageTo(webView, "ready", new { });
         SendState();
     }
 
@@ -165,10 +193,41 @@ public partial class MainWindow : Window
                 SendState(command.RequestId);
                 break;
             }
+            case "knowledge.switchProfile":
+            {
+                var payload = BridgeProtocol.ReadPayload<SwitchProfilePayload>(command.Payload);
+                if (string.IsNullOrWhiteSpace(payload.ProfileName))
+                {
+                    throw new BridgeProtocolException("The profile name is required.");
+                }
+
+                _controller.SwitchProfile(payload.ProfileName);
+                SendState(command.RequestId);
+                break;
+            }
             case "identity.confirm":
             {
                 var payload = BridgeProtocol.ReadPayload<ConfirmIdentityPayload>(command.Payload);
                 _controller.ConfirmIdentity(payload.CandidateIdentity, payload.LocalModKey);
+                SendState(command.RequestId);
+                break;
+            }
+            case "layout.setContextVisible":
+            {
+                if (!command.Payload.TryGetProperty("visible", out var visible)
+                    || visible.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                {
+                    throw new BridgeProtocolException("The context visibility must be a boolean.");
+                }
+
+                var payload = BridgeProtocol.ReadPayload<SetContextVisiblePayload>(command.Payload);
+                _controller.SetContextVisible(payload.Visible);
+                ContextColumn.Width = payload.Visible
+                    ? new GridLength(2, GridUnitType.Star)
+                    : new GridLength(0);
+                ContextShell.Visibility = payload.Visible
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
                 SendState(command.RequestId);
                 break;
             }
@@ -267,7 +326,7 @@ public partial class MainWindow : Window
 
     private void SendState(string? requestId = null)
     {
-        if (!_appShellReady || AppShell.CoreWebView2 is null)
+        if ((!_toolbarReady && !_contextReady) || Browser.CoreWebView2 is null)
         {
             return;
         }
@@ -284,7 +343,7 @@ public partial class MainWindow : Window
     private void SendError(string code, string message, string? requestId = null)
     {
         _controller.SetStatus(message);
-        if (!_appShellReady || AppShell.CoreWebView2 is null)
+        if (!_toolbarReady && !_contextReady)
         {
             return;
         }
@@ -295,12 +354,25 @@ public partial class MainWindow : Window
 
     private void SendMessage<T>(string kind, T payload, string? requestId = null)
     {
-        if (AppShell.CoreWebView2 is null)
+        var message = BridgeProtocol.SerializeMessage(kind, payload, requestId);
+        if (_toolbarReady && ToolbarShell.CoreWebView2 is not null)
         {
-            return;
+            ToolbarShell.CoreWebView2.PostWebMessageAsJson(message);
         }
 
-        AppShell.CoreWebView2.PostWebMessageAsJson(
+        if (_contextReady && ContextWebView.CoreWebView2 is not null)
+        {
+            ContextWebView.CoreWebView2.PostWebMessageAsJson(message);
+        }
+    }
+
+    private static void SendMessageTo<T>(
+        Microsoft.Web.WebView2.Wpf.WebView2 webView,
+        string kind,
+        T payload,
+        string? requestId = null)
+    {
+        webView.CoreWebView2?.PostWebMessageAsJson(
             BridgeProtocol.SerializeMessage(kind, payload, requestId));
     }
 }

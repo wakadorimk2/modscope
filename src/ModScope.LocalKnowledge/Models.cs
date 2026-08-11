@@ -15,9 +15,17 @@ public sealed record Mo2SourceDefinition(
     string ProfilePath,
     string ModsPath);
 
+public sealed record Mo2ProfileDefinition(
+    string Name,
+    string ProfilePath);
+
 public interface IMo2SnapshotReader
 {
     LocalModSnapshot Read(
+        Mo2SourceDefinition source,
+        CancellationToken cancellationToken = default);
+
+    IReadOnlyList<Mo2ProfileDefinition> ListProfiles(
         Mo2SourceDefinition source,
         CancellationToken cancellationToken = default);
 }

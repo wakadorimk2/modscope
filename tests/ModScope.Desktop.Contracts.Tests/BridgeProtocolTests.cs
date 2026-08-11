@@ -88,4 +88,33 @@ public sealed class BridgeProtocolTests
             "browser.url.invalid",
             document.RootElement.GetProperty("payload").GetProperty("code").GetString());
     }
+
+    [Fact]
+    public void ParsesProfileSwitchAndContextVisibilityCommands()
+    {
+        var profileEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "profile-1",
+              "command": "knowledge.switchProfile",
+              "payload": { "profileName": "Alternate" }
+            }
+            """);
+        var profilePayload = BridgeProtocol.ReadPayload<SwitchProfilePayload>(profileEnvelope.Payload);
+
+        var layoutEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "layout-1",
+              "command": "layout.setContextVisible",
+              "payload": { "visible": false }
+            }
+            """);
+        var layoutPayload = BridgeProtocol.ReadPayload<SetContextVisiblePayload>(layoutEnvelope.Payload);
+
+        Assert.Equal("Alternate", profilePayload.ProfileName);
+        Assert.False(layoutPayload.Visible);
+    }
 }
