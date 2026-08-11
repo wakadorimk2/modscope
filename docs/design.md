@@ -771,3 +771,85 @@ Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡
 - GUIがquery layerの派生データだけを利用する
 - write planeをread planeから分離できる
 - 7DTD固有解析を壊さずにGame Adapterを追加できる
+
+## 24. Web UI presentation layer
+
+2026-08-11のWeb UI実装依頼により、既存WPF画面をWeb frontendへ移行する縦切りを追加します。
+
+### 24.1 Responsibility boundary
+
+- .NET / C#はsource of truthです。
+- Local KnowledgeとQueryは、MO2、filesystem、profile、XML、diagnosticを担当します。
+- Web frontendは、表示、navigation、identity confirmation、progressive disclosureを担当します。
+- Web frontendは、MO2 parsing、Local Mod Knowledge、XML semantics、write operationを持ちません。
+- ModScope.Desktop.ContractsはQuery modelとfrontendの間のUI専用DTOです。
+- Contracts projectはQuery projectを参照しません。
+- Desktop hostだけがQuery modelをUI contractへ変換します。
+
+### 24.2 Two WebView2 surfaces
+
+Desktopは2つのWebView2を左右に配置します。
+
+- Browser WebView2：ユーザーが閲覧する外部Web page
+- App WebView2：ModScope.Webのbrowser chrome、Local context、Inspector
+
+任意サイトをfrontendのiframeへ移しません。
+Browser WebView2へWPF panelを重ねません。
+WPFはwindow、WebView2 host、native bridgeに限定します。
+
+2面構成は情報設計を検証する暫定surfaceです。
+Local contextは将来drawerまたはoverlayへ折り畳めるようにします。
+
+### 24.3 Bridge contract
+
+Web frontendとDesktop hostはWebView2 WebMessageを使います。
+
+JSON contract versionは'1'です。
+JSON propertyはcamelCaseです。
+日時はUTC ISO-8601です。
+
+frontendからhostへ送るcommandは次です。
+
+- browser.navigate
+- browser.back
+- browser.forward
+- browser.reload
+- browser.observe
+- knowledge.useFixture
+- knowledge.loadSource
+- identity.confirm
+- inspector.open
+
+hostからfrontendへ送るmessageは、state、error、readyです。
+stateはUI stateの完全なsnapshotです。
+
+Hostは次を検証します。
+
+- message source origin
+- contract version
+- request id
+- command name
+- payload shape
+- Browser URL scheme
+
+Browser WebView2へlocal context、absolute MO2 path、LocalModSnapshotを送信しません。
+Observeは固定scriptでbody textをbounded previewとして取得します。
+Inspectorはinspector.open commandの後に取得します。
+
+### 24.4 Frontend build
+
+Web frontendはSvelte、TypeScript、Viteを使用します。
+router、Redux、UI component library、theme systemはv0.1に追加しません。
+
+src/ModScope.Web/distをDesktop outputのWebAssetsへコピーします。
+App WebView2はvirtual host https://appassets.modscopeから静的frontendを読み込みます。
+App host以外のnavigationは拒否します。
+
+次のコマンドをcanonical buildとします。
+
+~~~powershell
+pwsh -NoProfile -File scripts/build.ps1
+~~~
+
+scriptはnpm ci、frontend check、frontend build、dotnet buildを順に実行します。
+node_modules、frontend dist、生成済みDesktop assetsはGit管理対象外です。

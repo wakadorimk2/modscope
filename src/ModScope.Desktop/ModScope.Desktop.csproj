@@ -12,11 +12,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ModScope.Desktop.Contracts\ModScope.Desktop.Contracts.csproj" />
     <ProjectReference Include="..\ModScope.Query\ModScope.Query.csproj" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\ModScope.Web\dist\**\*"
+             Condition="Exists('..\ModScope.Web\dist')"
+             Link="WebAssets\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\tests\Fixtures\7dtd-mo2-minimal\**\*"
           Link="Fixtures\7dtd-mo2-minimal\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
