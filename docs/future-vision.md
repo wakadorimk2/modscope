@@ -418,3 +418,15 @@ v0.1では、次を保留します。
 - AI chat、MCP、Codex automation
 - MO2 write
 - browser syncとChromium bundling
+
+## 17. Conclusion-first Web UI refinement
+
+現在のUIは、開発者向けのsource操作よりも、pageとLocal contextの結論を優先します。
+
+- 通常画面はページ、status、profile、enabled state、priority、version、evidenceを表示します。
+- identity確認は通常工程ではなく、認識失敗時の例外導線です。
+- Developer toolsはfixtureと明示sourceを検証するために残しますが、初期状態では閉じます。
+- Browser navigation完了後のObserveはDesktop hostが実行します。
+
+この段階では、MO2 profile自動検出、page identity自動認識、Profile切替を実装しません。
+Queryと契約を拡張した後に、起動時のLocal context自動更新とProfile選択を検討します。

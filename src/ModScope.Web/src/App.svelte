@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { createBridge, type Bridge } from './bridge';
-  import { initialState, type HostMessage, type UiState } from './contracts';
+  import { initialState, type BridgeErrorPayload, type HostMessage, type UiState } from './contracts';
 
   let state: UiState = initialState;
   let address = initialState.browser.url;
-  let identity = '';
   let selectedModKey = '';
   let inspectorOpen = false;
+  let pageDetailsOpen = false;
+  let developerToolsOpen = false;
+  let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
   let source = {
     instanceName: 'explicit-instance',
@@ -26,29 +28,57 @@
     if (message.kind === 'state') {
       state = message.payload;
       address = state.browser.url;
-      identity = state.identity.candidateIdentity;
       selectedModKey = state.identity.selectedLocalModKey ?? '';
+      lastError = null;
       if (state.inspector) {
         inspectorOpen = true;
       }
+      return;
+    }
+
+    if (message.kind === 'error') {
+      lastError = message.payload;
     }
   }
 
   function send(command: string, payload: unknown = {}) {
+    lastError = null;
     bridge?.send(command, payload);
   }
 
   function navigate() {
-    send('browser.navigate', { url: address.trim() });
+    const url = address.trim();
+    if (url.length > 0) {
+      send('browser.navigate', { url });
+    }
   }
 
   function loadSource() {
     send('knowledge.loadSource', source);
   }
 
+  function pageIdentity(): string {
+    return (
+      state.localContext?.candidateIdentity ||
+      state.identity.candidateIdentity ||
+      state.observation?.title ||
+      state.browser.title ||
+      ''
+    ).trim();
+  }
+
   function confirmIdentity(localModKey: string | null) {
+    const identity = pageIdentity();
+    if (identity.length === 0) {
+      lastError = {
+        code: 'identity.missing',
+        message: 'The page has no title. Enter a URL with a readable page title.'
+      };
+      return;
+    }
+
     send('identity.confirm', {
-      candidateIdentity: identity.trim(),
+      candidateIdentity: identity,
       localModKey
     });
   }
@@ -58,6 +88,15 @@
       inspectorOpen = true;
       send('inspector.open', { modKey: state.localContext.localModKey });
     }
+  }
+
+  function hasConclusion(): boolean {
+    const status = state.localContext?.status;
+    return status === 'installed' || status === 'notInstalled';
+  }
+
+  function showRecognitionFallback(): boolean {
+    return Boolean(state.observation) && !hasConclusion();
   }
 
   function formatLabel(value: string | null | undefined): string {
@@ -92,22 +131,24 @@
       <span class="eyebrow">MOD WORKSPACE</span>
       <h1>ModScope</h1>
     </div>
-    <p class="status-line">{state.statusMessage}</p>
+    <span class="muted-badge">Read-only</span>
   </header>
+
+  {#if lastError}
+    <p class="error-banner"><strong>{lastError.code}</strong> {lastError.message}</p>
+  {/if}
 
   <section class="browser-chrome panel">
     <div class="navigation-row">
-      <button class="icon-button" title="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
-      <button class="icon-button" title="Forward" disabled={!state.browser.canGoForward} onclick={() => send('browser.forward')}>→</button>
-      <button class="icon-button" title="Reload" onclick={() => send('browser.reload')}>↻</button>
+      <button class="icon-button" title="Back" aria-label="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
+      <button class="icon-button" title="Forward" aria-label="Forward" disabled={!state.browser.canGoForward} onclick={() => send('browser.forward')}>→</button>
+      <button class="icon-button" title="Reload" aria-label="Reload" onclick={() => send('browser.reload')}>↻</button>
       <input
         aria-label="URL"
         class="address-input"
         bind:value={address}
         onkeydown={(event) => event.key === 'Enter' && navigate()}
       />
-      <button class="primary-button" onclick={navigate}>Navigate</button>
-      <button class="secondary-button" onclick={() => send('browser.observe')}>Observe</button>
     </div>
     <div class="page-meta">
       <span class="page-title">{state.browser.title || 'No page title'}</span>
@@ -115,18 +156,154 @@
     </div>
   </section>
 
-  <section class="panel source-panel">
-    <div class="section-heading">
-      <div>
-        <span class="eyebrow">LOCAL KNOWLEDGE</span>
-        <h2>Choose a source</h2>
+  <section class="panel context-summary-panel">
+    {#if hasConclusion() && state.localContext}
+      <div class="summary-header">
+        <div>
+          <span class="eyebrow">LOCAL CONTEXT</span>
+          <h2>{pageIdentity() || 'Current page'}</h2>
+          <p class="summary-meta">
+            {state.localContext.profileName || 'Profile unknown'}
+            {#if state.localContext.knownVersion} · v{state.localContext.knownVersion}{/if}
+          </p>
+        </div>
+        <span class="status-chip {statusClass(state.localContext.status)}">
+          {formatLabel(state.localContext.status)}
+        </span>
       </div>
-      <div class="button-row">
-        <button class="secondary-button" onclick={() => send('knowledge.useFixture')}>Use fixture</button>
-        <button class="primary-button" onclick={loadSource}>Load source</button>
+
+      <div class="summary-grid">
+        <div><span>Enabled</span><strong>{formatLabel(state.localContext.enabledState)}</strong></div>
+        <div><span>Priority</span><strong>{state.localContext.priority ?? 'Unknown'}</strong></div>
+        <div><span>Version</span><strong>{state.localContext.knownVersion || 'Unknown'}</strong></div>
+        <div><span>Profile</span><strong>{state.localContext.profileName || 'Unknown'}</strong></div>
       </div>
+
+      {#if state.localContext.evidence.length > 0}
+        <div class="evidence-strip">
+          <span class="eyebrow">EVIDENCE</span>
+          {#each state.localContext.evidence as evidence}
+            <span class="evidence-tag">
+              <span class="status-dot" aria-hidden="true">✓</span>
+              {formatLabel(evidence.kind)} · <code>{evidence.source.relativePath}</code>
+            </span>
+          {/each}
+        </div>
+      {/if}
+
+      {#if state.localContext.uncertainties.length > 0}
+        <div class="notice-list">
+          {#each state.localContext.uncertainties as uncertainty}
+            <p class="notice">{uncertainty}</p>
+          {/each}
+        </div>
+      {/if}
+
+      {#if state.localContext.diagnostics.length > 0}
+        <div class="diagnostic-list">
+          {#each state.localContext.diagnostics as diagnostic}
+            <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+          {/each}
+        </div>
+      {/if}
+
+      {#if state.localContext.status === 'installed' && state.localContext.localModKey}
+        <button class="primary-button action-button" onclick={openInspector}>Inspect</button>
+      {/if}
+    {:else if showRecognitionFallback()}
+      <div class="exception-card">
+        <span class="eyebrow">RECOGNIZE</span>
+        <h2>Couldn’t recognize this page</h2>
+        <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
+
+        {#if state.localContext}
+          <span class="status-chip {statusClass(state.localContext.status)}">
+            {formatLabel(state.localContext.status)}
+          </span>
+        {/if}
+
+        {#if state.knowledge.candidates.length > 0}
+          <label class="select-label">
+            Local MOD
+            <select bind:value={selectedModKey}>
+              <option value="">Choose a local MOD</option>
+              {#each state.knowledge.candidates as candidate (candidate.modKey)}
+                <option value={candidate.modKey}>
+                  {candidate.displayName || candidate.directoryName}
+                  {candidate.version ? ' · v' + candidate.version : ''}
+                </option>
+              {/each}
+            </select>
+          </label>
+          <div class="action-row">
+            <button class="primary-button" disabled={!selectedModKey} onclick={() => confirmIdentity(selectedModKey)}>Choose local mod</button>
+            <button class="secondary-button" onclick={() => confirmIdentity(null)}>Mark as not installed</button>
+          </div>
+        {:else}
+          <p class="notice">No local MOD candidates are loaded. Open Developer tools to load a profile.</p>
+          <button class="secondary-button" onclick={() => (developerToolsOpen = true)}>Open Developer tools</button>
+        {/if}
+
+        {#if state.localContext?.uncertainties.length}
+          <div class="notice-list">
+            {#each state.localContext.uncertainties as uncertainty}
+              <p class="notice">{uncertainty}</p>
+            {/each}
+          </div>
+        {/if}
+
+        {#if state.localContext?.diagnostics.length}
+          <div class="diagnostic-list">
+            {#each state.localContext.diagnostics as diagnostic}
+              <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {:else}
+      <div class="empty-card">
+        <span class="eyebrow">LOCAL CONTEXT</span>
+        <h2>Browse a MOD page</h2>
+        <p class="subtle">ModScope will observe the current page and show local context here.</p>
+      </div>
+    {/if}
+  </section>
+
+  {#if state.observation}
+    <details class="panel page-details" bind:open={pageDetailsOpen}>
+      <summary>
+        <span>Page details</span>
+        <span class="status-chip status-{state.observation.extractionStatus}">{formatLabel(state.observation.extractionStatus)}</span>
+      </summary>
+      <div class="page-details-grid">
+        <div><span>Title</span><strong>{state.observation.title || 'Untitled page'}</strong></div>
+        <div><span>Observed</span><strong>{state.observation.observedAtUtc}</strong></div>
+      </div>
+      <pre>{state.observation.contentPreview || 'No body text was returned.'}</pre>
+      {#if state.observation.diagnostics.length > 0}
+        {#each state.observation.diagnostics as diagnostic}
+          <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+        {/each}
+      {/if}
+    </details>
+  {/if}
+
+  <details class="panel developer-tools" bind:open={developerToolsOpen}>
+    <summary>
+      <span>
+        <span class="eyebrow">DEVELOPER</span>
+        <strong>Developer tools</strong>
+      </span>
+      <span class="muted-badge">Read-only</span>
+    </summary>
+
+    <div class="developer-actions">
+      <button class="secondary-button" onclick={() => send('knowledge.useFixture')}>Use fixture</button>
+      <button class="primary-button" onclick={loadSource}>Load source</button>
+      <button class="secondary-button" onclick={() => send('browser.observe')}>Observe now</button>
     </div>
-    <details>
+
+    <details class="source-details">
       <summary>Explicit MO2 source paths</summary>
       <div class="source-grid">
         <label>Instance name<input bind:value={source.instanceName} /></label>
@@ -136,117 +313,17 @@
         <label>Mods path<input bind:value={source.modsPath} /></label>
       </div>
     </details>
+
     {#if state.knowledge.session}
-      <p class="subtle">
+      <p class="subtle developer-status">
         {state.knowledge.session.instanceName} / {state.knowledge.session.profileName}
         · {state.knowledge.candidates.length} MOD records
       </p>
     {/if}
-  </section>
-
-  <section class="panel identity-panel">
-    <div class="section-heading">
-      <div>
-        <span class="eyebrow">RECOGNIZE</span>
-        <h2>Confirm page identity</h2>
-      </div>
-      <span class="muted-badge">Manual confirmation</span>
-    </div>
-    <div class="identity-grid">
-      <label>
-        Page MOD identity
-        <input bind:value={identity} placeholder="Example: Alpha Mod" />
-      </label>
-      <label>
-        Local MOD record
-        <select bind:value={selectedModKey}>
-          <option value="">No local match</option>
-          {#each state.knowledge.candidates as candidate (candidate.modKey)}
-            <option value={candidate.modKey}>
-              {candidate.displayName || candidate.directoryName}
-              {candidate.version ? ' · v' + candidate.version : ''}
-            </option>
-          {/each}
-        </select>
-      </label>
-    </div>
-    <div class="button-row">
-      <button class="primary-button" onclick={() => confirmIdentity(selectedModKey || null)}>Confirm identity</button>
-      <button class="secondary-button" onclick={() => confirmIdentity(null)}>Confirm not installed</button>
-    </div>
-  </section>
-
-  <section class="panel context-panel">
-    <div class="section-heading">
-      <div>
-        <span class="eyebrow">LOCAL AWARENESS</span>
-        <h2>Current context</h2>
-      </div>
-      {#if state.localContext}
-        <span class:status-installed={state.localContext.status === 'installed'} class="status-chip {statusClass(state.localContext.status)}">
-          {formatLabel(state.localContext.status)}
-        </span>
-      {/if}
-    </div>
-
-    {#if state.localContext}
-      <div class="context-grid">
-        <div><span>Profile</span><strong>{state.localContext.profileName || 'Unknown'}</strong></div>
-        <div><span>Enabled</span><strong>{formatLabel(state.localContext.enabledState)}</strong></div>
-        <div><span>Priority</span><strong>{state.localContext.priority ?? 'Unknown'}</strong></div>
-        <div><span>Known version</span><strong>{state.localContext.knownVersion || 'Unknown'}</strong></div>
-      </div>
-
-      {#if state.localContext.evidence.length > 0}
-        <div class="subsection">
-          <span class="eyebrow">EVIDENCE</span>
-          {#each state.localContext.evidence as evidence}
-            <div class="evidence-row">
-              <span class="status-chip status-source">{formatLabel(evidence.kind)}</span>
-              <code>{evidence.source.relativePath}</code>
-            </div>
-          {/each}
-        </div>
-      {/if}
-
-      {#if state.localContext.uncertainties.length > 0}
-        <div class="subsection">
-          <span class="eyebrow">UNCERTAINTY</span>
-          {#each state.localContext.uncertainties as uncertainty}
-            <p class="notice">{uncertainty}</p>
-          {/each}
-        </div>
-      {/if}
-
-      {#if state.localContext.diagnostics.length > 0}
-        <div class="subsection">
-          <span class="eyebrow">DIAGNOSTICS</span>
-          {#each state.localContext.diagnostics as diagnostic}
-            <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
-          {/each}
-        </div>
-      {/if}
-
-      <button class="wide-button" disabled={state.localContext.status !== 'installed'} onclick={openInspector}>
-        Inspect local evidence
-      </button>
-    {:else}
-      <p class="empty-state">Observe a page and confirm its identity to reveal local context.</p>
+    {#if state.statusMessage}
+      <p class="subtle developer-status">{state.statusMessage}</p>
     {/if}
-  </section>
-
-  {#if state.observation}
-    <section class="panel observation-panel">
-      <div class="section-heading">
-        <div>
-          <span class="eyebrow">OBSERVATION</span>
-          <h2>{state.observation.title || 'Untitled page'}</h2>
-        </div>
-        <span class="status-chip status-{state.observation.extractionStatus}">{formatLabel(state.observation.extractionStatus)}</span>
-      </div>
-      <pre>{state.observation.contentPreview || 'No body text was returned.'}</pre>
-    </section>
-  {/if}
+  </details>
 
   {#if inspectorOpen}
     <aside class="inspector-drawer">
@@ -255,7 +332,7 @@
           <span class="eyebrow">INSPECTOR</span>
           <h2>{state.inspector?.directoryName || 'Loading evidence'}</h2>
         </div>
-        <button class="icon-button" title="Close inspector" onclick={() => (inspectorOpen = false)}>×</button>
+        <button class="icon-button" title="Close inspector" aria-label="Close inspector" onclick={() => (inspectorOpen = false)}>×</button>
       </div>
 
       {#if state.inspector}
