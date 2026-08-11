@@ -126,6 +126,23 @@ MO2、7DTD、ModInfo.xml、Config XML、XML patch semanticsについて、推測
 - 7DTDで実際に必要になるまで、ゲーム横断の抽象化を増やしません。
 - 1つの大きな変更ではなく、小さく検証可能なvertical sliceで進めます。
 
+## `.serena/`の版管理とmemory
+
+- `.serena/project.yml`と`.serena/.gitignore`は共有設定として管理します。
+- `.serena/project.local.yml`と`.serena/cache/`は個人環境の設定と生成cacheとしてGitへ追加しません。
+- `.serena/memories/`は、レビュー済みの運用補助memoryだけを明示的に追加します。
+- onboardingで生成したmemoryは下書きとして扱います。
+- memoryは、Serenaの使い方、探索入口、検証手順、文書への参照を記録します。
+- memoryをModScopeの製品仕様の正本にしません。
+- `AGENTS.md`と`docs/`がmemoryと競合した場合は、`AGENTS.md`と`docs/`を優先します。
+- memoryへ秘密情報、認証情報、個人パス、raw log、短期作業履歴を保存しません。
+- memoryをcommitする前に、差分、機密情報、正本との重複、鮮度を確認します。
+- memoryを追加するときは、対象パスを明示してGitへ追加します。
+- Serenaの`read_only: true`は使用しません。
+- コード編集、任意shell、JetBrains編集、Serenaプロジェクト削除は`.serena/project.yml`の`excluded_tools`で除外します。
+- `write_memory`、`edit_memory`、`delete_memory`、`rename_memory`は明示依頼と差分レビューを前提に使用します。
+- Serenaの更新後は、`get_current_config`で編集ツールの除外漏れを確認します。
+
 ## 報告とコミュニケーション
 
 - ユーザーの言語を使います。
