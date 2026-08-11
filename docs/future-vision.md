@@ -2,102 +2,246 @@
 
 ## 1. 目的
 
-ModScopeの最終ゴールは、MO2で管理された7DTD MOD空間を、次の2つの利用者が理解できる状態にすることです。
+ModScopeの将来像は、MODの発見、評価、導入判断、問題調査を、Web pageとlocal environmentの同じWorkspaceで行える状態です。
 
-- AI agent：必要な証拠だけを取得し、短いqueryでMOD空間を探索する
-- 人間：MOD構成、変更の影響、競合、最終結果を無理なく理解する
+ModScopeはMod Managerではありません。MO2をsource of truthとして残します。ModScopeは、MO2から再生成可能なLocal Mod Knowledgeと、Web pageに対するLocal contextを提供します。
 
-ModScopeはMO2を置き換えません。MO2をsource of truthとして残し、ModScopeは再生成可能なindex、解析結果、read modelを提供します。
+Web pageはprimary surfaceです。Local contextはprogressive disclosureします。Inspectorは、必要なときだけ根拠と技術詳細を開きます。
 
-## 2. 最終的な利用体験
+## 2. 中心となる利用体験
 
-### AI agent
+### 2.1 Human browser
 
-AI agentは、数百MODと数千XML patchを毎回全文読みません。
+ユーザーは、Nexus Mods、ランキングサイト、GitHub、Wiki、forum、作者サイト、ガイドサイトなどを自由に閲覧します。
 
-次のような質問を、対象を絞った結果で処理します。
+ModScopeは、現在のpageを主画面に置きます。page observationから候補MODを示します。v0.1では、ユーザーがMOD identityを確認します。
 
-- gunAK47を変更しているMODはどれか
-- items.xmlに触っている有効MODはどれか
-- 同じXPathまたはattributeを変更するMODはあるか
-- このMODが上書きする、または上書きされる対象は何か
-- ロード順によって結果が変わりそうな箇所はどこか
-- static解析とruntime観測が一致しない箇所はどこか
+確認後、ModScopeはcurrent profileとのLocal contextを表示します。
 
-結果は、結論、根拠、source path、priority、uncertaintyを含む説明単位にします。
+- installed / not installed / unresolved
+- active profile
+- enabled状態
+- priority
+- known version
+- known dependencies
+- known overlap
+- possible overlap
+- unknownまたはnot assessedの理由
 
-### 人間
+詳細が必要な場合だけInspectorを開きます。
 
-人間向けのGUIは、情報を一度に多く表示しません。
+### 2.2 InspectorとCompare
 
-最初に、次の情報を表示します。
-
-- 現在のprofileの概要
-- 重要な警告
-- 影響の大きいMODまたはfeature
-- 競合の可能性
-- 次に確認すべき対象
-
-利用者がMOD、feature、targetを選択した後に、詳細を表示します。
-
-## 3. GUIの設計原則
-
-### 3.1 情報を段階的に表示する
-
-初期画面には概要だけを表示します。詳細は、検索、filter、MOD選択、target選択の後に表示します。
-
-### 3.2 重要性を説明する
-
-単に「競合あり」と表示しません。
-
-次の順序で説明します。
+Inspectorは、結論からevidenceへ進む構造にします。
 
 1. 何が起きているか
 2. なぜ重要か
-3. どのMODが関係するか
-4. どのpriorityが関係するか
-5. どの証拠があるか
-6. 何が未確認か
+3. 関係するMODとprofile
+4. priorityとoperation
+5. static evidenceまたはruntime evidence
+6. 未確認事項
+7. 必要な場合だけraw XML、XPath、attribute、patch fragment
 
-### 3.3 技術詳細を隠しすぎない
+Compareは、候補MODとcurrent profileの関係を説明します。単なる一致件数を主結果にしません。
 
-raw XML、XPath、attribute、patch fragment、ロード順は、詳細画面から確認できるようにします。
+### 2.3 Agent
 
-ただし、技術詳細を初期画面へ押し出しません。summaryからevidenceへ進める構造にします。
+Agentは、数百MODと数千XML patchを毎回全文読みません。
 
-### 3.4 巨大な表とgraphを初期表示しない
+Agentは、次のようなqueryをLocal Mod Knowledgeへ送ります。
 
-巨大なMOD表やconflict graphを、初期画面の中心に置きません。
+- このpageのMODはinstalledか
+- 現在のprofileでenabledか
+- このMODに関係するfiles、targets、XPathは何か
+- 同じtargetやXPathを変更するMODは何か
+- priorityによって結果が変わりそうな箇所は何か
+- static evidenceとruntime evidenceが一致しない箇所は何か
 
-必要な対象を選択した後に、関係する部分だけを表示します。graphを表示する場合も、局所的なsubgraphに限定します。
+結果は、結論、対象、根拠、source reference、priority、uncertainty、diagnosticを含む小さな説明単位にします。
 
-### 3.5 色だけに依存しない
+AgentはCodexに限定しません。CLI、structured files、local API、MCP、その他のagent-friendly interfaceから、共通のread modelへ接続できる構造を目指します。
 
-状態は、文章、アイコン、構造、ラベル、順序で説明します。色は補助情報とします。
+## 3. Product principles
 
-## 4. 最終アーキテクチャ
+### Web page first
 
-最終的なModScopeは、次の責務を持ちます。
+MOD一覧を主画面にしません。ユーザーが現在見ているpageを主画面にします。
 
-1. MO2 Adapter
-2. 7DTD Adapter
-3. source snapshot
-4. normalized model
-5. forward / reverse index
-6. Query / Search layer
-7. semantic Conflict Analyzer
-8. RuntimeOCD Adapter
-9. GUI read model
-10. optional write layer
-11. optional game adapter
+### Local context is progressive disclosure
 
-各責務は、source data、derived data、evidence、inferenceを混ぜません。
+local metadata、installed状態、profile、overlap、dependenciesを必要な範囲で表示します。raw XMLと巨大なgraphを初期表示しません。
 
-## 5. Semantic conflict analysis
+### Everything useful without AI
 
-最終的なConflict Analyzerは、ファイル名の一致だけを検出しません。
+browse、inspect、compare、local environmentの理解は、AIなしで成立します。
 
-次を考慮します。
+### Everything easy to inspect or automate with AI
+
+人間向け表示とagent向け出力は同じ根拠へリンクします。AIだけの隠れた状態を作りません。
+
+### Evidence before inference
+
+source、normalized value、static evidence、runtime evidence、inference、uncertainty、diagnosticを分離します。
+
+### Read-only first
+
+MO2を変更しません。writeは別planeとして扱います。
+
+### Site-independent and game-aware
+
+Nexus専用にしません。最初は7DTD + MO2に集中します。将来のSite AdapterとGame Adapterの境界は維持します。
+
+## 4. 将来アーキテクチャ
+
+```text
+Human browser surface
+  -> page observation
+  -> MOD identity confirmation
+  -> Local context
+  -> Inspector / Compare / Diagnosis
+
+Agent browser boundary
+  -> Web observation and evidence
+  -> agent read model
+
+MO2 source
+  -> MO2 Adapter
+  -> source snapshot
+  -> Game Adapter
+  -> Local Mod Knowledge
+  -> query / reverse index
+
+Runtime tool
+  -> Runtime Adapter
+  -> runtime evidence
+  -> evidence comparison
+
+Optional future write plane
+  -> dry-run
+  -> explicit approval
+  -> MO2 operation
+```
+
+各レイヤーは、責務と根拠の種類を共有しません。
+
+- Browsing LayerはWeb pageを扱います。
+- Local Mod Knowledge LayerはMO2 sourceから生成します。
+- Context LayerはpageのMOD identityとprofileを照合します。
+- Analysis Layerはstatic evidenceまたはruntime evidenceを解釈します。
+- Write planeはread planeから独立します。
+
+## 5. Local Mod Knowledgeの進化
+
+### 5.1 初期対象
+
+最初の対象は7DTD + MO2です。
+
+Local Mod Knowledgeは、次を扱います。
+
+- MO2 instanceとprofile
+- modlist
+- enabled状態
+- priority
+- MOD directory
+- ModInfo.xml
+- MOD内file list
+- Config XML
+- XML patch operation
+- target XML
+- XPath
+- entity、property、attribute
+- reverse reference
+- source path
+- parser version
+- diagnostics
+
+### 5.2 将来の知識拡張
+
+必要性が確認できた場合に、次を追加します。
+
+- game versionとの関係
+- known dependencies
+- compatibility guideとの関係
+- Web pageのauthor、version、category
+- user-confirmed tags
+- static conflict candidates
+- runtime-observed changes
+- effective resultの説明
+
+Web pageの情報とMO2の事実を同じsourceとして扱いません。各値のprovenanceを保持します。
+
+## 6. Browsing LayerとSite Adapter
+
+### 6.1 Generic page observation
+
+未知サイトでも、URL、title、基本page content、取得時刻、extraction statusを扱えることを目指します。
+
+pageからMOD identityが自動確定しない場合があります。その場合は、ユーザー確認またはunresolvedを使います。
+
+### 6.2 Site Adapter
+
+既知サイトの構造化情報は、Site Adapterから追加します。
+
+候補情報は、MOD name、author、version、game、required game version、dependencies、download information、description、categoryです。
+
+Site Adapterは任意です。Site Adapterがない場合も、generic page observationを利用できます。
+
+Site Adapterは、ModScopeのcore identity registryにはしません。ページ構造の変化、認証、rate limit、利用規約、licenseを考慮します。
+
+### 6.3 Human browserとagent browser
+
+Human browserは、閲覧、navigation、ユーザー確認を主目的にします。
+
+Agent browserは、Web explorationとevidence取得を主目的にします。
+
+同じLocal Mod Knowledgeを利用できます。ただし、browser engine、login session、vendor API、操作UIは共有前提にしません。
+
+Kitesurfなどの外部backendは候補です。ModScopeを特定backendに依存させません。
+
+## 7. Browser engineの調査方針
+
+Browser engineを自作しません。
+
+候補は次のとおりです。
+
+- Windows WebView2などのembedded WebView
+- 既存system browserとの連携
+- browser extensionとlocal companion
+- browser automationを使うprototype
+
+評価項目は次のとおりです。
+
+- navigationとJavaScript互換性
+- authenticationとcookie
+- page observationの取得
+- local dataとのsecurity boundary
+- page scriptからの隔離
+- Windows配布と更新
+- licensingとmaintenance
+- Site Adapterとの接続性
+
+最終選定は、最小vertical sliceで検証した後に行います。
+
+## 8. Codexとexternal agent integration
+
+Codexは、ModScopeのcore productではありません。Codexは、Local Mod Knowledgeを利用できるagentの一つです。
+
+agent accessは、次の境界で設計します。
+
+- 小さなquery result
+- source reference
+- evidence type
+- uncertainty
+- diagnostic
+- raw detailへの明示的な参照
+
+MCP、local API、CLI、structured filesのどれを採用するかは後で比較します。transportをLocal Mod Knowledgeの意味モデルに埋め込みません。
+
+## 9. Semantic conflict analysis
+
+将来のConflict Analyzerは、同名fileの一致だけを検出しません。
+
+次を扱える構造を目指します。
 
 - append
 - prepend
@@ -107,161 +251,149 @@ raw XML、XPath、attribute、patch fragment、ロード順は、詳細画面か
 - removeattribute
 - insertBefore
 - insertAfter
-- その他の7DTD XML patch semantics
-- XPath
+- XPath interaction
 - target XML
 - attribute
 - operation sequence
 - MO2 priority
 
-解析結果には、少なくとも次を含めます。
+結果には、次を含めます。
 
-- 競合対象
+- conflict candidate
 - 関係するMOD
 - operation sequence
-- priority
 - expected effective result
 - static evidence
 - confidence
-- 未解釈のoperation
+- unknown operation
 - 判定不能の理由
 
-判定不能な状態を、正常または競合と断定しません。
+判定不能な状態を、正常またはconflictと断定しません。
 
-## 6. RuntimeOCDとの連携
+## 10. Runtime evidence
 
-RuntimeOCDの結果は、static analysisの代替ではありません。
+RuntimeOCDは、検証と補強のための外部実装です。ModScopeの中心ではありません。
 
-ModScopeは、次の2種類のevidenceを分けて保持します。
+Runtime Adapterは、license、公開仕様、input、output、ログ形式を確認してから追加します。
 
-- static evidence：ファイルとpatchから導いた事実
-- runtime evidence：実ゲーム実行時に観測された事実
+保持するruntime evidenceは、次のとおりです。
 
-将来は、次を比較します。
+- evidence source
+- tool version
+- game version
+- capture time
+- MOD identity
+- targetまたは関連target
+- observed operationまたはresult
+- raw log reference
+- import diagnostic
 
-- staticにはあるがruntimeで観測されない変更
-- runtimeで観測されたがstaticに対応しない変更
-- staticのeffective resultとruntime resultの差異
-- load order、条件分岐、runtime stateによる差異
+static evidenceとruntime evidenceを比較します。差異はinferenceまたはdiagnosticとして追跡します。
 
-RuntimeOCDのコードをコピーする前提にはしません。Adapter接続、ログ取り込み、ライセンス確認を基本とします。
+## 11. Read / writeの将来境界
 
-## 7. Read / writeの将来境界
+Read planeは、MO2 source、snapshot、Local Mod Knowledge、query、Inspector、analysisを扱います。
 
-### Read plane
+Write planeは、必要性が確認できた場合だけ追加します。
 
-read planeは、MO2 sourceを読み取り、snapshot、index、query result、解析結果を生成します。
+候補はenable / disable、reorder、profile変更です。
 
-### Write plane
+Write planeには、次を要求します。
 
-write planeは、将来必要になった場合だけ追加します。
+- read planeからの独立
+- dry-run
+- 変更前後のdiff
+- 対象profileとMODの明示
+- 明示承認
+- 失敗時の復旧方針
+- MO2の実仕様に基づく検証
 
-候補は次のとおりです。
+Write planeが追加されても、ModScopeはMod Managerにはなりません。
 
-- enable / disable
-- reorder
-- profile変更
-- 変更の適用
+## 12. Roadmap
 
-write planeは、次の条件を満たす必要があります。
+### Phase 0：設計、仕様確認、fixture
 
-- read planeと独立している
-- dry-runを提供する
-- 変更前後の差分を表示する
-- 対象profileとMODを明示する
-- ユーザーの明示承認を要求する
-- 失敗時の復旧手段を定義する
-- MO2の実仕様に基づく
+source boundary、page observation、MOD identity confirmation、Local context、evidence modelを定義します。
 
-## 8. ゲーム横断のescape hatch
+### Phase 1：v0.1 Browser-first vertical slice
 
-最初は7DTDとMO2だけを対象にします。
+7DTD + MO2の1 profileをread-onlyで読み取ります。既存Web engine上でpage observationを取得します。ユーザー確認したMOD identityとcurrent profileを照合します。Inspectorで根拠を表示します。
 
-将来のゲーム対応を妨げないため、次の境界を維持します。
+v0.1は、site固有Adapter、複数game、完全なsemantic conflict、RuntimeOCD、MO2 write、特定agent backendを含めません。
 
-- source snapshot、file、evidence、queryは可能な範囲で汎用的にする
-- ModInfo.xmlや7DTD patch semanticsは7DTD Adapterに置く
-- Conflict Analyzerの意味論はgame-specific registryまたはadapterで扱う
-- 2つ目のゲームを実際に扱う必要が生じるまで抽象化を増やさない
+### Phase 2：Structured Local Mod Knowledge
 
-## 9. 段階的ロードマップ
+ModInfo、Config XML、patch operation、target、XPath、reverse indexを拡張します。
 
-### Phase 0：設計と仕様確認
+### Phase 3：Query、Inspector、必要なSite Adapter
 
-設計文書、実データfixture、MO2と7DTDの調査項目を準備します。
+neutral read modelを安定させます。必要性が確認できたsiteだけAdapterを追加します。
 
-完了条件は、実装者がsource boundaryとデータモデルを推測せずに作業を開始できることです。
+### Phase 4：Semantic conflict
 
-### Phase 1：source snapshot
+patch semantics、priority、operation sequence、effective resultを解析します。
 
-MO2 profile、modlist、enabled状態、priority、MOD directory、ファイル一覧をread-onlyで取得します。
+### Phase 5：Runtime evidence
 
-完了条件は、同じ入力から再現可能なsnapshotを生成できることです。
+外部runtime resultを取り込み、static resultと比較します。
 
-### Phase 2：structured index
+### Phase 6：Workspace UIの拡張
 
-ModInfo.xml、Config XML、patch operation、XPath、target XML、attributeを構造化します。
+Browser page、Local context、Inspector、Compare、Diagnosisを拡張します。高密度Mod Manager UIは作りません。
 
-完了条件は、MOD空間を全文探索せずに、対象XMLとXPathからMODへ戻れることです。
+### Phase 7：Controlled write
 
-### Phase 3：query surface
+必要性が確認できた場合に、dry-runと明示承認付きのMO2操作を追加します。
 
-AI agentと将来GUIが使うquery resultを提供します。
+### Phase 8：Game Adapter拡張
 
-完了条件は、source path、priority、enabled状態、evidenceを含む小さな結果を返せることです。
+第二gameへの需要と共通性が確認できた場合だけ対応します。
 
-### Phase 4：semantic conflict
-
-patch semantics、priority、operation sequenceを解析します。
-
-完了条件は、conflict、effective result、uncertaintyを根拠付きで説明できることです。
-
-### Phase 5：runtime evidence
-
-RuntimeOCDなどの外部結果をAdapter経由で取り込みます。
-
-完了条件は、static evidenceとruntime evidenceを比較し、差異を表示できることです。
-
-### Phase 6：低認知負荷GUI
-
-概要、検索、filter、段階的詳細表示、conflict detail、evidence表示を実装します。
-
-完了条件は、利用者が巨大な表やraw XMLを最初に読むことなく、重要な影響と確認対象を理解できることです。
-
-### Phase 7：controlled write
-
-必要性が確認できた場合に、dry-runと明示承認付きのMO2操作を実装します。
-
-完了条件は、read planeを壊さずに変更内容を事前確認できることです。
-
-### Phase 8：game adapter拡張
-
-第二ゲームへの需要と共通性が確認できた場合だけ対応します。
-
-完了条件は、7DTD固有の解析を壊さずに新しいgame adapterを追加できることです。
-
-## 10. 最終的な成功条件
+## 13. 最終的な成功条件
 
 ModScopeは、次の状態を目指します。
 
-- MO2の正本を変更せずにMOD空間を理解できる
-- AI agentが必要な証拠だけをqueryできる
-- 人間が低い認知負荷で影響範囲を確認できる
-- 同名ファイル競合とsemantic conflictを区別できる
-- static resultとruntime resultを比較できる
-- 解析結果の根拠と不確実性を追跡できる
+- Web上のMOD探索とlocal environmentの理解が一つのWorkspaceでつながる
+- AIなしでbrowse、inspect、compare、diagnoseが成立する
+- Agentが必要なevidenceだけをqueryできる
+- MO2のsource of truthを変更せずにlocal MOD空間を理解できる
+- page identity、local record、runtime resultのprovenanceを追跡できる
+- unknownとinferenceをverified factと区別できる
+- file overlapとsemantic conflictを区別できる
+- static evidenceとruntime evidenceを比較できる
 - GUIがquery layerの派生データだけを利用する
-- write操作がread planeから分離されている
-- 新しいgame adapterを必要な時だけ追加できる
+- write planeがread planeから分離されている
+- 必要なときだけSite AdapterとGame Adapterを追加できる
 
-## 11. 今後の判断基準
+## 14. Clear deferred work
+
+次は、要件と検証がそろうまで保留します。
+
+- Browser engineの最終選定
+- Browser engineの自作
+- 複数Site Adapter
+- agent Web backendの固定
+- Kitesurfなどへの必須依存
+- Codex専用integration
+- 複数game対応
+- 完全なXML patch semantics
+- RuntimeOCDの再実装
+- MO2 write
+- installerとdistribution
+- storage engineの固定
+- 大規模cloud同期
+
+## 15. 今後の判断基準
 
 新しい機能を追加する前に、次を確認します。
 
-- 実際のMO2または7DTDの問題を解決するか
-- AI agentまたは人間の探索コストを下げるか
+- Web上のMOD探索またはlocal environmentの理解を改善するか
+- Local Mod Knowledgeに属するか
+- 既存ブラウザ、MO2、external agentの責務を不必要に奪っていないか
+- 今のvertical sliceで検証可能か
 - source of truthを曖昧にしないか
 - read-only境界を壊さないか
+- evidenceとinferenceを混ぜないか
 - GUIの認知負荷を増やさないか
-- 将来のsemantic analysisやruntime comparisonを妨げないか
-- 現在のフェーズで検証可能な小さなsliceにできるか
+- 将来のsemantic analysis、runtime comparison、Game Adapterを妨げないか
