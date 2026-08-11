@@ -16,22 +16,28 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 
 ## 現在のフェーズ
 
-現在は設計フェーズです。現在の作業で変更できるファイルは、次の3ファイルだけです。
+明示的な実装依頼により、現在はLocal Knowledge基盤の実装フェーズです。
+
+今回の実装で変更できる範囲は、次のとおりです。
 
 - `AGENTS.md`
 - `docs/design.md`
-- `docs/future-vision.md`
+- `.serena/project.yml`
+- `global.json`
+- `ModScope.sln`
+- `src/ModScope.LocalKnowledge/`
+- `tests/ModScope.LocalKnowledge.Tests/`
+- `tests/Fixtures/`
 
-次の作業は、明示的な依頼があるまで開始しません。
+今回の実装では、次の対象を作成しません。
 
-- 実装コード
-- 依存関係
-- `package.json`、`pyproject.toml`などのmanifest
 - GUI実装
 - Browser engine実装
 - CLI実装
-- build環境
 - MO2実環境への書き込み
+
+C# / .NET 8のクラスライブラリとxUnitテストを使用します。
+匿名synthetic fixtureを検証の基準にします。
 
 v0.1は、旧来の「source snapshotとAI用indexだけ」の縛りでは定義しません。現在の製品仮説は、7DTD + MO2のLocal Mod Knowledgeと、最小のBrowse → Recognize → Local awareness → Inspectの縦切りです。
 

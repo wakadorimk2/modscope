@@ -1,0 +1,2 @@
+<!DOCTYPE configs [<!ENTITY external SYSTEM "file:///not/allowed">]>
+<configs>&external;</configs>
