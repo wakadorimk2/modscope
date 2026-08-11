@@ -4,7 +4,9 @@
 
 この文書は、ModScopeの製品定義、現在のアーキテクチャ、責務境界、v0.1の範囲を定義します。
 
-現在のリポジトリは設計フェーズです。実装コード、依存関係、GUI、Browser engine、CLIは作成しません。
+現在のリポジトリはLocal Knowledge基盤の実装フェーズです。
+初回実装は、C# / .NET 8のクラスライブラリとxUnitテストで構成します。
+GUI、Browser engine、CLI、MO2 writeは初回実装に含めません。
 
 v0.1は、AI用index単体ではありません。7DTD + MO2のLocal Mod Knowledgeと、最小のBrowse → Recognize → Local awareness → Inspectを検証するvertical sliceです。
 
@@ -593,7 +595,26 @@ Agent backendの選定は、Local Mod Knowledgeのschemaと分離します。
 - Site Adapter、Game Adapter、MO2 Adapterの責務を分離する
 - Codex、Kitesurf、SQLite、JSONL、MCPなどを必須の実装選択にしない
 
-後回しにすることは、実装言語、storage engine、CLI framework、GUI framework、transport、installer、MO2 write APIです。
+storage engine、CLI framework、GUI framework、transport、installer、MO2 write APIは後回しにします。
+
+### 18.1 初回実装の決定
+
+2026-08-11の明示的な実装依頼により、Local Knowledge基盤の初回実装を開始します。
+
+- 実装言語はC#です。
+- target frameworkは.NET 8です。
+- 成果物はクラスライブラリとxUnitテストです。
+- 検証入力は匿名synthetic fixtureです。
+- 入力パスはinstance、profile、modsを明示指定します。
+- MO2 sourceはread-onlyで扱います。
+- snapshot、normalized value、source reference、diagnosticを保持します。
+- `modlist.txt`のprofile orderを初回のpriority根拠として保持します。
+- file overwriteの勝者、semantic conflict、patch operationの意味解釈は行いません。
+
+Python、TypeScript、Browser先行の実装は今回の代替案として採用しません。
+
+匿名fixtureでは、実MO2環境と7DTD MODの形式差を完全には検証できません。
+実データによるread-only検証は、初回実装後の未確定事項として残します。
 
 ## 19. Risksとunknowns
 
