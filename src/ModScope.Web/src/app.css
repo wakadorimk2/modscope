@@ -13,6 +13,7 @@
 html,
 body,
 #app {
+  height: 100%;
   min-height: 100%;
 }
 
@@ -43,6 +44,80 @@ button:disabled {
   min-height: 100vh;
   padding: 18px;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(11, 17, 32, 0.98));
+}
+
+.toolbar-surface {
+  min-height: 100%;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(11, 17, 32, 0.98));
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+}
+
+.toolbar-navigation {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.toolbar-address {
+  flex: 1 1 auto;
+  min-width: 120px;
+  height: 34px;
+  padding: 7px 10px;
+}
+
+.profile-picker {
+  display: flex;
+  flex: 0 1 250px;
+  align-items: center;
+  gap: 4px;
+  min-width: 170px;
+  color: #cbd5e1;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.profile-picker select {
+  min-width: 0;
+  height: 34px;
+  padding: 6px 8px;
+}
+
+.toolbar-context-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  border-radius: 8px;
+  background: rgba(14, 116, 144, 0.22);
+  color: #bae6fd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shortcut-hint {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.error-notice {
+  margin: 5px 0 0;
+  padding: 5px 8px;
+  overflow: hidden;
+  border-left: 2px solid #fb7185;
+  background: rgba(127, 29, 29, 0.2);
+  color: #fecdd3;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand-bar,
@@ -259,6 +334,10 @@ select:focus {
 
 .context-summary-panel {
   min-height: 168px;
+}
+
+.diagnostics-panel {
+  padding-top: 12px;
 }
 
 .summary-header {
@@ -565,6 +644,19 @@ dd {
 
   .navigation-row {
     flex-wrap: wrap;
+  }
+
+  .toolbar-row {
+    flex-wrap: wrap;
+  }
+
+  .toolbar-address {
+    order: 2;
+    flex-basis: 100%;
+  }
+
+  .profile-picker {
+    flex: 1 1 auto;
   }
 
   .address-input {

@@ -65,9 +65,24 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
           priorityEvidence: null,
           diagnostics: []
         }
-      ]
+      ],
+      profiles: [{ name: 'default' }]
     };
     next.statusMessage = 'Mock Local Knowledge loaded.';
+  } else if (command === 'knowledge.switchProfile' && typeof payload === 'object' && payload !== null) {
+    const profileName = (payload as { profileName?: unknown }).profileName;
+    if (typeof profileName === 'string' && profileName.length > 0 && next.knowledge.session) {
+      next.knowledge.session = { ...next.knowledge.session, profileName };
+      next.identity = { candidateIdentity: '', selectedLocalModKey: null };
+      next.localContext = null;
+      next.inspector = null;
+      next.statusMessage = 'Mock profile switched.';
+    }
+  } else if (command === 'layout.setContextVisible' && typeof payload === 'object' && payload !== null) {
+    const visible = (payload as { visible?: unknown }).visible;
+    if (typeof visible === 'boolean') {
+      next.layout = { contextVisible: visible };
+    }
   }
   return next;
 }

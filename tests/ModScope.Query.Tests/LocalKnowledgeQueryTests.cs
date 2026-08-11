@@ -83,6 +83,73 @@ public sealed class LocalKnowledgeQueryTests
         Assert.Equal(PageObservation.MaxContentPreviewLength, page.BoundedContentPreview!.Length);
     }
 
+    [Fact]
+    public void ListsOnlyExplicitInstanceProfilesAndSwitchesReadOnlySession()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-profiles-");
+        try
+        {
+            var profilesPath = Directory.CreateDirectory(Path.Combine(root.FullName, "profiles"));
+            var defaultProfile = CreateProfile(profilesPath.FullName, "Default", "+Alpha Mod");
+            CreateProfile(profilesPath.FullName, "Alternate", "+Beta Mod");
+            CreateProfile(root.FullName, "OutsideCatalog", "+Alpha Mod");
+            var modsPath = Directory.CreateDirectory(Path.Combine(root.FullName, "mods"));
+            Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Alpha Mod"));
+            Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Beta Mod"));
+
+            var query = CreateQuery();
+            query.Load(new Mo2SourceInput(
+                "synthetic-instance",
+                "Default",
+                root.FullName,
+                defaultProfile,
+                modsPath.FullName));
+
+            Assert.Equal(
+                new[] { "Alternate", "Default" },
+                query.GetProfiles().Select(profile => profile.ProfileName));
+
+            var switched = query.SwitchProfile("Alternate");
+
+            Assert.Equal("Alternate", switched.ProfileName);
+            Assert.Contains(query.GetModCandidates(), candidate => candidate.DirectoryName == "Beta Mod");
+            Assert.DoesNotContain(query.GetProfiles(), profile => profile.ProfileName == "OutsideCatalog");
+            Assert.Throws<ArgumentException>(() => query.SwitchProfile("OutsideCatalog"));
+            Assert.Equal("Beta Mod", query.GetModCandidates().Single(candidate => candidate.DirectoryName == "Beta Mod").DirectoryName);
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void FallsBackToCurrentExplicitProfileWhenProfilesDirectoryIsMissing()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-profile-fallback-");
+        try
+        {
+            var profilePath = Directory.CreateDirectory(Path.Combine(root.FullName, "profile"));
+            File.WriteAllText(Path.Combine(profilePath.FullName, "modlist.txt"), "");
+            var modsPath = Directory.CreateDirectory(Path.Combine(root.FullName, "mods"));
+
+            var query = CreateQuery();
+            query.Load(new Mo2SourceInput(
+                "synthetic-instance",
+                "FixtureProfile",
+                root.FullName,
+                profilePath.FullName,
+                modsPath.FullName));
+
+            var profile = Assert.Single(query.GetProfiles());
+            Assert.Equal("FixtureProfile", profile.ProfileName);
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
     private static ILocalKnowledgeQuery CreateQuery()
     {
         return LocalKnowledgeQueryService.CreateDefault();
@@ -114,4 +181,11 @@ public sealed class LocalKnowledgeQueryTests
         AppContext.BaseDirectory,
         "Fixtures",
         "7dtd-mo2-minimal");
+
+    private static string CreateProfile(string profilesRoot, string name, string modList)
+    {
+        var profilePath = Directory.CreateDirectory(Path.Combine(profilesRoot, name));
+        File.WriteAllText(Path.Combine(profilePath.FullName, "modlist.txt"), modList);
+        return profilePath.FullName;
+    }
 }

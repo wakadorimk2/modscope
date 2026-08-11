@@ -3,6 +3,10 @@
   import { createBridge, type Bridge } from './bridge';
   import { initialState, type BridgeErrorPayload, type HostMessage, type UiState } from './contracts';
 
+  const surface = new URLSearchParams(window.location.search).get('surface') === 'toolbar'
+    ? 'toolbar'
+    : 'context';
+
   let state: UiState = initialState;
   let address = initialState.browser.url;
   let selectedModKey = '';
@@ -21,7 +25,13 @@
 
   onMount(() => {
     bridge = createBridge(handleHostMessage);
-    return bridge.connect();
+    const disconnect = bridge.connect();
+    window.addEventListener('keydown', handleShortcut);
+
+    return () => {
+      disconnect();
+      window.removeEventListener('keydown', handleShortcut);
+    };
   });
 
   function handleHostMessage(message: HostMessage) {
@@ -30,9 +40,7 @@
       address = state.browser.url;
       selectedModKey = state.identity.selectedLocalModKey ?? '';
       lastError = null;
-      if (state.inspector) {
-        inspectorOpen = true;
-      }
+      inspectorOpen = Boolean(state.inspector);
       return;
     }
 
@@ -50,6 +58,24 @@
     const url = address.trim();
     if (url.length > 0) {
       send('browser.navigate', { url });
+    }
+  }
+
+  function switchProfile(event: Event) {
+    const profileName = (event.currentTarget as HTMLSelectElement).value;
+    if (profileName.length > 0) {
+      send('knowledge.switchProfile', { profileName });
+    }
+  }
+
+  function toggleContext() {
+    send('layout.setContextVisible', { visible: !state.layout.contextVisible });
+  }
+
+  function handleShortcut(event: KeyboardEvent) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'i') {
+      event.preventDefault();
+      toggleContext();
     }
   }
 
@@ -125,126 +151,100 @@
   <title>ModScope</title>
 </svelte:head>
 
-<main class="shell">
-  <header class="brand-bar">
-    <div>
-      <span class="eyebrow">MOD WORKSPACE</span>
-      <h1>ModScope</h1>
-    </div>
-    <span class="muted-badge">Read-only</span>
-  </header>
+{#if surface === 'toolbar'}
+  <main class="toolbar-surface">
+    <div class="toolbar-row">
+      <div class="toolbar-navigation" aria-label="Browser navigation">
+        <button class="icon-button" title="Back" aria-label="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
+        <button class="icon-button" title="Forward" aria-label="Forward" disabled={!state.browser.canGoForward} onclick={() => send('browser.forward')}>→</button>
+        <button class="icon-button" title="Reload" aria-label="Reload" onclick={() => send('browser.reload')}>↻</button>
+      </div>
 
-  {#if lastError}
-    <p class="error-banner"><strong>{lastError.code}</strong> {lastError.message}</p>
-  {/if}
-
-  <section class="browser-chrome panel">
-    <div class="navigation-row">
-      <button class="icon-button" title="Back" aria-label="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
-      <button class="icon-button" title="Forward" aria-label="Forward" disabled={!state.browser.canGoForward} onclick={() => send('browser.forward')}>→</button>
-      <button class="icon-button" title="Reload" aria-label="Reload" onclick={() => send('browser.reload')}>↻</button>
       <input
         aria-label="URL"
-        class="address-input"
+        class="toolbar-address"
         bind:value={address}
         onkeydown={(event) => event.key === 'Enter' && navigate()}
       />
+
+      <label class="profile-picker">
+        <span>7 Days to Die ·</span>
+        <select
+          aria-label="Active profile"
+          value={state.knowledge.session?.profileName ?? ''}
+          disabled={state.knowledge.profiles.length === 0}
+          onchange={switchProfile}
+        >
+          {#if state.knowledge.profiles.length === 0}
+            <option value="">No profile</option>
+          {:else}
+            {#each state.knowledge.profiles as profile (profile.name)}
+              <option value={profile.name}>{profile.name}</option>
+            {/each}
+          {/if}
+        </select>
+      </label>
+
+      <button class="toolbar-context-button" onclick={toggleContext}>
+        {state.layout.contextVisible ? 'Context' : 'Show context'}
+      </button>
+      <span class="shortcut-hint">Ctrl/Cmd+I</span>
     </div>
-    <div class="page-meta">
-      <span class="page-title">{state.browser.title || 'No page title'}</span>
-      <span class="page-url">{state.browser.url}</span>
-    </div>
-  </section>
 
-  <section class="panel context-summary-panel">
-    {#if hasConclusion() && state.localContext}
-      <div class="summary-header">
-        <div>
-          <span class="eyebrow">LOCAL CONTEXT</span>
-          <h2>{pageIdentity() || 'Current page'}</h2>
-          <p class="summary-meta">
-            {state.localContext.profileName || 'Profile unknown'}
-            {#if state.localContext.knownVersion} · v{state.localContext.knownVersion}{/if}
-          </p>
-        </div>
-        <span class="status-chip {statusClass(state.localContext.status)}">
-          {formatLabel(state.localContext.status)}
-        </span>
+    {#if lastError}
+      <p class="error-notice"><strong>{lastError.code}</strong> {lastError.message}</p>
+    {/if}
+  </main>
+{:else}
+  <main class="shell">
+    <header class="brand-bar">
+      <div>
+        <span class="eyebrow">MOD WORKSPACE</span>
+        <h1>ModScope</h1>
       </div>
+      <span class="muted-badge">Read-only</span>
+    </header>
 
-      <div class="summary-grid">
-        <div><span>Enabled</span><strong>{formatLabel(state.localContext.enabledState)}</strong></div>
-        <div><span>Priority</span><strong>{state.localContext.priority ?? 'Unknown'}</strong></div>
-        <div><span>Version</span><strong>{state.localContext.knownVersion || 'Unknown'}</strong></div>
-        <div><span>Profile</span><strong>{state.localContext.profileName || 'Unknown'}</strong></div>
-      </div>
+    {#if lastError}
+      <p class="error-notice"><strong>{lastError.code}</strong> {lastError.message}</p>
+    {/if}
 
-      {#if state.localContext.evidence.length > 0}
-        <div class="evidence-strip">
-          <span class="eyebrow">EVIDENCE</span>
-          {#each state.localContext.evidence as evidence}
-            <span class="evidence-tag">
-              <span class="status-dot" aria-hidden="true">✓</span>
-              {formatLabel(evidence.kind)} · <code>{evidence.source.relativePath}</code>
-            </span>
-          {/each}
-        </div>
-      {/if}
-
-      {#if state.localContext.uncertainties.length > 0}
-        <div class="notice-list">
-          {#each state.localContext.uncertainties as uncertainty}
-            <p class="notice">{uncertainty}</p>
-          {/each}
-        </div>
-      {/if}
-
-      {#if state.localContext.diagnostics.length > 0}
-        <div class="diagnostic-list">
-          {#each state.localContext.diagnostics as diagnostic}
-            <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
-          {/each}
-        </div>
-      {/if}
-
-      {#if state.localContext.status === 'installed' && state.localContext.localModKey}
-        <button class="primary-button action-button" onclick={openInspector}>Inspect</button>
-      {/if}
-    {:else if showRecognitionFallback()}
-      <div class="exception-card">
-        <span class="eyebrow">RECOGNIZE</span>
-        <h2>Couldn’t recognize this page</h2>
-        <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
-
-        {#if state.localContext}
+    <section class="panel context-summary-panel">
+      {#if hasConclusion() && state.localContext}
+        <div class="summary-header">
+          <div>
+            <span class="eyebrow">LOCAL CONTEXT</span>
+            <h2>{pageIdentity() || 'Current page'}</h2>
+            <p class="summary-meta">
+              {state.localContext.profileName || 'Profile unknown'}
+              {#if state.localContext.knownVersion} · v{state.localContext.knownVersion}{/if}
+            </p>
+          </div>
           <span class="status-chip {statusClass(state.localContext.status)}">
             {formatLabel(state.localContext.status)}
           </span>
-        {/if}
+        </div>
 
-        {#if state.knowledge.candidates.length > 0}
-          <label class="select-label">
-            Local MOD
-            <select bind:value={selectedModKey}>
-              <option value="">Choose a local MOD</option>
-              {#each state.knowledge.candidates as candidate (candidate.modKey)}
-                <option value={candidate.modKey}>
-                  {candidate.displayName || candidate.directoryName}
-                  {candidate.version ? ' · v' + candidate.version : ''}
-                </option>
-              {/each}
-            </select>
-          </label>
-          <div class="action-row">
-            <button class="primary-button" disabled={!selectedModKey} onclick={() => confirmIdentity(selectedModKey)}>Choose local mod</button>
-            <button class="secondary-button" onclick={() => confirmIdentity(null)}>Mark as not installed</button>
+        <div class="summary-grid">
+          <div><span>Enabled</span><strong>{formatLabel(state.localContext.enabledState)}</strong></div>
+          <div><span>Priority</span><strong>{state.localContext.priority ?? 'Unknown'}</strong></div>
+          <div><span>Version</span><strong>{state.localContext.knownVersion || 'Unknown'}</strong></div>
+          <div><span>Profile</span><strong>{state.localContext.profileName || 'Unknown'}</strong></div>
+        </div>
+
+        {#if state.localContext.evidence.length > 0}
+          <div class="evidence-strip">
+            <span class="eyebrow">EVIDENCE</span>
+            {#each state.localContext.evidence as evidence}
+              <span class="evidence-tag">
+                <span class="status-dot" aria-hidden="true">✓</span>
+                {formatLabel(evidence.kind)} · <code>{evidence.source.relativePath}</code>
+              </span>
+            {/each}
           </div>
-        {:else}
-          <p class="notice">No local MOD candidates are loaded. Open Developer tools to load a profile.</p>
-          <button class="secondary-button" onclick={() => (developerToolsOpen = true)}>Open Developer tools</button>
         {/if}
 
-        {#if state.localContext?.uncertainties.length}
+        {#if state.localContext.uncertainties.length > 0}
           <div class="notice-list">
             {#each state.localContext.uncertainties as uncertainty}
               <p class="notice">{uncertainty}</p>
@@ -252,138 +252,207 @@
           </div>
         {/if}
 
-        {#if state.localContext?.diagnostics.length}
+        {#if state.localContext.diagnostics.length > 0}
           <div class="diagnostic-list">
             {#each state.localContext.diagnostics as diagnostic}
               <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
             {/each}
           </div>
         {/if}
-      </div>
-    {:else}
-      <div class="empty-card">
-        <span class="eyebrow">LOCAL CONTEXT</span>
-        <h2>Browse a MOD page</h2>
-        <p class="subtle">ModScope will observe the current page and show local context here.</p>
-      </div>
-    {/if}
-  </section>
 
-  {#if state.observation}
-    <details class="panel page-details" bind:open={pageDetailsOpen}>
-      <summary>
-        <span>Page details</span>
-        <span class="status-chip status-{state.observation.extractionStatus}">{formatLabel(state.observation.extractionStatus)}</span>
-      </summary>
-      <div class="page-details-grid">
-        <div><span>Title</span><strong>{state.observation.title || 'Untitled page'}</strong></div>
-        <div><span>Observed</span><strong>{state.observation.observedAtUtc}</strong></div>
-      </div>
-      <pre>{state.observation.contentPreview || 'No body text was returned.'}</pre>
-      {#if state.observation.diagnostics.length > 0}
-        {#each state.observation.diagnostics as diagnostic}
-          <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
-        {/each}
-      {/if}
-    </details>
-  {/if}
-
-  <details class="panel developer-tools" bind:open={developerToolsOpen}>
-    <summary>
-      <span>
-        <span class="eyebrow">DEVELOPER</span>
-        <strong>Developer tools</strong>
-      </span>
-      <span class="muted-badge">Read-only</span>
-    </summary>
-
-    <div class="developer-actions">
-      <button class="secondary-button" onclick={() => send('knowledge.useFixture')}>Use fixture</button>
-      <button class="primary-button" onclick={loadSource}>Load source</button>
-      <button class="secondary-button" onclick={() => send('browser.observe')}>Observe now</button>
-    </div>
-
-    <details class="source-details">
-      <summary>Explicit MO2 source paths</summary>
-      <div class="source-grid">
-        <label>Instance name<input bind:value={source.instanceName} /></label>
-        <label>Profile name<input bind:value={source.profileName} /></label>
-        <label>Instance root<input bind:value={source.instanceRootPath} /></label>
-        <label>Profile path<input bind:value={source.profilePath} /></label>
-        <label>Mods path<input bind:value={source.modsPath} /></label>
-      </div>
-    </details>
-
-    {#if state.knowledge.session}
-      <p class="subtle developer-status">
-        {state.knowledge.session.instanceName} / {state.knowledge.session.profileName}
-        · {state.knowledge.candidates.length} MOD records
-      </p>
-    {/if}
-    {#if state.statusMessage}
-      <p class="subtle developer-status">{state.statusMessage}</p>
-    {/if}
-  </details>
-
-  {#if inspectorOpen}
-    <aside class="inspector-drawer">
-      <div class="drawer-heading">
-        <div>
-          <span class="eyebrow">INSPECTOR</span>
-          <h2>{state.inspector?.directoryName || 'Loading evidence'}</h2>
-        </div>
-        <button class="icon-button" title="Close inspector" aria-label="Close inspector" onclick={() => (inspectorOpen = false)}>×</button>
-      </div>
-
-      {#if state.inspector}
-        {#if state.inspector.modInfo}
-          <div class="drawer-section">
-            <span class="eyebrow">METADATA</span>
-            <dl>
-              <dt>Display name</dt><dd>{state.inspector.modInfo.displayName || 'Unknown'}</dd>
-              <dt>Version</dt><dd>{state.inspector.modInfo.version || 'Unknown'}</dd>
-              <dt>Author</dt><dd>{state.inspector.modInfo.author || 'Unknown'}</dd>
-              <dt>Parse status</dt><dd>{formatLabel(state.inspector.modInfo.parseStatus)}</dd>
-            </dl>
-          </div>
+        {#if state.localContext.status === 'installed' && state.localContext.localModKey}
+          <button class="primary-button action-button" onclick={openInspector}>Inspect</button>
         {/if}
+      {:else if showRecognitionFallback()}
+        <div class="exception-card">
+          <span class="eyebrow">RECOGNIZE</span>
+          <h2>Couldn’t recognize this page</h2>
+          <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
 
-        <div class="drawer-section">
-          <span class="eyebrow">FILES · {state.inspector.files.length}</span>
-          <ul class="compact-list">
-            {#each state.inspector.files as file}
-              <li><code>{file.relativePath}</code><span>{sizeLabel(file.size)}</span></li>
-            {/each}
-          </ul>
-        </div>
+          {#if state.localContext}
+            <span class="status-chip {statusClass(state.localContext.status)}">
+              {formatLabel(state.localContext.status)}
+            </span>
+          {/if}
 
-        <div class="drawer-section">
-          <span class="eyebrow">XML · {state.inspector.xmlFiles.length}</span>
-          {#each state.inspector.xmlFiles as xml}
-            <details class="xml-item">
-              <summary><code>{xml.relativePath}</code><span>{formatLabel(xml.parseStatus)}</span></summary>
-              <p>{xml.rootElementName || 'Unknown root'} · {xml.elementCount} elements · {xml.attributeCount} attributes</p>
-              {#each xml.xpathCandidates as xpath}
-                <code class="block-code">{xpath.rawValue}</code>
+          {#if state.knowledge.candidates.length > 0}
+            <label class="select-label">
+              Local MOD
+              <select bind:value={selectedModKey}>
+                <option value="">Choose a local MOD</option>
+                {#each state.knowledge.candidates as candidate (candidate.modKey)}
+                  <option value={candidate.modKey}>
+                    {candidate.displayName || candidate.directoryName}
+                    {candidate.version ? ' · v' + candidate.version : ''}
+                  </option>
+                {/each}
+              </select>
+            </label>
+            <div class="action-row">
+              <button class="primary-button" disabled={!selectedModKey} onclick={() => confirmIdentity(selectedModKey)}>Choose local mod</button>
+              <button class="secondary-button" onclick={() => confirmIdentity(null)}>Mark as not installed</button>
+            </div>
+          {:else}
+            <p class="notice">No local MOD candidates are loaded. Open Developer tools to load a profile.</p>
+            <button class="secondary-button" onclick={() => (developerToolsOpen = true)}>Open Developer tools</button>
+          {/if}
+
+          {#if state.localContext?.uncertainties.length}
+            <div class="notice-list">
+              {#each state.localContext.uncertainties as uncertainty}
+                <p class="notice">{uncertainty}</p>
               {/each}
-              {#each xml.diagnostics as diagnostic}
+            </div>
+          {/if}
+
+          {#if state.localContext?.diagnostics.length}
+            <div class="diagnostic-list">
+              {#each state.localContext.diagnostics as diagnostic}
                 <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
               {/each}
-            </details>
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <div class="empty-card">
+          <span class="eyebrow">LOCAL CONTEXT</span>
+          <h2>Browse a MOD page</h2>
+          <p class="subtle">ModScope will observe the current page and show local context here.</p>
+        </div>
+      {/if}
+    </section>
+
+    {#if state.diagnostics.length > 0}
+      <section class="panel diagnostics-panel">
+        <span class="eyebrow">DIAGNOSTICS</span>
+        {#each state.diagnostics as diagnostic}
+          <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+        {/each}
+      </section>
+    {/if}
+
+    {#if state.observation}
+      <details class="panel page-details" bind:open={pageDetailsOpen}>
+        <summary>
+          <span>Page details</span>
+          <span class="status-chip {statusClass(state.observation.extractionStatus)}">{formatLabel(state.observation.extractionStatus)}</span>
+        </summary>
+        <div class="page-details-grid">
+          <div><span>Title</span><strong>{state.observation.title || 'Untitled page'}</strong></div>
+          <div><span>Observed</span><strong>{state.observation.observedAtUtc}</strong></div>
+        </div>
+        <pre>{state.observation.contentPreview || 'No body text was returned.'}</pre>
+        {#if state.observation.diagnostics.length > 0}
+          {#each state.observation.diagnostics as diagnostic}
+            <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
           {/each}
+        {/if}
+      </details>
+    {/if}
+
+    <details class="panel developer-tools" bind:open={developerToolsOpen}>
+      <summary>
+        <span>
+          <span class="eyebrow">DEVELOPER</span>
+          <strong>Developer tools</strong>
+        </span>
+        <span class="muted-badge">Read-only</span>
+      </summary>
+
+      <div class="developer-actions">
+        <button class="secondary-button" onclick={() => send('knowledge.useFixture')}>Use fixture</button>
+        <button class="primary-button" onclick={loadSource}>Load source</button>
+        <button class="secondary-button" onclick={() => send('browser.observe')}>Observe now</button>
+      </div>
+
+      <details class="source-details">
+        <summary>Explicit MO2 source paths</summary>
+        <div class="source-grid">
+          <label>Instance name<input bind:value={source.instanceName} /></label>
+          <label>Profile name<input bind:value={source.profileName} /></label>
+          <label>Instance root<input bind:value={source.instanceRootPath} /></label>
+          <label>Profile path<input bind:value={source.profilePath} /></label>
+          <label>Mods path<input bind:value={source.modsPath} /></label>
+        </div>
+      </details>
+
+      {#if state.knowledge.session}
+        <p class="subtle developer-status">
+          {state.knowledge.session.instanceName} / {state.knowledge.session.profileName}
+          · {state.knowledge.candidates.length} MOD records
+          · {state.knowledge.profiles.length} profiles
+        </p>
+      {/if}
+      {#if state.statusMessage}
+        <p class="subtle developer-status">{state.statusMessage}</p>
+      {/if}
+    </details>
+
+    {#if inspectorOpen}
+      <aside class="inspector-drawer">
+        <div class="drawer-heading">
+          <div>
+            <span class="eyebrow">INSPECTOR</span>
+            <h2>{state.inspector?.directoryName || 'Loading evidence'}</h2>
+          </div>
+          <button class="icon-button" title="Close inspector" aria-label="Close inspector" onclick={() => (inspectorOpen = false)}>×</button>
         </div>
 
-        {#if state.inspector.diagnostics.length > 0}
+        {#if state.inspector}
+          {#if state.inspector.modInfo}
+            <div class="drawer-section">
+              <span class="eyebrow">METADATA</span>
+              <dl>
+                <dt>Display name</dt><dd>{state.inspector.modInfo.displayName || 'Unknown'}</dd>
+                <dt>Version</dt><dd>{state.inspector.modInfo.version || 'Unknown'}</dd>
+                <dt>Author</dt><dd>{state.inspector.modInfo.author || 'Unknown'}</dd>
+                <dt>Parse status</dt><dd>{formatLabel(state.inspector.modInfo.parseStatus)}</dd>
+              </dl>
+            </div>
+          {/if}
+
           <div class="drawer-section">
-            <span class="eyebrow">DIAGNOSTICS</span>
-            {#each state.inspector.diagnostics as diagnostic}
-              <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+            <span class="eyebrow">FILES · {state.inspector.files.length}</span>
+            <ul class="compact-list">
+              {#each state.inspector.files as file}
+                <li><code>{file.relativePath}</code><span>{sizeLabel(file.size)}</span></li>
+              {/each}
+            </ul>
+          </div>
+
+          <div class="drawer-section">
+            <span class="eyebrow">XML · {state.inspector.xmlFiles.length}</span>
+            {#each state.inspector.xmlFiles as xml}
+              <details class="xml-item">
+                <summary><code>{xml.relativePath}</code><span>{formatLabel(xml.parseStatus)}</span></summary>
+                <p>{xml.rootElementName || 'Unknown root'} · {xml.elementCount} elements · {xml.attributeCount} attributes</p>
+                {#each xml.xpathCandidates as xpath}
+                  <code class="block-code">{xpath.rawValue}</code>
+                {/each}
+                {#each xml.diagnostics as diagnostic}
+                  <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+                {/each}
+              </details>
             {/each}
           </div>
+
+          {#if state.inspector.diagnostics.length > 0}
+            <div class="drawer-section">
+              <span class="eyebrow">DIAGNOSTICS</span>
+              {#each state.inspector.diagnostics as diagnostic}
+                <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+              {/each}
+            </div>
+          {/if}
+
+          <div class="drawer-section">
+            <span class="eyebrow">PROVENANCE</span>
+            <p class="subtle">{state.inspector.source.kind} · {state.inspector.source.relativePath}</p>
+          </div>
+        {:else}
+          <p class="empty-state">Inspector evidence is loading.</p>
         {/if}
-      {:else}
-        <p class="empty-state">Inspector evidence is loading.</p>
-      {/if}
-    </aside>
-  {/if}
-</main>
+      </aside>
+    {/if}
+  </main>
+{/if}

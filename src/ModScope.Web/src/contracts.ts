@@ -58,9 +58,14 @@ export type ModCandidateUiState = {
   diagnostics: DiagnosticUiState[];
 };
 
+export type ProfileUiState = {
+  name: string;
+};
+
 export type KnowledgeUiState = {
   session?: KnowledgeSessionUiState | null;
   candidates: ModCandidateUiState[];
+  profiles: ProfileUiState[];
 };
 
 export type IdentityUiState = {
@@ -150,6 +155,10 @@ export type InspectorUiState = {
   source: SourceReferenceUiState;
 };
 
+export type LayoutUiState = {
+  contextVisible: boolean;
+};
+
 export type UiState = {
   browser: BrowserUiState;
   observation?: PageObservationUiState | null;
@@ -157,6 +166,7 @@ export type UiState = {
   identity: IdentityUiState;
   localContext?: LocalContextUiState | null;
   inspector?: InspectorUiState | null;
+  layout: LayoutUiState;
   statusMessage: string;
   diagnostics: DiagnosticUiState[];
 };
@@ -181,7 +191,8 @@ export const initialState: UiState = {
   observation: null,
   knowledge: {
     session: null,
-    candidates: []
+    candidates: [],
+    profiles: []
   },
   identity: {
     candidateIdentity: '',
@@ -189,6 +200,9 @@ export const initialState: UiState = {
   },
   localContext: null,
   inspector: null,
+  layout: {
+    contextVisible: true
+  },
   statusMessage: 'Load a source and observe the current page.',
   diagnostics: []
 };
