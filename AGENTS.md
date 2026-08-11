@@ -16,7 +16,7 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 
 ## 現在のフェーズ
 
-明示的な実装依頼により、現在はLocal Knowledge基盤の実装フェーズです。
+明示的な実装依頼により、現在はLocal Knowledge基盤とGUI縦切りの実装フェーズです。
 
 今回の実装で変更できる範囲は、次のとおりです。
 
@@ -26,17 +26,21 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 - `global.json`
 - `ModScope.sln`
 - `src/ModScope.LocalKnowledge/`
+- `src/ModScope.Query/`
+- `src/ModScope.Desktop/`
 - `tests/ModScope.LocalKnowledge.Tests/`
+- `tests/ModScope.Query.Tests/`
 - `tests/Fixtures/`
 
 今回の実装では、次の対象を作成しません。
 
-- GUI実装
-- Browser engine実装
 - CLI実装
 - MO2実環境への書き込み
+- 独自Browser engine実装
+- Site Adapter
+- 完全なsemantic conflict判定
 
-C# / .NET 8のクラスライブラリとxUnitテストを使用します。
+C# / .NET 8のcore/queryライブラリ、WPF / .NET 10のDesktopアプリ、xUnitテストを使用します。
 匿名synthetic fixtureを検証の基準にします。
 
 v0.1は、旧来の「source snapshotとAI用indexだけ」の縛りでは定義しません。現在の製品仮説は、7DTD + MO2のLocal Mod Knowledgeと、最小のBrowse → Recognize → Local awareness → Inspectの縦切りです。
