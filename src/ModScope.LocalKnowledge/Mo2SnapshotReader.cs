@@ -751,9 +751,19 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             throw new DirectoryNotFoundException($"The explicit MO2 instance root does not exist: {instanceRoot}");
         }
 
+        if (IsReparsePoint(instanceRoot))
+        {
+            throw new IOException($"The explicit MO2 instance root is a reparse point: {instanceRoot}");
+        }
+
         if (!Directory.Exists(profilePath))
         {
             throw new DirectoryNotFoundException($"The explicit MO2 profile path does not exist: {profilePath}");
+        }
+
+        if (IsReparsePoint(profilePath))
+        {
+            throw new IOException($"The explicit MO2 profile path is a reparse point: {profilePath}");
         }
 
         if (!Directory.Exists(modsPath))
@@ -761,15 +771,17 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             throw new DirectoryNotFoundException($"The explicit MO2 mods path does not exist: {modsPath}");
         }
 
-        if (!ParsingUtilities.IsWithin(instanceRoot, profilePath)
-            || !ParsingUtilities.IsWithin(instanceRoot, modsPath))
+        if (IsReparsePoint(modsPath))
         {
-            throw new ArgumentException(
-                "The explicit profile and mods paths must remain within the explicit MO2 instance root.",
-                nameof(source));
+            throw new IOException($"The explicit MO2 mods path is a reparse point: {modsPath}");
         }
 
         return new ValidatedSourcePaths(instanceRoot, profilePath, modsPath);
+    }
+
+    private static bool IsReparsePoint(string path)
+    {
+        return new DirectoryInfo(path).Attributes.HasFlag(FileAttributes.ReparsePoint);
     }
 
     private static string GetAbsolutePath(string path, string parameterName)
