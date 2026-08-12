@@ -237,6 +237,49 @@ h2 {
   color: #fda4af;
 }
 
+.diagnostic-warning {
+  border-color: #fbbf24;
+  background: rgba(120, 53, 15, 0.16);
+  color: #fde68a;
+}
+
+.diagnostic-info {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.16);
+  color: #bae6fd;
+}
+
+.diagnostic-count {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.4);
+  color: #e2e8f0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.diagnostic-raw,
+.diagnostic-source {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: currentColor;
+  font-size: 10px;
+  opacity: 0.82;
+}
+
+.diagnostic-source {
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.diagnostic-summary {
+  margin-top: 6px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
 .subtle,
 .empty-state,
 .page-url,

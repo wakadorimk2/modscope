@@ -1,7 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { createBridge, type Bridge } from './bridge';
-  import { initialState, type BridgeErrorPayload, type HostMessage, type UiState } from './contracts';
+  import {
+    initialState,
+    type BridgeErrorPayload,
+    type DiagnosticUiState,
+    type HostMessage,
+    type UiState
+  } from './contracts';
 
   const surface = new URLSearchParams(window.location.search).get('surface') === 'toolbar'
     ? 'toolbar'
@@ -22,6 +28,37 @@
     profilePath: '',
     modsPath: ''
   };
+
+  type DiagnosticGroup = {
+    diagnostic: DiagnosticUiState;
+    count: number;
+  };
+
+  function groupDiagnostics(diagnostics: DiagnosticUiState[]): DiagnosticGroup[] {
+    const groups = new Map<string, DiagnosticGroup>();
+
+    for (const diagnostic of diagnostics) {
+      const key = [
+        diagnostic.code,
+        diagnostic.severity,
+        diagnostic.message,
+        diagnostic.rawValue ?? ''
+      ].join('\u0000');
+      const existing = groups.get(key);
+
+      if (existing) {
+        existing.count += 1;
+      } else {
+        groups.set(key, { diagnostic, count: 1 });
+      }
+    }
+
+    return Array.from(groups.values());
+  }
+
+  function diagnosticClass(severity: string): string {
+    return `diagnostic diagnostic-${severity.toLowerCase()}`;
+  }
 
   onMount(() => {
     bridge = createBridge(handleHostMessage);
@@ -254,8 +291,14 @@
 
         {#if state.localContext.diagnostics.length > 0}
           <div class="diagnostic-list">
-            {#each state.localContext.diagnostics as diagnostic}
-              <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+            {#each groupDiagnostics(state.localContext.diagnostics) as group}
+              <p class={diagnosticClass(group.diagnostic.severity)}>
+                <strong>{group.diagnostic.code}</strong>
+                {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
+                {group.diagnostic.message}
+                {#if group.diagnostic.rawValue}<code class="diagnostic-raw">{group.diagnostic.rawValue}</code>{/if}
+                {#if group.diagnostic.source}<span class="diagnostic-source">Example: {group.diagnostic.source.relativePath}</span>{/if}
+              </p>
             {/each}
           </div>
         {/if}
@@ -307,8 +350,14 @@
 
           {#if state.localContext?.diagnostics.length}
             <div class="diagnostic-list">
-              {#each state.localContext.diagnostics as diagnostic}
-                <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+              {#each groupDiagnostics(state.localContext.diagnostics) as group}
+                <p class={diagnosticClass(group.diagnostic.severity)}>
+                  <strong>{group.diagnostic.code}</strong>
+                  {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
+                  {group.diagnostic.message}
+                  {#if group.diagnostic.rawValue}<code class="diagnostic-raw">{group.diagnostic.rawValue}</code>{/if}
+                  {#if group.diagnostic.source}<span class="diagnostic-source">Example: {group.diagnostic.source.relativePath}</span>{/if}
+                </p>
               {/each}
             </div>
           {/if}
@@ -323,10 +372,20 @@
     </section>
 
     {#if state.diagnostics.length > 0}
+      {@const diagnosticGroups = groupDiagnostics(state.diagnostics)}
       <section class="panel diagnostics-panel">
         <span class="eyebrow">DIAGNOSTICS</span>
-        {#each state.diagnostics as diagnostic}
-          <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+        <p class="diagnostic-summary">
+          {diagnosticGroups.length} types · {state.diagnostics.length} occurrences
+        </p>
+        {#each diagnosticGroups as group}
+          <p class={diagnosticClass(group.diagnostic.severity)}>
+            <strong>{group.diagnostic.code}</strong>
+            {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
+            {group.diagnostic.message}
+            {#if group.diagnostic.rawValue}<code class="diagnostic-raw">{group.diagnostic.rawValue}</code>{/if}
+            {#if group.diagnostic.source}<span class="diagnostic-source">Example: {group.diagnostic.source.relativePath}</span>{/if}
+          </p>
         {/each}
       </section>
     {/if}
