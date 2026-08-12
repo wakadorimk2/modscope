@@ -763,6 +763,11 @@ portable instanceとglobal instanceを、実行中MO2、remembered source、AppD
 external Mods / Profiles pathは、MO2設定から解決したread-only pathだけを扱います。
 RuntimeOCD、semantic conflict、effective result、MO2 writeはこのPhaseの対象外です。
 
+完了判定メモ（2026-08-13）：
+MO2 source discovery、profile切り替え、page observation、MOD identity confirmation、Local context、Inspectorを実MO2のread-only環境で確認しました。
+Core、Resourceなどの配布単位とMO2 record単位のgroupingは未確定です。
+Phase 2ではMO2 recordを独立したraw sourceとして保持し、package groupingは後続課題とします。
+
 ### Phase 3：queryとSite Adapter
 
 neutral read modelを安定させます。必要性が確認できた既知サイトだけSite Adapterを追加します。
