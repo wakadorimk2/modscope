@@ -258,9 +258,18 @@ public sealed record KnowledgeUiState(
 public sealed record KnowledgeOperationUiState(
     string Kind,
     bool IsBusy,
-    string? TargetProfileName)
+    string? TargetProfileName,
+    string Phase,
+    int? Completed,
+    int? Total)
 {
-    public static KnowledgeOperationUiState Idle { get; } = new("idle", false, null);
+    public static KnowledgeOperationUiState Idle { get; } = new(
+        "idle",
+        false,
+        null,
+        "idle",
+        null,
+        null);
 }
 
 public sealed record SourceCandidateUiState(

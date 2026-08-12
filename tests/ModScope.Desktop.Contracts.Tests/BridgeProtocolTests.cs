@@ -166,8 +166,25 @@ public sealed class BridgeProtocolTests
                 null,
                 Array.Empty<ModCandidateUiState>(),
                 Array.Empty<ProfileUiState>(),
-                new KnowledgeOperationUiState("profile-switch", true, "Alternate")));
+                new KnowledgeOperationUiState(
+                    "profile-switch",
+                    true,
+                    "Alternate",
+                    "scanning-mod-folders",
+                    3,
+                    89)));
 
-        Assert.Contains("\"operation\":{\"kind\":\"profile-switch\",\"isBusy\":true,\"targetProfileName\":\"Alternate\"}", message);
+        Assert.Contains(
+            "\"operation\":{\"kind\":\"profile-switch\",\"isBusy\":true,\"targetProfileName\":\"Alternate\",\"phase\":\"scanning-mod-folders\",\"completed\":3,\"total\":89}",
+            message);
+    }
+
+    [Fact]
+    public void IdleKnowledgeOperationHasNoProgressValues()
+    {
+        Assert.Equal("idle", KnowledgeOperationUiState.Idle.Phase);
+        Assert.False(KnowledgeOperationUiState.Idle.IsBusy);
+        Assert.Null(KnowledgeOperationUiState.Idle.Completed);
+        Assert.Null(KnowledgeOperationUiState.Idle.Total);
     }
 }

@@ -105,20 +105,30 @@ public sealed class LocalKnowledgeQueryTests
                 "<xml><Name value=\"Beta Mod\" /></xml>");
 
             var query = CreateQuery();
+            var loadProgress = new RecordingProgress();
             query.Load(new Mo2SourceInput(
                 "synthetic-instance",
                 "Default",
                 root.FullName,
                 defaultProfile,
-                modsPath.FullName));
+                modsPath.FullName),
+                progress: loadProgress);
+
+            Assert.Contains(
+                loadProgress.Values,
+                progress => progress.Phase == "scanning-mod-folders");
 
             Assert.Equal(
                 new[] { "Alternate", "Default" },
                 query.GetProfiles().Select(profile => profile.ProfileName));
 
-            var switched = query.SwitchProfile("Alternate");
+            var switchProgress = new RecordingProgress();
+            var switched = query.SwitchProfile("Alternate", progress: switchProgress);
 
             Assert.Equal("Alternate", switched.ProfileName);
+            Assert.Contains(
+                switchProgress.Values,
+                progress => progress.Phase == "projecting-profile");
             Assert.Contains(query.GetModCandidates(), candidate => candidate.DirectoryName == "Beta Mod");
             Assert.DoesNotContain(query.GetProfiles(), profile => profile.ProfileName == "OutsideCatalog");
             Assert.Throws<ArgumentException>(() => query.SwitchProfile("OutsideCatalog"));
@@ -235,6 +245,16 @@ public sealed class LocalKnowledgeQueryTests
         var profilePath = Directory.CreateDirectory(Path.Combine(profilesRoot, name));
         File.WriteAllText(Path.Combine(profilePath.FullName, "modlist.txt"), modList);
         return profilePath.FullName;
+    }
+
+    private sealed class RecordingProgress : IProgress<LocalKnowledgeProgress>
+    {
+        public List<LocalKnowledgeProgress> Values { get; } = new();
+
+        public void Report(LocalKnowledgeProgress value)
+        {
+            Values.Add(value);
+        }
     }
 
     private sealed class FakeSourceDiscovery : IMo2SourceDiscovery

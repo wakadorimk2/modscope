@@ -927,6 +927,28 @@ bridge stateはoperation kind、busy state、target profile nameを保持しま�
 失敗時は既存stateを保持し、statusまたはsource cardへ要約を表示します。
 Profile dropdownとsource操作はbusy中だけ無効にします。
 
+### 24.3.1 Operation progress rail
+
+初回ロード、source load、Profile switchは、派生UI stateとしてoperation progressを公開します。
+Progress stateはsnapshot ID、manifest、normalized data、LocalKnowledgeIndexへ含めません。
+
+`KnowledgeOperationUiState`はoperation kind、busy state、対象Profile、phase、completed、totalを持ちます。
+実数を安全に取得できないphaseではcompletedとtotalをnullにします。
+
+outer MOD folderの並列scanだけは、folder数をtotalとして決定的な進捗を報告します。
+inner MOD recordの数とは区別します。
+cache hitではstatic knowledgeを再利用するphaseを報告します。
+index構築とProfile projectionは不定形phaseとして表示します。
+
+Desktop hostはoperation tokenでstale callbackを破棄します。
+progress通知は最大20回/秒へ間引きます。
+Web UIは150msを超えたoperationだけ、画面上端のprogress railを表示します。
+短時間のcache hitでは、progress railを表示しません。
+
+progress railは現在のBrowser pageとLocal contextを隠しません。
+operation失敗時は既存stateを保持し、既存のstatus summaryを表示します。
+MO2のsource of truthとread-only境界は変更しません。
+
 ### 24.4 Frontend build
 
 Web frontendはSvelte、TypeScript、Viteを使用します。

@@ -1,5 +1,6 @@
 using System.IO;
 using ModScope.Desktop.Contracts;
+using ModScope.LocalKnowledge;
 using ModScope.Query;
 
 namespace ModScope.Desktop;
@@ -21,6 +22,9 @@ public sealed class DesktopSessionController
     private string _statusMessage = "Load a source and observe the current page.";
     private bool _contextVisible = true;
     private KnowledgeOperationUiState _operation = KnowledgeOperationUiState.Idle;
+    private long _operationToken;
+
+    internal event EventHandler? OperationStateChanged;
 
     public DesktopSessionController()
         : this(LocalKnowledgeQueryService.CreateDefault())
@@ -89,7 +93,8 @@ public sealed class DesktopSessionController
     public async Task DiscoverSourcesAsync(IReadOnlyList<string>? selectedRoots = null)
     {
         await _operationGate.WaitAsync();
-        BeginOperation("source-discovery", null);
+        var operationToken = BeginOperation("source-discovery", null);
+        var progress = CreateProgressReporter(operationToken);
         try
         {
             try
@@ -103,8 +108,8 @@ public sealed class DesktopSessionController
                     .ToList();
                 if (readyCandidates.Count == 1)
                 {
-                    BeginOperation("source-load", readyCandidates[0].ProfileName);
-                    if (await LoadSourceCandidateCoreAsync(readyCandidates[0].CandidateId))
+                    SetOperationPhase(operationToken, "reading-profile", readyCandidates[0].ProfileName);
+                    if (await LoadSourceCandidateCoreAsync(readyCandidates[0].CandidateId, progress))
                     {
                         _statusMessage = $"Detected MO2 source {readyCandidates[0].InstanceName} / {readyCandidates[0].ProfileName}.";
                     }
@@ -125,7 +130,7 @@ public sealed class DesktopSessionController
         }
         finally
         {
-            EndOperation();
+            EndOperation(operationToken);
             _operationGate.Release();
         }
     }
@@ -150,14 +155,15 @@ public sealed class DesktopSessionController
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(candidateId);
         await _operationGate.WaitAsync();
-        BeginOperation("source-load", null);
+        var operationToken = BeginOperation("source-load", null);
+        var progress = CreateProgressReporter(operationToken);
         try
         {
-            return await LoadSourceCandidateCoreAsync(candidateId);
+            return await LoadSourceCandidateCoreAsync(candidateId, progress);
         }
         finally
         {
-            EndOperation();
+            EndOperation(operationToken);
             _operationGate.Release();
         }
     }
@@ -166,12 +172,13 @@ public sealed class DesktopSessionController
     {
         ArgumentNullException.ThrowIfNull(source);
         await _operationGate.WaitAsync();
-        BeginOperation("source-load", source.ProfileName);
+        var operationToken = BeginOperation("source-load", source.ProfileName);
+        var progress = CreateProgressReporter(operationToken);
         try
         {
             try
             {
-                var session = await Task.Run(() => _query.Load(source));
+                var session = await Task.Run(() => _query.Load(source, progress: progress));
                 ApplyLoadedSession(session, null);
                 _sourceDiscovery = null;
                 return true;
@@ -184,7 +191,7 @@ public sealed class DesktopSessionController
         }
         finally
         {
-            EndOperation();
+            EndOperation(operationToken);
             _operationGate.Release();
         }
     }
@@ -222,12 +229,13 @@ public sealed class DesktopSessionController
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
         await _operationGate.WaitAsync();
-        BeginOperation("profile-switch", profileName.Trim());
+        var operationToken = BeginOperation("profile-switch", profileName.Trim());
+        var progress = CreateProgressReporter(operationToken);
         try
         {
             try
             {
-                var session = await Task.Run(() => _query.SwitchProfile(profileName));
+                var session = await Task.Run(() => _query.SwitchProfile(profileName, progress: progress));
                 ApplyProfileSession(session);
                 return true;
             }
@@ -239,7 +247,7 @@ public sealed class DesktopSessionController
         }
         finally
         {
-            EndOperation();
+            EndOperation(operationToken);
             _operationGate.Release();
         }
     }
@@ -322,11 +330,15 @@ public sealed class DesktopSessionController
             _operation);
     }
 
-    private async Task<bool> LoadSourceCandidateCoreAsync(string candidateId)
+    private async Task<bool> LoadSourceCandidateCoreAsync(
+        string candidateId,
+        IProgress<LocalKnowledgeProgress> progress)
     {
         try
         {
-            var session = await Task.Run(() => _query.LoadSourceCandidate(candidateId));
+            var session = await Task.Run(() => _query.LoadSourceCandidate(
+                candidateId,
+                progress: progress));
             ApplyLoadedSession(session, candidateId.Trim());
             return true;
         }
@@ -337,17 +349,157 @@ public sealed class DesktopSessionController
         }
     }
 
-    private void BeginOperation(string kind, string? targetProfileName)
+    private long BeginOperation(string kind, string? targetProfileName)
     {
-        _operation = new KnowledgeOperationUiState(kind, true, targetProfileName);
+        var operationToken = Interlocked.Increment(ref _operationToken);
+        _operation = new KnowledgeOperationUiState(
+            kind,
+            true,
+            targetProfileName,
+            InitialPhase(kind),
+            null,
+            null);
         _statusMessage = targetProfileName is null
             ? "Loading local MO2 knowledge."
             : $"Loading profile {targetProfileName}.";
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+        return operationToken;
     }
 
-    private void EndOperation()
+    private void SetOperationPhase(
+        long operationToken,
+        string phase,
+        string? targetProfileName = null)
     {
+        if (operationToken != _operationToken || !_operation.IsBusy)
+        {
+            return;
+        }
+
+        _operation = _operation with
+        {
+            Phase = phase,
+            TargetProfileName = targetProfileName ?? _operation.TargetProfileName,
+            Completed = null,
+            Total = null
+        };
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyOperationProgress(
+        long operationToken,
+        LocalKnowledgeProgress progress)
+    {
+        if (operationToken != _operationToken || !_operation.IsBusy)
+        {
+            return;
+        }
+
+        var completed = progress.Completed;
+        var total = progress.Total;
+        if (total is int totalValue && totalValue < 0)
+        {
+            completed = null;
+            total = null;
+        }
+        else if (completed is int completedValue && total is int boundedTotal)
+        {
+            completed = Math.Clamp(completedValue, 0, boundedTotal);
+        }
+
+        _operation = _operation with
+        {
+            Phase = progress.Phase,
+            Completed = completed,
+            Total = total
+        };
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private IProgress<LocalKnowledgeProgress> CreateProgressReporter(long operationToken)
+    {
+        var uiProgress = new Progress<LocalKnowledgeProgress>(progress =>
+            ApplyOperationProgress(operationToken, progress));
+        return new ThrottledProgress(uiProgress);
+    }
+
+    private void EndOperation(long operationToken)
+    {
+        if (operationToken != _operationToken)
+        {
+            return;
+        }
+
         _operation = KnowledgeOperationUiState.Idle;
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static string InitialPhase(string kind)
+    {
+        return string.Equals(kind, "source-discovery", StringComparison.Ordinal)
+            ? "discovering-source"
+            : "reading-profile";
+    }
+
+    private sealed class ThrottledProgress : IProgress<LocalKnowledgeProgress>
+    {
+        private readonly IProgress<LocalKnowledgeProgress> _inner;
+        private readonly object _gate = new();
+        private long _lastReportedAt;
+        private string? _lastPhase;
+        private int? _lastCompleted;
+
+        public ThrottledProgress(IProgress<LocalKnowledgeProgress> inner)
+        {
+            _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+        }
+
+        public void Report(LocalKnowledgeProgress value)
+        {
+            LocalKnowledgeProgress? report = null;
+            lock (_gate)
+            {
+                var phaseChanged = !string.Equals(
+                    _lastPhase,
+                    value.Phase,
+                    StringComparison.Ordinal);
+                if (phaseChanged)
+                {
+                    _lastCompleted = null;
+                }
+
+                if (value.Completed is int completed
+                    && _lastCompleted is int previousCompleted
+                    && completed < previousCompleted)
+                {
+                    return;
+                }
+
+                if (value.Completed is int nextCompleted)
+                {
+                    _lastCompleted = nextCompleted;
+                }
+
+                var now = System.Diagnostics.Stopwatch.GetTimestamp();
+                var interval = System.Diagnostics.Stopwatch.Frequency / 20;
+                var elapsed = _lastReportedAt == 0
+                    ? long.MaxValue
+                    : now - _lastReportedAt;
+                var isTerminal = value.Completed is int terminalCompleted
+                    && value.Total is int terminalTotal
+                    && terminalCompleted >= terminalTotal;
+                if (!phaseChanged && !isTerminal && elapsed < interval)
+                {
+                    return;
+                }
+
+                _lastPhase = value.Phase;
+                _lastReportedAt = now;
+                report = value;
+            }
+
+            _inner.Report(report);
+        }
     }
 
     private void ApplyProfileSession(KnowledgeSessionReadModel session)

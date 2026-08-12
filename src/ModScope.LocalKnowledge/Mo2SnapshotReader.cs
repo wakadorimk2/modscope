@@ -10,11 +10,14 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 
     public LocalModSnapshot Read(
         Mo2SourceDefinition source,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         var paths = ValidateSource(source);
         cancellationToken.ThrowIfCancellationRequested();
+
+        progress?.Report(new LocalKnowledgeProgress("reading-profile"));
 
         var modListPath = Path.Combine(paths.ProfilePath, "modlist.txt");
         if (!File.Exists(modListPath))
@@ -39,8 +42,9 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         var profileEntries = ParseProfileEntries(decodedModList.Text);
         diagnostics.AddRange(profileEntries.SelectMany(entry => entry.Diagnostics));
 
-        var staticCatalog = GetStaticCatalog(paths, cancellationToken);
+        var staticCatalog = GetStaticCatalog(paths, cancellationToken, progress);
         diagnostics.AddRange(staticCatalog.Diagnostics);
+        progress?.Report(new LocalKnowledgeProgress("projecting-profile"));
         var records = ProjectRecords(staticCatalog, profileEntries, diagnostics, cancellationToken);
 
         var manifestFiles = new List<InputManifestFile>
@@ -83,19 +87,22 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 
     private static StaticModCatalog GetStaticCatalog(
         ValidatedSourcePaths paths,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<LocalKnowledgeProgress>? progress)
     {
         var cacheKey = BuildStaticCatalogCacheKey(paths.ModsPath);
+        progress?.Report(new LocalKnowledgeProgress("checking-cache"));
 
         lock (StaticCatalogCacheGate)
         {
             if (StaticCatalogCache.TryGetValue(cacheKey, out var cached)
                 && IsStaticCatalogCurrent(cached, paths.ModsPath, cancellationToken))
             {
+                progress?.Report(new LocalKnowledgeProgress("reusing-static-knowledge"));
                 return cached;
             }
 
-            var rebuilt = BuildStaticCatalog(paths, cancellationToken);
+            var rebuilt = BuildStaticCatalog(paths, cancellationToken, progress);
             StaticCatalogCache[cacheKey] = rebuilt;
             return rebuilt;
         }
@@ -103,7 +110,8 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 
     private static StaticModCatalog BuildStaticCatalog(
         ValidatedSourcePaths paths,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<LocalKnowledgeProgress>? progress)
     {
         var diagnostics = new List<Diagnostic>();
         var directories = EnumerateModDirectories(paths.ModsPath, diagnostics)
@@ -112,11 +120,17 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             .OrderBy(directory => directory.Name, StringComparer.Ordinal)
             .ToList();
         var results = new ModDirectoryReadResult[directories.Count];
+        progress?.Report(new LocalKnowledgeProgress(
+            "scanning-mod-folders",
+            0,
+            directories.Count));
         var options = new ParallelOptions
         {
             CancellationToken = cancellationToken,
             MaxDegreeOfParallelism = 2
         };
+        var progressGate = new object();
+        var completed = 0;
 
         Parallel.For(
             0,
@@ -127,6 +141,14 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                 results[index] = BuildModRecordsForDirectory(
                     directories[index],
                     cancellationToken);
+                lock (progressGate)
+                {
+                    completed += 1;
+                    progress?.Report(new LocalKnowledgeProgress(
+                        "scanning-mod-folders",
+                        completed,
+                        directories.Count));
+                }
             });
 
         var records = results
@@ -152,6 +174,8 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                 new SourceReference(SourceReferenceKind.ModDirectory, "mods")));
             metadataFingerprint = Array.Empty<MetadataFingerprintEntry>();
         }
+
+        progress?.Report(new LocalKnowledgeProgress("building-index"));
 
         return new StaticModCatalog(
             directories.Select(directory => directory.Name).ToList().AsReadOnly(),
