@@ -30,6 +30,9 @@ public interface ILocalKnowledgeQuery
     LocalContextReadModel ConfirmIdentity(IdentityConfirmation confirmation);
 
     InspectorReadModel GetInspector(string modKey);
+
+    IReadOnlyList<KnowledgeReferenceReadModel> FindReferences(
+        KnowledgeReferenceQuery query);
 }
 
 public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
@@ -306,6 +309,65 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             QueryProjection.Source(record.Source));
     }
 
+    public IReadOnlyList<KnowledgeReferenceReadModel> FindReferences(
+        KnowledgeReferenceQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query.Value, nameof(query));
+
+        if (query.Limit is < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                query.Limit,
+                "The reference query limit cannot be negative.");
+        }
+
+        var snapshot = RequireSnapshot();
+        if (query.Limit == 0)
+        {
+            return Array.Empty<KnowledgeReferenceReadModel>();
+        }
+
+        var normalizedValue = NormalizeQueryValue(query.NodeKind, query.Value);
+        if (normalizedValue.Length == 0)
+        {
+            throw new ArgumentException(
+                "The reference query value is empty after normalization.",
+                nameof(query));
+        }
+
+        var localNodeKind = MapNodeKind(query.NodeKind);
+        var references = query.Direction switch
+        {
+            KnowledgeQueryDirection.Forward => snapshot.Index.ForwardReferences,
+            KnowledgeQueryDirection.Reverse => snapshot.Index.ReverseReferences,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(query),
+                query.Direction,
+                "The reference query direction is not supported.")
+        };
+        var lookup = BuildReferenceLookup(snapshot);
+        var results = new List<KnowledgeReferenceReadModel>();
+
+        foreach (var reference in references)
+        {
+            if (reference.From.Kind != localNodeKind
+                || !string.Equals(reference.From.Value, normalizedValue, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            results.Add(ToReferenceReadModel(reference, snapshot, lookup));
+            if (query.Limit is int limit && results.Count >= limit)
+            {
+                break;
+            }
+        }
+
+        return results.AsReadOnly();
+    }
+
     private LocalModSnapshot RequireSnapshot()
     {
         return _snapshot ?? throw new InvalidOperationException(
@@ -407,6 +469,184 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             new[] { message },
             diagnostics.AsReadOnly());
     }
+
+    private static KnowledgeReferenceReadModel ToReferenceReadModel(
+        LocalKnowledgeReference reference,
+        LocalModSnapshot snapshot,
+        ReferenceLookup lookup)
+    {
+        var owner = ResolveOwner(reference, lookup);
+        var operation = ResolveOperation(reference, lookup);
+        var diagnostics = new List<DiagnosticReadModel>();
+
+        if (owner is null)
+        {
+            diagnostics.Add(new DiagnosticReadModel(
+                "query.owner.unresolved",
+                QueryDiagnosticSeverity.Warning,
+                "The owner MOD for the indexed reference could not be resolved.",
+                QueryProjection.Source(reference.Evidence.Source)));
+        }
+
+        if (operation is not null)
+        {
+            diagnostics.AddRange(QueryProjection.Diagnostics(operation.Operation.Diagnostics));
+        }
+
+        return new KnowledgeReferenceReadModel(
+            QueryProjection.Node(reference.From),
+            QueryProjection.Node(reference.To),
+            QueryProjection.ReferenceRelation(reference.Relation),
+            QueryProjection.Evidence(reference.Evidence),
+            owner is null
+                ? null
+                : QueryProjection.ModReferenceContext(
+                    owner,
+                    snapshot.ProfileEntries.FirstOrDefault(entry =>
+                        string.Equals(
+                            entry.NormalizedModName,
+                            owner.Mo2OuterDirectoryName ?? owner.DirectoryName,
+                            StringComparison.OrdinalIgnoreCase))),
+            operation is null ? null : QueryProjection.PatchOperation(operation.Operation),
+            diagnostics.AsReadOnly());
+    }
+
+    private static ReferenceLookup BuildReferenceLookup(LocalModSnapshot snapshot)
+    {
+        var lookup = new ReferenceLookup();
+        foreach (var mod in snapshot.Mods)
+        {
+            lookup.NodeOwners[new ReferenceNodeKey(LocalKnowledgeNodeKind.Mod, mod.ModKey)] = mod;
+
+            foreach (var file in mod.Files)
+            {
+                lookup.NodeOwners[new ReferenceNodeKey(
+                    LocalKnowledgeNodeKind.File,
+                    BuildIndexedFileValue(mod, file.RelativePath))] = mod;
+            }
+
+            foreach (var xmlFile in mod.XmlFiles)
+            {
+                var fileValue = BuildIndexedFileValue(mod, xmlFile.RelativePath);
+                lookup.NodeOwners[new ReferenceNodeKey(LocalKnowledgeNodeKind.XmlFile, fileValue)] = mod;
+
+                foreach (var operation in xmlFile.PatchOperations)
+                {
+                    var operationValue = $"{fileValue}#{operation.ElementPath}";
+                    var context = new ReferenceOperationContext(mod, operation);
+                    lookup.NodeOwners[new ReferenceNodeKey(
+                        LocalKnowledgeNodeKind.PatchOperation,
+                        operationValue)] = mod;
+                    lookup.Operations[operationValue] = context;
+                }
+            }
+        }
+
+        return lookup;
+    }
+
+    private static LocalModRecord? ResolveOwner(
+        LocalKnowledgeReference reference,
+        ReferenceLookup lookup)
+    {
+        foreach (var node in new[] { reference.From, reference.To })
+        {
+            if (node.Kind == LocalKnowledgeNodeKind.PatchOperation
+                && lookup.Operations.TryGetValue(node.Value, out var operation))
+            {
+                return operation.Mod;
+            }
+
+            if (lookup.NodeOwners.TryGetValue(new ReferenceNodeKey(node.Kind, node.Value), out var owner))
+            {
+                return owner;
+            }
+        }
+
+        return null;
+    }
+
+    private static ReferenceOperationContext? ResolveOperation(
+        LocalKnowledgeReference reference,
+        ReferenceLookup lookup)
+    {
+        foreach (var node in new[] { reference.From, reference.To })
+        {
+            if (node.Kind == LocalKnowledgeNodeKind.PatchOperation
+                && lookup.Operations.TryGetValue(node.Value, out var operation))
+            {
+                return operation;
+            }
+        }
+
+        return null;
+    }
+
+    private static LocalKnowledgeNodeKind MapNodeKind(KnowledgeQueryNodeKind kind)
+    {
+        return kind switch
+        {
+            KnowledgeQueryNodeKind.Mod => LocalKnowledgeNodeKind.Mod,
+            KnowledgeQueryNodeKind.File => LocalKnowledgeNodeKind.File,
+            KnowledgeQueryNodeKind.XmlFile => LocalKnowledgeNodeKind.XmlFile,
+            KnowledgeQueryNodeKind.PatchOperation => LocalKnowledgeNodeKind.PatchOperation,
+            KnowledgeQueryNodeKind.TargetXml => LocalKnowledgeNodeKind.TargetXml,
+            KnowledgeQueryNodeKind.XPath => LocalKnowledgeNodeKind.XPath,
+            KnowledgeQueryNodeKind.Entity => LocalKnowledgeNodeKind.Entity,
+            KnowledgeQueryNodeKind.Property => LocalKnowledgeNodeKind.Property,
+            KnowledgeQueryNodeKind.Attribute => LocalKnowledgeNodeKind.Attribute,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
+        };
+    }
+
+    private static string NormalizeQueryValue(
+        KnowledgeQueryNodeKind kind,
+        string value)
+    {
+        var normalized = value.Trim();
+        if (kind is KnowledgeQueryNodeKind.Mod
+            or KnowledgeQueryNodeKind.File
+            or KnowledgeQueryNodeKind.XmlFile
+            or KnowledgeQueryNodeKind.PatchOperation
+            or KnowledgeQueryNodeKind.TargetXml)
+        {
+            normalized = normalized.Replace('\\', '/');
+        }
+
+        if (kind == KnowledgeQueryNodeKind.TargetXml
+            && normalized.StartsWith("Config/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["Config/".Length..];
+        }
+
+        return normalized;
+    }
+
+    private static string BuildIndexedFileValue(
+        LocalModRecord mod,
+        string relativePath)
+    {
+        var directoryPath = (mod.ResolvedDirectoryRelativePath ?? mod.DirectoryName)
+            .Replace('\\', '/');
+        var normalizedFilePath = relativePath.Replace('\\', '/');
+        return $"mods/{directoryPath}/{normalizedFilePath}";
+    }
+
+    private sealed class ReferenceLookup
+    {
+        public Dictionary<ReferenceNodeKey, LocalModRecord> NodeOwners { get; } = new();
+
+        public Dictionary<string, ReferenceOperationContext> Operations { get; } =
+            new(StringComparer.Ordinal);
+    }
+
+    private readonly record struct ReferenceNodeKey(
+        LocalKnowledgeNodeKind Kind,
+        string Value);
+
+    private sealed record ReferenceOperationContext(
+        LocalModRecord Mod,
+        XmlPatchOperationObservation Operation);
 }
 
 internal static class QueryProjection
@@ -426,6 +666,98 @@ internal static class QueryProjection
                 ? null
                 : new EvidenceReferenceReadModel(QueryEvidenceKind.Source, Source(profileEntry.Source)),
             Diagnostics(record.Diagnostics));
+    }
+
+    public static ModReferenceContextReadModel ModReferenceContext(
+        LocalModRecord record,
+        ProfileModEntry? profileEntry)
+    {
+        var candidate = ModCandidate(record, profileEntry);
+        return new ModReferenceContextReadModel(
+            candidate.ModKey,
+            candidate.DirectoryName,
+            candidate.DisplayName,
+            candidate.Version,
+            candidate.ProfileState,
+            candidate.EnabledState,
+            candidate.Priority,
+            candidate.Source,
+            candidate.PriorityEvidence,
+            candidate.Diagnostics);
+    }
+
+    public static KnowledgeNodeReadModel Node(LocalKnowledgeNode node)
+    {
+        return new KnowledgeNodeReadModel(
+            node.Kind switch
+            {
+                LocalKnowledgeNodeKind.Mod => KnowledgeQueryNodeKind.Mod,
+                LocalKnowledgeNodeKind.File => KnowledgeQueryNodeKind.File,
+                LocalKnowledgeNodeKind.XmlFile => KnowledgeQueryNodeKind.XmlFile,
+                LocalKnowledgeNodeKind.PatchOperation => KnowledgeQueryNodeKind.PatchOperation,
+                LocalKnowledgeNodeKind.TargetXml => KnowledgeQueryNodeKind.TargetXml,
+                LocalKnowledgeNodeKind.XPath => KnowledgeQueryNodeKind.XPath,
+                LocalKnowledgeNodeKind.Entity => KnowledgeQueryNodeKind.Entity,
+                LocalKnowledgeNodeKind.Property => KnowledgeQueryNodeKind.Property,
+                LocalKnowledgeNodeKind.Attribute => KnowledgeQueryNodeKind.Attribute,
+                _ => throw new ArgumentOutOfRangeException(nameof(node), node.Kind, null)
+            },
+            node.Value);
+    }
+
+    public static KnowledgeReferenceRelation ReferenceRelation(LocalKnowledgeRelation relation)
+    {
+        return relation switch
+        {
+            LocalKnowledgeRelation.Contains => KnowledgeReferenceRelation.Contains,
+            LocalKnowledgeRelation.Targets => KnowledgeReferenceRelation.Targets,
+            LocalKnowledgeRelation.Selects => KnowledgeReferenceRelation.Selects,
+            LocalKnowledgeRelation.Mentions => KnowledgeReferenceRelation.Mentions,
+            _ => throw new ArgumentOutOfRangeException(nameof(relation), relation, null)
+        };
+    }
+
+    public static EvidenceReferenceReadModel Evidence(EvidenceReference evidence)
+    {
+        return new EvidenceReferenceReadModel(
+            MapEvidenceKind(evidence.Kind),
+            Source(evidence.Source));
+    }
+
+    public static XmlPatchOperationReadModel PatchOperation(
+        XmlPatchOperationObservation operation)
+    {
+        return new XmlPatchOperationReadModel(
+            operation.ElementPath,
+            operation.RawOperationName,
+            operation.NormalizedKind is null
+                ? null
+                : MapPatchOperationKind(operation.NormalizedKind.Value),
+            RawXmlObservation(operation.RawObservation),
+            operation.XPathCandidates
+                .Select(candidate => new XmlXPathCandidateReadModel(
+                    candidate.RawValue,
+                    candidate.ElementPath,
+                    Source(candidate.Source)))
+                .ToList()
+                .AsReadOnly(),
+            operation.TargetXmlCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
+            operation.EntityCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
+            operation.PropertyCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
+            operation.AttributeCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
+            Diagnostics(operation.Diagnostics),
+            Source(operation.Source));
+    }
+
+    public static XmlReferenceCandidateReadModel ReferenceCandidate(
+        XmlReferenceCandidate candidate)
+    {
+        return new XmlReferenceCandidateReadModel(
+            candidate.RawValue,
+            candidate.NormalizedValue,
+            candidate.ElementPath,
+            MapEvidenceKind(candidate.EvidenceKind),
+            Source(candidate.Source));
     }
 
     public static ModInfoReadModel? ModInfo(ModInfoMetadata? metadata)
@@ -474,7 +806,13 @@ internal static class QueryProjection
                 Source(candidate.Source))).ToList().AsReadOnly(),
             file.RawObservations.Select(RawXmlObservation).ToList().AsReadOnly(),
             Diagnostics(file.Diagnostics),
-            Source(file.Source));
+            Source(file.Source))
+        {
+            PatchOperations = file.PatchOperations
+                .Select(PatchOperation)
+                .ToList()
+                .AsReadOnly()
+        };
     }
 
     public static RawXmlObservationReadModel RawXmlObservation(RawXmlObservation observation)
@@ -560,6 +898,23 @@ internal static class QueryProjection
             EvidenceKind.Inference => QueryEvidenceKind.Inference,
             EvidenceKind.Uncertainty => QueryEvidenceKind.Uncertainty,
             EvidenceKind.Diagnostic => QueryEvidenceKind.Diagnostic,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
+        };
+    }
+
+    private static QueryXmlPatchOperationKind MapPatchOperationKind(
+        XmlPatchOperationKind kind)
+    {
+        return kind switch
+        {
+            XmlPatchOperationKind.Set => QueryXmlPatchOperationKind.Set,
+            XmlPatchOperationKind.SetAttribute => QueryXmlPatchOperationKind.SetAttribute,
+            XmlPatchOperationKind.Remove => QueryXmlPatchOperationKind.Remove,
+            XmlPatchOperationKind.RemoveAttribute => QueryXmlPatchOperationKind.RemoveAttribute,
+            XmlPatchOperationKind.Append => QueryXmlPatchOperationKind.Append,
+            XmlPatchOperationKind.Prepend => QueryXmlPatchOperationKind.Prepend,
+            XmlPatchOperationKind.InsertBefore => QueryXmlPatchOperationKind.InsertBefore,
+            XmlPatchOperationKind.InsertAfter => QueryXmlPatchOperationKind.InsertAfter,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }
