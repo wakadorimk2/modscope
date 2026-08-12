@@ -379,6 +379,40 @@ select:focus {
   min-height: 168px;
 }
 
+.source-discovery-panel {
+  border-color: rgba(125, 211, 252, 0.28);
+}
+
+.source-candidate-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.source-candidate-card {
+  padding: 11px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.42);
+}
+
+.source-candidate-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.source-candidate-header strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.source-candidate-header .subtle {
+  margin-top: 4px;
+}
+
 .diagnostics-panel {
   padding-top: 12px;
 }

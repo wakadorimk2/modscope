@@ -120,6 +120,18 @@
     send('knowledge.loadSource', source);
   }
 
+  function discoverSources() {
+    send('knowledge.discoverSources');
+  }
+
+  function selectSource(candidateId: string) {
+    send('knowledge.selectSource', { candidateId });
+  }
+
+  function selectRoot() {
+    send('knowledge.selectRoot');
+  }
+
   function pageIdentity(): string {
     return (
       state.localContext?.candidateIdentity ||
@@ -169,6 +181,7 @@
     return value
       .replace(/([a-z])([A-Z])/g, '$1 $2')
       .replace(/-/g, ' ')
+      .replace(/:/g, ' · ')
       .replace(/^./, (character) => character.toUpperCase());
   }
 
@@ -244,6 +257,68 @@
 
     {#if lastError}
       <p class="error-notice"><strong>{lastError.code}</strong> {lastError.message}</p>
+    {/if}
+
+    {#if state.sourceDiscovery.candidates.length > 0 || !state.knowledge.session}
+      <section class="panel source-discovery-panel">
+        <div class="summary-header">
+          <div>
+            <span class="eyebrow">MO2 SOURCE</span>
+            <h2>Choose a local source</h2>
+            <p class="summary-meta">ModScope checks known MO2 locations and keeps this read-only.</p>
+          </div>
+          <span class="muted-badge">No absolute paths sent to Web</span>
+        </div>
+
+        {#if state.sourceDiscovery.candidates.length === 0}
+          <p class="notice">No MO2 source is ready. Scan again or choose an MO2 instance folder.</p>
+        {:else}
+          <div class="source-candidate-list">
+            {#each state.sourceDiscovery.candidates as candidate (candidate.candidateId)}
+              <article class="source-candidate-card">
+                <div class="source-candidate-header">
+                  <div>
+                    <strong>{candidate.instanceName || 'Unknown instance'} · {candidate.profileName || 'Profile unknown'}</strong>
+                    <p class="subtle">{candidate.gameName || 'Game unknown'}</p>
+                  </div>
+                  <span class="status-chip {statusClass(candidate.readiness)}">{formatLabel(candidate.readiness)}</span>
+                </div>
+
+                {#if candidate.evidence.length > 0}
+                  <div class="evidence-strip">
+                    {#each candidate.evidence as evidence}
+                      <span class="evidence-tag">{formatLabel(evidence)}</span>
+                    {/each}
+                  </div>
+                {/if}
+
+                {#if candidate.diagnostics.length > 0}
+                  <div class="diagnostic-list">
+                    {#each groupDiagnostics(candidate.diagnostics) as group}
+                      <p class={diagnosticClass(group.diagnostic.severity)}>
+                        <strong>{group.diagnostic.code}</strong>
+                        {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
+                        {group.diagnostic.message}
+                      </p>
+                    {/each}
+                  </div>
+                {/if}
+
+                {#if candidate.isReady}
+                  <button class="primary-button action-button" onclick={() => selectSource(candidate.candidateId)}>
+                    Use this source
+                  </button>
+                {/if}
+              </article>
+            {/each}
+          </div>
+        {/if}
+
+        <div class="action-row">
+          <button class="secondary-button" onclick={discoverSources}>Scan again</button>
+          <button class="secondary-button" onclick={selectRoot}>Select MO2 folder</button>
+        </div>
+      </section>
     {/if}
 
     <section class="panel context-summary-panel">
