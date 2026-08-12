@@ -64,6 +64,96 @@ public enum QueryXmlParseStatus
     EncodingError
 }
 
+public enum KnowledgeQueryNodeKind
+{
+    Mod,
+    File,
+    XmlFile,
+    PatchOperation,
+    TargetXml,
+    XPath,
+    Entity,
+    Property,
+    Attribute
+}
+
+public enum KnowledgeQueryDirection
+{
+    Forward,
+    Reverse
+}
+
+public enum KnowledgeReferenceRelation
+{
+    Contains,
+    Targets,
+    Selects,
+    Mentions
+}
+
+public enum QueryXmlPatchOperationKind
+{
+    Set,
+    SetAttribute,
+    Remove,
+    RemoveAttribute,
+    Append,
+    Prepend,
+    InsertBefore,
+    InsertAfter
+}
+
+public sealed record KnowledgeReferenceQuery(
+    KnowledgeQueryNodeKind NodeKind,
+    string Value,
+    KnowledgeQueryDirection Direction,
+    int? Limit = null);
+
+public sealed record KnowledgeNodeReadModel(
+    KnowledgeQueryNodeKind Kind,
+    string Value);
+
+public sealed record XmlReferenceCandidateReadModel(
+    string RawValue,
+    string? NormalizedValue,
+    string ElementPath,
+    QueryEvidenceKind EvidenceKind,
+    SourceReferenceReadModel Source);
+
+public sealed record XmlPatchOperationReadModel(
+    string ElementPath,
+    string RawOperationName,
+    QueryXmlPatchOperationKind? NormalizedKind,
+    RawXmlObservationReadModel RawObservation,
+    IReadOnlyList<XmlXPathCandidateReadModel> XPathCandidates,
+    IReadOnlyList<XmlReferenceCandidateReadModel> TargetXmlCandidates,
+    IReadOnlyList<XmlReferenceCandidateReadModel> EntityCandidates,
+    IReadOnlyList<XmlReferenceCandidateReadModel> PropertyCandidates,
+    IReadOnlyList<XmlReferenceCandidateReadModel> AttributeCandidates,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics,
+    SourceReferenceReadModel Source);
+
+public sealed record ModReferenceContextReadModel(
+    string ModKey,
+    string DirectoryName,
+    string? DisplayName,
+    string? Version,
+    QueryProfileState ProfileState,
+    QueryEnabledState EnabledState,
+    int? Priority,
+    SourceReferenceReadModel Source,
+    EvidenceReferenceReadModel? PriorityEvidence,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+
+public sealed record KnowledgeReferenceReadModel(
+    KnowledgeNodeReadModel From,
+    KnowledgeNodeReadModel To,
+    KnowledgeReferenceRelation Relation,
+    EvidenceReferenceReadModel Evidence,
+    ModReferenceContextReadModel? OwnerMod,
+    XmlPatchOperationReadModel? Operation,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+
 public sealed record Mo2SourceInput(
     string InstanceName,
     string ProfileName,
@@ -210,7 +300,11 @@ public sealed record XmlFileReadModel(
     IReadOnlyList<XmlXPathCandidateReadModel> XPathCandidates,
     IReadOnlyList<RawXmlObservationReadModel> RawObservations,
     IReadOnlyList<DiagnosticReadModel> Diagnostics,
-    SourceReferenceReadModel Source);
+    SourceReferenceReadModel Source)
+{
+    public IReadOnlyList<XmlPatchOperationReadModel> PatchOperations { get; init; } =
+        Array.Empty<XmlPatchOperationReadModel>();
+}
 
 public sealed record InspectorReadModel(
     string ModKey,

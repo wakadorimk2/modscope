@@ -768,9 +768,26 @@ MO2 source discovery、profile切り替え、page observation、MOD identity con
 Core、Resourceなどの配布単位とMO2 record単位のgroupingは未確定です。
 Phase 2ではMO2 recordを独立したraw sourceとして保持し、package groupingは後続課題とします。
 
-### Phase 3：queryとSite Adapter
+### Phase 3：QueryとInspector core
 
-neutral read modelを安定させます。必要性が確認できた既知サイトだけSite Adapterを追加します。
+neutral read modelを安定させます。既存のLocalKnowledgeIndexを、C# Query APIからread-onlyで検索できます。
+Site Adapterは、具体的な必要性が確認されるまで追加しません。
+
+2026-08-13のPhase 3実装範囲は次のとおりです。
+
+- `Mod`、`File`、`XmlFile`、`PatchOperation`、`TargetXml`、`XPath`、`Entity`、`Property`、`Attribute`をQuery対象にします。
+- forward queryとreverse queryを、正規化後のOrdinal完全一致で提供します。
+- pathの区切り文字を正規化します。`TargetXml`では`Config/`接頭辞も既存parserと同じ規則で除去します。
+- Query結果はfrom、to、relation、evidence、owner MODのprofile state、enabled state、priority、operation、diagnosticを含みます。
+- limitは呼び出し側が指定します。未指定時は全件を返します。
+- Inspector read modelはpatch operation、target、XPath、entity、property、attribute、unknown operation、diagnosticを保持します。
+- unknown operation、unresolved owner、inferenceを破棄しません。
+
+この変更の理由は、Phase 2で生成したforward / reverse indexをQuery layerから利用できなかったためです。
+影響範囲は`ModScope.Query`とQuery testsです。
+Desktop bridge、Web UI、agent transportは変更しません。
+Site Adapterを先に追加する代替案は、具体的なサイト要件が未確認のため採用しません。
+semantic conflictとeffective resultはPhase 4の対象として残します。
 
 ### Phase 4：semantic conflict
 
