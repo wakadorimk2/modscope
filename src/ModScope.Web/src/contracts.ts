@@ -68,6 +68,22 @@ export type KnowledgeUiState = {
   profiles: ProfileUiState[];
 };
 
+export type SourceCandidateUiState = {
+  candidateId: string;
+  instanceName: string;
+  gameName: string;
+  profileName: string;
+  readiness: string;
+  isReady: boolean;
+  evidence: string[];
+  diagnostics: DiagnosticUiState[];
+};
+
+export type SourceDiscoveryUiState = {
+  candidates: SourceCandidateUiState[];
+  selectedCandidateId?: string | null;
+};
+
 export type IdentityUiState = {
   candidateIdentity: string;
   selectedLocalModKey?: string | null;
@@ -163,6 +179,7 @@ export type UiState = {
   browser: BrowserUiState;
   observation?: PageObservationUiState | null;
   knowledge: KnowledgeUiState;
+  sourceDiscovery: SourceDiscoveryUiState;
   identity: IdentityUiState;
   localContext?: LocalContextUiState | null;
   inspector?: InspectorUiState | null;
@@ -193,6 +210,10 @@ export const initialState: UiState = {
     session: null,
     candidates: [],
     profiles: []
+  },
+  sourceDiscovery: {
+    candidates: [],
+    selectedCandidateId: null
   },
   identity: {
     candidateIdentity: '',
