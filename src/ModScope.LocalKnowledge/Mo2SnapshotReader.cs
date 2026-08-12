@@ -46,7 +46,7 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
         var records = new List<LocalModRecord>();
-        var inventories = new List<(string DirectoryName, IReadOnlyList<FileInventoryItem> Files)>();
+        var manifestInventory = new List<FileInventoryItem>();
         var recordedDirectoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var profileEntry in firstProfileEntryByName.Values.OrderBy(entry => entry.Priority))
@@ -78,15 +78,15 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             }
 
             recordedDirectoryNames.Add(directory.Name);
-            var parsed = BuildModRecord(
+            var parsed = BuildModRecordsForDirectory(
                 directory,
                 ModProfileState.Listed,
                 profileEntry.EnabledState,
                 profileEntry.Priority,
                 cancellationToken);
-            records.Add(parsed.Record);
-            inventories.Add((directory.Name, parsed.Inventory));
-            diagnostics.AddRange(parsed.Record.Diagnostics);
+            records.AddRange(parsed.Records);
+            manifestInventory.AddRange(parsed.Inventory);
+            diagnostics.AddRange(parsed.Diagnostics);
         }
 
         foreach (var directory in directoryLookup.Values.OrderBy(item => item.Name, StringComparer.Ordinal))
@@ -97,15 +97,15 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                 continue;
             }
 
-            var parsed = BuildModRecord(
+            var parsed = BuildModRecordsForDirectory(
                 directory,
                 ModProfileState.Unlisted,
                 ModEnabledState.Unknown,
                 null,
                 cancellationToken);
-            records.Add(parsed.Record);
-            inventories.Add((directory.Name, parsed.Inventory));
-            diagnostics.AddRange(parsed.Record.Diagnostics);
+            records.AddRange(parsed.Records);
+            manifestInventory.AddRange(parsed.Inventory);
+            diagnostics.AddRange(parsed.Diagnostics);
         }
 
         var manifestFiles = new List<InputManifestFile>
@@ -113,17 +113,14 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             new("profile/modlist.txt", modListBytes.LongLength, modListHash)
         };
 
-        foreach (var inventory in inventories.OrderBy(item => item.DirectoryName, StringComparer.Ordinal))
+        foreach (var file in manifestInventory
+                     .OrderBy(item => item.Source.RelativePath, StringComparer.Ordinal)
+                     .ThenBy(item => item.RelativePath, StringComparer.Ordinal))
         {
-            foreach (var file in inventory.Files.OrderBy(item => item.RelativePath, StringComparer.Ordinal))
-            {
-                manifestFiles.Add(new InputManifestFile(
-                    ParsingUtilities.BuildSourcePath(
-                        ParsingUtilities.BuildSourcePath("mods", inventory.DirectoryName),
-                        file.RelativePath),
-                    file.Size,
-                    file.Sha256));
-            }
+            manifestFiles.Add(new InputManifestFile(
+                file.Source.RelativePath,
+                file.Size,
+                file.Sha256));
         }
 
         var manifest = new InputManifest(
@@ -143,7 +140,10 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             CollectionHelpers.ReadOnly(profileEntries),
             CollectionHelpers.ReadOnly(records),
             manifest,
-            CollectionHelpers.ReadOnly(diagnostics));
+            CollectionHelpers.ReadOnly(diagnostics))
+        {
+            Index = LocalKnowledgeIndexBuilder.Build(records)
+        };
     }
 
     private static IReadOnlyList<ProfileModEntry> ParseProfileEntries(string text)
@@ -346,17 +346,229 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         }
     }
 
-    private static (LocalModRecord Record, IReadOnlyList<FileInventoryItem> Inventory) BuildModRecord(
-        DirectoryInfo directory,
+    private static ModDirectoryReadResult BuildModRecordsForDirectory(
+        DirectoryInfo outerDirectory,
         ModProfileState profileState,
         ModEnabledState enabledState,
         int? priority,
         CancellationToken cancellationToken)
     {
-        var modSource = new SourceReference(
+        var discovery = DiscoverModRoots(outerDirectory, cancellationToken);
+        var diagnostics = discovery.Diagnostics.ToList();
+        var records = new List<LocalModRecord>();
+        var inventory = new List<FileInventoryItem>();
+
+        if (discovery.AcceptedRoots.Count == 0)
+        {
+            var outerSource = BuildModDirectorySource(outerDirectory.Name);
+            var outerScan = ScanFiles(outerDirectory, outerSource.RelativePath, cancellationToken);
+            inventory.AddRange(outerScan.Files);
+            diagnostics.AddRange(outerScan.Diagnostics);
+            diagnostics.Add(new Diagnostic(
+                "mod.root.not_found",
+                DiagnosticSeverity.Warning,
+                $"The MO2 outer folder '{outerDirectory.Name}' has no ModInfo.xml at depth 0 or 1.",
+                outerSource,
+                outerDirectory.Name));
+
+            return new ModDirectoryReadResult(
+                Array.Empty<LocalModRecord>(),
+                inventory.AsReadOnly(),
+                diagnostics.AsReadOnly());
+        }
+
+        foreach (var root in discovery.AcceptedRoots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var parsed = BuildModRecord(
+                outerDirectory,
+                root,
+                profileState,
+                enabledState,
+                priority,
+                cancellationToken);
+            records.Add(parsed.Record);
+            inventory.AddRange(parsed.Inventory);
+            diagnostics.AddRange(parsed.Record.Diagnostics);
+        }
+
+        return new ModDirectoryReadResult(
+            records.AsReadOnly(),
+            inventory.AsReadOnly(),
+            diagnostics.AsReadOnly());
+    }
+
+    private static ModRootDiscoveryResult DiscoverModRoots(
+        DirectoryInfo outerDirectory,
+        CancellationToken cancellationToken)
+    {
+        var outerSource = BuildModDirectorySource(outerDirectory.Name);
+        var discoveryDiagnostics = new List<Diagnostic>();
+        var modInfoFiles = EnumerateModInfoFiles(
+            outerDirectory,
+            outerSource,
+            discoveryDiagnostics,
+            cancellationToken);
+        var direct = modInfoFiles.FirstOrDefault(file =>
+            ParsingUtilities.NormalizeRelativePath(Path.GetRelativePath(outerDirectory.FullName, file.FullName))
+                .Equals("ModInfo.xml", StringComparison.OrdinalIgnoreCase));
+        var accepted = new List<ModRootCandidate>();
+        var diagnostics = new List<Diagnostic>(discoveryDiagnostics);
+
+        if (direct is not null)
+        {
+            accepted.Add(CreateModRootCandidate(
+                outerDirectory,
+                outerDirectory,
+                EvidenceKind.Source,
+                outerSource));
+        }
+        else
+        {
+            foreach (var file in modInfoFiles
+                         .Where(file => GetDirectoryDepth(outerDirectory, file.Directory) == 1)
+                         .GroupBy(file => file.Directory!.FullName, StringComparer.OrdinalIgnoreCase)
+                         .Select(group => group.OrderBy(file => file.FullName, StringComparer.Ordinal).First())
+                         .OrderBy(file => file.Directory!.Name, StringComparer.Ordinal))
+            {
+                accepted.Add(CreateModRootCandidate(
+                    outerDirectory,
+                    file.Directory!,
+                    EvidenceKind.Inference,
+                    outerSource));
+            }
+        }
+
+        foreach (var file in modInfoFiles
+                     .Where(file => GetDirectoryDepth(outerDirectory, file.Directory) >= 2)
+                     .OrderBy(file => file.FullName, StringComparer.Ordinal))
+        {
+            var relativePath = ParsingUtilities.NormalizeRelativePath(
+                Path.GetRelativePath(outerDirectory.FullName, file.FullName));
+            diagnostics.Add(new Diagnostic(
+                "mod.root.depth_exceeded",
+                DiagnosticSeverity.Warning,
+                $"The ModInfo.xml candidate '{relativePath}' is deeper than the supported root depth.",
+                outerSource,
+                relativePath));
+        }
+
+        return new ModRootDiscoveryResult(
+            accepted.AsReadOnly(),
+            diagnostics.AsReadOnly());
+    }
+
+    private static IReadOnlyList<FileInfo> EnumerateModInfoFiles(
+        DirectoryInfo outerDirectory,
+        SourceReference outerSource,
+        List<Diagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        var files = new List<FileInfo>();
+        var pending = new Stack<DirectoryInfo>();
+        pending.Push(outerDirectory);
+
+        while (pending.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var directory = pending.Pop();
+            IEnumerable<DirectoryInfo> childDirectories;
+            IEnumerable<FileInfo> childFiles;
+            try
+            {
+                childDirectories = directory.EnumerateDirectories("*", SearchOption.TopDirectoryOnly).ToList();
+                childFiles = directory.EnumerateFiles("*", SearchOption.TopDirectoryOnly).ToList();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                diagnostics.Add(new Diagnostic(
+                    "mod.root.discovery.read_failed",
+                    DiagnosticSeverity.Warning,
+                    $"The directory '{directory.Name}' could not be inspected for ModInfo.xml: {exception.Message}",
+                    outerSource,
+                    directory.Name));
+                continue;
+            }
+
+            files.AddRange(childFiles
+                .Where(file => file.Name.Equals("ModInfo.xml", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(file => file.FullName, StringComparer.Ordinal));
+
+            foreach (var childDirectory in childDirectories
+                         .OrderBy(item => item.Name, StringComparer.Ordinal)
+                         .Reverse())
+            {
+                if (childDirectory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                {
+                    diagnostics.Add(new Diagnostic(
+                        "mod.root.discovery.reparse_skipped",
+                        DiagnosticSeverity.Warning,
+                        $"The reparse-point directory '{childDirectory.Name}' was not inspected for ModInfo.xml.",
+                        outerSource,
+                        childDirectory.Name));
+                    continue;
+                }
+
+                pending.Push(childDirectory);
+            }
+        }
+
+        return files
+            .OrderBy(file => file.FullName, StringComparer.Ordinal)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    private static ModRootCandidate CreateModRootCandidate(
+        DirectoryInfo outerDirectory,
+        DirectoryInfo innerDirectory,
+        EvidenceKind evidenceKind,
+        SourceReference outerSource)
+    {
+        var innerRelativePath = innerDirectory.FullName.Equals(
+            outerDirectory.FullName,
+            StringComparison.OrdinalIgnoreCase)
+            ? outerDirectory.Name
+            : ParsingUtilities.BuildSourcePath(
+                outerDirectory.Name,
+                ParsingUtilities.NormalizeRelativePath(
+                    Path.GetRelativePath(outerDirectory.FullName, innerDirectory.FullName)));
+        var innerSource = new SourceReference(
             SourceReferenceKind.ModDirectory,
-            ParsingUtilities.BuildSourcePath("mods", directory.Name));
-        var scan = ScanFiles(directory, cancellationToken);
+            ParsingUtilities.BuildSourcePath("mods", innerRelativePath));
+
+        return new ModRootCandidate(
+            innerDirectory,
+            outerDirectory.Name,
+            innerRelativePath,
+            evidenceKind,
+            outerSource,
+            innerSource);
+    }
+
+    private static int GetDirectoryDepth(DirectoryInfo root, DirectoryInfo? directory)
+    {
+        if (directory is null)
+        {
+            return int.MaxValue;
+        }
+
+        var relativePath = ParsingUtilities.NormalizeRelativePath(
+            Path.GetRelativePath(root.FullName, directory.FullName));
+        return relativePath == "." || string.IsNullOrEmpty(relativePath)
+            ? 0
+            : relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries).Length;
+    }
+
+    private static (LocalModRecord Record, IReadOnlyList<FileInventoryItem> Inventory) BuildModRecord(
+        DirectoryInfo outerDirectory,
+        ModRootCandidate root,
+        ModProfileState profileState,
+        ModEnabledState enabledState,
+        int? priority,
+        CancellationToken cancellationToken)
+    {
+        var scan = ScanFiles(root.Directory, root.InnerSource.RelativePath, cancellationToken);
         var fileRecords = scan.Files
             .Select(file => new ModFileRecord(
                 file.RelativePath,
@@ -366,27 +578,39 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                 new EvidenceReference(EvidenceKind.Source, file.Source)))
             .ToList()
             .AsReadOnly();
-        var parsed = SevenDaysToDieParsing.Parse(directory.Name, scan.Files);
+        var parsed = SevenDaysToDieParsing.Parse(root.InnerDirectoryRelativePath, scan.Files);
         var diagnostics = scan.Diagnostics.Concat(parsed.Diagnostics).ToList();
+        var rootResolution = new ModRootResolution(
+            root.OuterDirectoryRelativePath,
+            root.InnerDirectoryRelativePath,
+            root.EvidenceKind,
+            root.OuterSource,
+            root.InnerSource);
 
         return (
             new LocalModRecord(
-                directory.Name,
-                directory.Name,
+                root.Directory.Name,
+                root.InnerDirectoryRelativePath,
                 profileState,
                 enabledState,
                 priority,
-                directory.Name,
+                root.InnerDirectoryRelativePath,
                 parsed.ModInfo,
                 fileRecords,
                 parsed.XmlFiles,
                 diagnostics.AsReadOnly(),
-                modSource),
+                root.InnerSource)
+            {
+                Mo2OuterDirectoryName = outerDirectory.Name,
+                Mo2OuterSource = root.OuterSource,
+                RootResolution = rootResolution
+            },
             scan.Files);
     }
 
     private static FileInventoryScanResult ScanFiles(
         DirectoryInfo root,
+        string sourceDirectoryPath,
         CancellationToken cancellationToken)
     {
         var files = new List<FileInventoryItem>();
@@ -414,7 +638,7 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                     $"The MOD directory '{directory.Name}' could not be read: {exception.Message}",
                     new SourceReference(
                         SourceReferenceKind.ModDirectory,
-                        ParsingUtilities.BuildSourcePath("mods", root.Name))));
+                        sourceDirectoryPath)));
                 continue;
             }
 
@@ -428,7 +652,7 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                         $"The reparse-point directory '{childDirectory.Name}' was not traversed.",
                         new SourceReference(
                             SourceReferenceKind.ModDirectory,
-                            ParsingUtilities.BuildSourcePath("mods", root.Name))));
+                            sourceDirectoryPath)));
                     continue;
                 }
 
@@ -446,16 +670,14 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                         $"The reparse-point file '{file.Name}' was not read.",
                         new SourceReference(
                             SourceReferenceKind.ModFile,
-                            ParsingUtilities.BuildSourcePath("mods", root.Name))));
+                            sourceDirectoryPath)));
                     continue;
                 }
 
                 var relativePath = ParsingUtilities.NormalizeRelativePath(Path.GetRelativePath(root.FullName, file.FullName));
                 var source = new SourceReference(
                     SourceReferenceKind.ModFile,
-                    ParsingUtilities.BuildSourcePath(
-                        ParsingUtilities.BuildSourcePath("mods", root.Name),
-                        relativePath));
+                    ParsingUtilities.BuildSourcePath(sourceDirectoryPath, relativePath));
 
                 try
                 {
@@ -511,6 +733,13 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         return $"sha256:{ParsingUtilities.Sha256Hex(Encoding.UTF8.GetBytes(canonical.ToString()))}";
     }
 
+    private static SourceReference BuildModDirectorySource(string directoryRelativePath)
+    {
+        return new SourceReference(
+            SourceReferenceKind.ModDirectory,
+            ParsingUtilities.BuildSourcePath("mods", directoryRelativePath));
+    }
+
     private static ValidatedSourcePaths ValidateSource(Mo2SourceDefinition source)
     {
         var instanceRoot = GetAbsolutePath(source.InstanceRootPath, nameof(source.InstanceRootPath));
@@ -560,5 +789,22 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 
     private sealed record FileInventoryScanResult(
         IReadOnlyList<FileInventoryItem> Files,
+        IReadOnlyList<Diagnostic> Diagnostics);
+
+    private sealed record ModRootCandidate(
+        DirectoryInfo Directory,
+        string OuterDirectoryRelativePath,
+        string InnerDirectoryRelativePath,
+        EvidenceKind EvidenceKind,
+        SourceReference OuterSource,
+        SourceReference InnerSource);
+
+    private sealed record ModRootDiscoveryResult(
+        IReadOnlyList<ModRootCandidate> AcceptedRoots,
+        IReadOnlyList<Diagnostic> Diagnostics);
+
+    private sealed record ModDirectoryReadResult(
+        IReadOnlyList<LocalModRecord> Records,
+        IReadOnlyList<FileInventoryItem> Inventory,
         IReadOnlyList<Diagnostic> Diagnostics);
 }

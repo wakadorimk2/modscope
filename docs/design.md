@@ -213,13 +213,16 @@ source pathは明示します。暗黙の探索範囲を広げません。
 - normalized MOD identity
 - enabled / disabled
 - priority
-- resolved MOD directory
+- MO2 outer directory
+- resolved 7DTD inner root
 - unresolved reason
 
 #### MOD record
 
 - stable MOD id候補
-- directory name
+- MO2 outer directoryとroot resolution
+- resolved inner root directory name
+- root discoveryのevidence種別
 - display name候補
 - enabled状態
 - priority
@@ -227,7 +230,16 @@ source pathは明示します。暗黙の探索範囲を広げません。
 - file references
 - diagnostics
 
-MOD名だけをstable idとしません。directory、profile、source identityの関係を保持します。
+MO2 profile entryはouter directory単位で保持します。
+7DTD MOD recordはresolved inner root単位で生成します。
+outer直下の`ModInfo.xml`は`Source`としてrootを解決します。
+outer直下の子directoryにある`ModInfo.xml`は`Inference`としてrootを解決します。
+子directoryのrootは、1つのouterから複数生成できます。
+2階層以上の`ModInfo.xml`候補はraw path付きdiagnosticだけを保持します。
+rootを解決できないouterはMOD recordを生成しません。
+そのouterのraw inventory、manifest hash、`mod.root.not_found`を保持します。
+stable MOD keyは`mods/`からのnormalizedな`outer`または`outer/inner` pathです。
+`ModInfo.Name`はmetadataであり、stable MOD keyに使いません。
 
 #### File record
 
@@ -280,7 +292,9 @@ MO2 Adapterは、次だけを担当します。
 - 明示されたinstance、profile、mods pathの読み取り
 - modlistのraw保持とnormalized projection
 - enabled状態とpriorityの取得
-- MOD directoryとrelative pathの解決
+- MO2 outer directoryと7DTD inner rootの解決
+- depth 0 / depth 1のroot discoveryと、depth 2以上のdiagnostic化
+- inner rootを基準にしたMOD fileとsource referenceの解決
 - 欠落、重複、未解決入力のdiagnostic化
 
 MO2 Adapterは、MO2のファイルを書き換えません。7DTDのXML semanticsを解釈しません。
@@ -712,9 +726,11 @@ Browser、Local Mod Knowledge、context projection、analysis、mutationを分�
 
 1 profileをread-onlyで読み取ります。Local Mod Knowledgeを生成します。WPF + WebView2上でpage observationを取得し、ユーザー確認したMOD identityとLocal contextを結びます。Inspectorで根拠を開きます。WebView2はbrowser engineの実装資産ではなく、Browsing Layerのhostです。
 
-### Phase 2：structured Local Mod Knowledge
+### Phase 2：structured Local Mod Knowledge（実装中）
 
 ModInfo、Config XML、patch operation、target、XPath、reverse indexを拡張します。
+既存のPhase 1 Local Knowledgeを、raw、normalized、inference、diagnostic付きの静的なstructured modelへ拡張します。
+RuntimeOCD、semantic conflict、effective result、MO2 writeはこのPhaseの対象外です。
 
 ### Phase 3：queryとSite Adapter
 

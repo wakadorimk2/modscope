@@ -11,13 +11,13 @@ public sealed class LocalKnowledgeReaderTests
     {
         var snapshot = ReadFixture();
 
-        Assert.Equal(7, snapshot.ProfileEntries.Count);
+        Assert.Equal(10, snapshot.ProfileEntries.Count);
 
         var alphaEntries = snapshot.ProfileEntries
             .Where(entry => entry.NormalizedModName == "Alpha Mod")
             .ToList();
         Assert.Equal(2, alphaEntries.Count);
-        Assert.Equal(" +Alpha Mod", alphaEntries[0].RawLine);
+        Assert.Equal("+Alpha Mod", alphaEntries[0].RawLine);
         Assert.Equal(ModEnabledState.Enabled, alphaEntries[0].EnabledState);
         Assert.Equal(0, alphaEntries[0].Priority);
         Assert.Equal(SourceReferenceKind.ProfileFile, alphaEntries[0].PriorityEvidence.Source.Kind);
@@ -61,10 +61,12 @@ public sealed class LocalKnowledgeReaderTests
         Assert.Equal(ModEnabledState.Unknown, unlisted.EnabledState);
         Assert.Null(unlisted.Priority);
 
-        var noInfo = GetMod(snapshot, "No ModInfo");
-        Assert.Equal(ModProfileState.Unlisted, noInfo.ProfileState);
-        Assert.Null(noInfo.ModInfo);
-        Assert.Contains(noInfo.Diagnostics, diagnostic => diagnostic.Code == "modinfo.missing");
+        Assert.DoesNotContain(snapshot.Mods, mod => mod.Mo2OuterDirectoryName == "No ModInfo");
+        Assert.Contains(snapshot.Diagnostics, diagnostic =>
+            diagnostic.Code == "mod.root.not_found" &&
+            diagnostic.Source?.RelativePath == "mods/No ModInfo");
+        Assert.Contains(snapshot.InputManifest.Files, file =>
+            file.RelativePath == "mods/No ModInfo/Config/dtd.xml");
     }
 
     [Fact]
@@ -89,7 +91,14 @@ public sealed class LocalKnowledgeReaderTests
         var alpha = GetMod(ReadFixture(), "Alpha Mod");
 
         Assert.Equal(
-            new[] { "Config/Sub/recipes.xml", "Config/items.xml", "ModInfo.xml", "readme.txt" },
+            new[]
+            {
+                "Config/Sub/recipes.xml",
+                "Config/items.xml",
+                "Config/operations.xml",
+                "ModInfo.xml",
+                "readme.txt"
+            },
             alpha.Files.Select(file => file.RelativePath));
         Assert.All(alpha.Files, file => Assert.Matches("^[0-9a-f]{64}$", file.Sha256));
 
@@ -101,19 +110,192 @@ public sealed class LocalKnowledgeReaderTests
     }
 
     [Fact]
+    public void ReadsTextModInfoSchemaAndPreservesDuplicateAndUnknownObservations()
+    {
+        var textMod = GetMod(ReadFixture(), "Text Mod");
+
+        Assert.NotNull(textMod.ModInfo);
+        Assert.Equal("Text Mod", textMod.ModInfo!.Name);
+        Assert.Equal("Text Display", textMod.ModInfo.DisplayName);
+        Assert.Equal("2.0", textMod.ModInfo.Version);
+        Assert.Contains(textMod.ModInfo.RawObservations, observation => observation.ElementName == "Name");
+        Assert.Contains(textMod.ModInfo.UnknownObservations, observation => observation.ElementName == "UnknownField");
+        Assert.Contains(textMod.Diagnostics, diagnostic => diagnostic.Code == "modinfo.duplicate_field");
+    }
+
+    [Fact]
+    public void ExtractsKnownAndUnknownPatchOperationsWithCandidates()
+    {
+        var alpha = GetMod(ReadFixture(), "Alpha Mod");
+        var operationsFile = Assert.Single(alpha.XmlFiles, file => file.RelativePath == "Config/operations.xml");
+
+        Assert.Equal(10, operationsFile.PatchOperations.Count);
+
+        var set = Assert.Single(operationsFile.PatchOperations, operation => operation.RawOperationName == "set");
+        Assert.Equal(XmlPatchOperationKind.Set, set.NormalizedKind);
+        Assert.Equal(
+            "/items/item[@name='Alpha']/property[@name='Health']/@value",
+            Assert.Single(set.XPathCandidates).RawValue);
+        var explicitTarget = Assert.Single(
+            set.TargetXmlCandidates,
+            candidate => candidate.EvidenceKind == EvidenceKind.Normalized);
+        Assert.Equal("items.xml", explicitTarget.NormalizedValue);
+        Assert.Contains(set.EntityCandidates, candidate => candidate.NormalizedValue == "item");
+        Assert.Contains(set.PropertyCandidates, candidate => candidate.NormalizedValue == "Health");
+        Assert.Contains(set.AttributeCandidates, candidate => candidate.NormalizedValue == "value");
+
+        var append = Assert.Single(operationsFile.PatchOperations, operation => operation.RawOperationName == "append");
+        Assert.Equal(XmlPatchOperationKind.Append, append.NormalizedKind);
+        Assert.Contains(append.PropertyCandidates, candidate => candidate.NormalizedValue == "Tags");
+        Assert.Contains(append.TargetXmlCandidates, candidate =>
+            candidate.NormalizedValue == "operations.xml"
+            && candidate.EvidenceKind == EvidenceKind.Inference);
+
+        var unknown = Assert.Single(operationsFile.PatchOperations, operation => operation.RawOperationName == "mystery");
+        Assert.Null(unknown.NormalizedKind);
+        Assert.Contains(unknown.RawObservation.Attributes, attribute =>
+            attribute.Name == "custom" && attribute.Value == "preserve");
+        Assert.Contains(unknown.Diagnostics, diagnostic => diagnostic.Code == "xml.patch.operation.unknown");
+        Assert.Contains(operationsFile.Diagnostics, diagnostic => diagnostic.Code == "xml.patch.operation.unknown");
+
+        var csv = Assert.Single(operationsFile.PatchOperations, operation => operation.RawOperationName == "csv");
+        Assert.Null(csv.NormalizedKind);
+        Assert.Contains(csv.Diagnostics, diagnostic => diagnostic.RawValue == "csv");
+    }
+
+    [Fact]
+    public void BuildsDeterministicForwardAndReverseKnowledgeReferences()
+    {
+        var first = ReadFixture();
+        var second = ReadFixture();
+
+        Assert.NotEmpty(first.Index.ForwardReferences);
+        Assert.NotEmpty(first.Index.ReverseReferences);
+        Assert.Equal(first.Index.ForwardReferences, second.Index.ForwardReferences);
+        Assert.Equal(first.Index.ReverseReferences, second.Index.ReverseReferences);
+
+        Assert.Contains(first.Index.ForwardReferences, reference =>
+            reference.From.Kind == LocalKnowledgeNodeKind.PatchOperation
+            && reference.To.Kind == LocalKnowledgeNodeKind.XPath
+            && reference.To.Value == "/items/item[@name='Alpha']/property[@name='Health']/@value"
+            && reference.Relation == LocalKnowledgeRelation.Selects);
+        Assert.Contains(first.Index.ReverseReferences, reference =>
+            reference.From.Kind == LocalKnowledgeNodeKind.XPath
+            && reference.From.Value == "/items/item[@name='Alpha']/property[@name='Health']/@value"
+            && reference.To.Kind == LocalKnowledgeNodeKind.PatchOperation);
+        Assert.Contains(first.Index.ReverseReferences, reference =>
+            reference.From.Kind == LocalKnowledgeNodeKind.TargetXml
+            && reference.From.Value == "items.xml"
+            && reference.To.Kind == LocalKnowledgeNodeKind.PatchOperation
+            && reference.Evidence.Kind == EvidenceKind.Normalized);
+        Assert.Contains(first.Index.ReverseReferences, reference =>
+            reference.From.Kind == LocalKnowledgeNodeKind.TargetXml
+            && reference.From.Value == "operations.xml"
+            && reference.To.Kind == LocalKnowledgeNodeKind.PatchOperation
+            && reference.Evidence.Kind == EvidenceKind.Inference);
+    }
+
+    [Fact]
+    public void ReportsInvalidEncodingWithoutDiscardingTheDiagnostic()
+    {
+        var temporaryRoot = Directory.CreateTempSubdirectory("modscope-encoding-");
+        try
+        {
+            CopyDirectory(FixtureRoot, temporaryRoot.FullName);
+            var invalidPath = Path.Combine(
+                temporaryRoot.FullName,
+                "mods",
+                "Alpha Mod",
+                "Config",
+                "invalid-encoding.xml");
+            File.WriteAllBytes(invalidPath, new byte[] { 0xEF, 0xBB, 0xBF, 0xFF });
+
+            var snapshot = new Mo2SnapshotReader().Read(CreateSource(temporaryRoot.FullName));
+            var alpha = GetMod(snapshot, "Alpha Mod");
+            var invalid = Assert.Single(alpha.XmlFiles, file => file.RelativePath == "Config/invalid-encoding.xml");
+
+            Assert.Equal(XmlParseStatus.EncodingError, invalid.ParseStatus);
+            Assert.Contains(invalid.Diagnostics, diagnostic => diagnostic.Code == "xml.encoding.invalid");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
     public void KeepsMalformedAndDtdDiagnosticsPerFile()
     {
         var snapshot = ReadFixture();
         var beta = GetMod(snapshot, "Beta Mod");
-        var noInfo = GetMod(snapshot, "No ModInfo");
-
         var malformed = Assert.Single(beta.XmlFiles, file => file.RelativePath == "Config/malformed.xml");
         Assert.Equal(XmlParseStatus.Malformed, malformed.ParseStatus);
         Assert.Contains(malformed.Diagnostics, diagnostic => diagnostic.Code == "xml.malformed");
 
-        var dtd = Assert.Single(noInfo.XmlFiles, file => file.RelativePath == "Config/dtd.xml");
+        var dtd = Assert.Single(beta.XmlFiles, file => file.RelativePath == "Config/dtd.xml");
         Assert.Equal(XmlParseStatus.DtdBlocked, dtd.ParseStatus);
         Assert.Contains(dtd.Diagnostics, diagnostic => diagnostic.Code == "xml.dtd.blocked");
+    }
+
+    [Fact]
+    public void DiscoversInferredRootsAndPreservesOuterAndInnerSources()
+    {
+        var snapshot = ReadFixture();
+
+        var wrapped = Assert.Single(snapshot.Mods, mod => mod.ModKey == "Wrapped Outer/Wrapped Inner");
+        Assert.Equal("Wrapped Inner", wrapped.DirectoryName);
+        Assert.Equal("Wrapped Outer", wrapped.Mo2OuterDirectoryName);
+        Assert.Equal(ModProfileState.Listed, wrapped.ProfileState);
+        Assert.Equal(ModEnabledState.Disabled, wrapped.EnabledState);
+        Assert.Equal(4, wrapped.Priority);
+        Assert.Equal(EvidenceKind.Inference, wrapped.RootResolution!.EvidenceKind);
+        Assert.Equal("mods/Wrapped Outer", wrapped.RootResolution.OuterSource.RelativePath);
+        Assert.Equal("mods/Wrapped Outer/Wrapped Inner", wrapped.RootResolution.InnerSource.RelativePath);
+        Assert.Equal("mods/Wrapped Outer/Wrapped Inner/ModInfo.xml", wrapped.ModInfo!.Source.RelativePath);
+        Assert.Contains(wrapped.Files, file =>
+            file.Source.RelativePath == "mods/Wrapped Outer/Wrapped Inner/Config/items.xml");
+
+        var direct = GetMod(snapshot, "Alpha Mod");
+        Assert.Equal(EvidenceKind.Source, direct.RootResolution!.EvidenceKind);
+        Assert.Equal("mods/Alpha Mod", direct.RootResolution.OuterSource.RelativePath);
+        Assert.Equal("mods/Alpha Mod", direct.RootResolution.InnerSource.RelativePath);
+    }
+
+    [Fact]
+    public void DiscoversMultipleInnerRootsAndReportsDeepCandidates()
+    {
+        var snapshot = ReadFixture();
+
+        var first = Assert.Single(snapshot.Mods, mod => mod.ModKey == "Multi Outer/First Inner");
+        var second = Assert.Single(snapshot.Mods, mod => mod.ModKey == "Multi Outer/Second Inner");
+        Assert.Equal(ModEnabledState.Enabled, first.EnabledState);
+        Assert.Equal(ModEnabledState.Enabled, second.EnabledState);
+        Assert.Equal(5, first.Priority);
+        Assert.Equal(5, second.Priority);
+        Assert.Equal(EvidenceKind.Inference, first.RootResolution!.EvidenceKind);
+        Assert.Equal(EvidenceKind.Inference, second.RootResolution!.EvidenceKind);
+
+        var deep = Assert.Single(snapshot.Mods, mod => mod.ModKey == "Deep Outer/Deep Inner");
+        Assert.DoesNotContain(snapshot.Mods, mod => mod.ModKey.Contains("Nested", StringComparison.Ordinal));
+        Assert.Contains(deep.XmlFiles, file => file.RelativePath == "Config/Nested/ModInfo.xml");
+        Assert.Contains(snapshot.Diagnostics, diagnostic =>
+            diagnostic.Code == "mod.root.depth_exceeded" &&
+            diagnostic.RawValue == "Deep Inner/Config/Nested/ModInfo.xml");
+    }
+
+    [Fact]
+    public void IndexUsesResolvedInnerPathsAndExcludesUnresolvedOuterDirectories()
+    {
+        var snapshot = ReadFixture();
+
+        Assert.Contains(snapshot.Index.ForwardReferences, reference =>
+            reference.From.Kind == LocalKnowledgeNodeKind.Mod &&
+            reference.From.Value == "Wrapped Outer/Wrapped Inner" &&
+            reference.To.Kind == LocalKnowledgeNodeKind.File &&
+            reference.To.Value == "mods/Wrapped Outer/Wrapped Inner/Config/items.xml");
+        Assert.DoesNotContain(snapshot.Index.ForwardReferences, reference =>
+            reference.From.Kind == LocalKnowledgeNodeKind.Mod &&
+            reference.From.Value == "No ModInfo");
     }
 
     [Fact]
@@ -126,6 +308,132 @@ public sealed class LocalKnowledgeReaderTests
         Assert.Equal(first.InputManifest.Files, second.InputManifest.Files);
         Assert.Equal(ParserMetadata.ParserVersion, first.ParserVersion);
         Assert.Equal(ParserMetadata.SchemaVersion, first.SchemaVersion);
+    }
+
+    [Fact]
+    public void NormalizedSnapshotDataAndIndexAreStableForTheSameInput()
+    {
+        var first = ReadFixture();
+        var second = ReadFixture();
+
+        var firstProfiles = first.ProfileEntries
+            .Select(entry => string.Join("|", new[]
+            {
+                entry.RawLine,
+                entry.SourceLineNumber.ToString(),
+                entry.EnabledState.ToString(),
+                entry.NormalizedModName ?? string.Empty,
+                entry.Priority?.ToString() ?? string.Empty,
+                string.Join(",", entry.Diagnostics.Select(diagnostic => diagnostic.Code))
+            }))
+            .ToArray();
+        var secondProfiles = second.ProfileEntries
+            .Select(entry => string.Join("|", new[]
+            {
+                entry.RawLine,
+                entry.SourceLineNumber.ToString(),
+                entry.EnabledState.ToString(),
+                entry.NormalizedModName ?? string.Empty,
+                entry.Priority?.ToString() ?? string.Empty,
+                string.Join(",", entry.Diagnostics.Select(diagnostic => diagnostic.Code))
+            }))
+            .ToArray();
+        Assert.Equal(firstProfiles, secondProfiles);
+
+        var firstMods = first.Mods
+            .OrderBy(mod => mod.ModKey, StringComparer.Ordinal)
+            .Select(mod => string.Join("|", new[]
+            {
+                mod.DirectoryName,
+                mod.ModKey,
+                mod.ProfileState.ToString(),
+                mod.EnabledState.ToString(),
+                mod.Priority?.ToString() ?? string.Empty,
+                mod.ResolvedDirectoryRelativePath ?? string.Empty,
+                mod.ModInfo is null
+                    ? string.Empty
+                    : string.Join(":", new[]
+                    {
+                        mod.ModInfo.Name ?? string.Empty,
+                        mod.ModInfo.DisplayName ?? string.Empty,
+                        mod.ModInfo.Version ?? string.Empty
+                    }),
+                string.Join(";", mod.Files
+                    .OrderBy(file => file.RelativePath, StringComparer.Ordinal)
+                    .Select(file => string.Join(":", new[]
+                    {
+                        file.RelativePath,
+                        file.Size.ToString(),
+                        file.Sha256,
+                        file.Source.RelativePath
+                    }))),
+                string.Join(";", mod.XmlFiles
+                    .OrderBy(file => file.RelativePath, StringComparer.Ordinal)
+                    .Select(file => string.Join(":", new[]
+                    {
+                        file.RelativePath,
+                        file.ParseStatus.ToString(),
+                        file.Source.RelativePath,
+                        string.Join(",", file.PatchOperations
+                            .OrderBy(operation => operation.ElementPath, StringComparer.Ordinal)
+                            .Select(operation => string.Join("/", new[]
+                            {
+                                operation.ElementPath,
+                                operation.RawOperationName,
+                                operation.NormalizedKind?.ToString() ?? string.Empty
+                            })))
+                    })))
+            }))
+            .ToArray();
+        var secondMods = second.Mods
+            .OrderBy(mod => mod.ModKey, StringComparer.Ordinal)
+            .Select(mod => string.Join("|", new[]
+            {
+                mod.DirectoryName,
+                mod.ModKey,
+                mod.ProfileState.ToString(),
+                mod.EnabledState.ToString(),
+                mod.Priority?.ToString() ?? string.Empty,
+                mod.ResolvedDirectoryRelativePath ?? string.Empty,
+                mod.ModInfo is null
+                    ? string.Empty
+                    : string.Join(":", new[]
+                    {
+                        mod.ModInfo.Name ?? string.Empty,
+                        mod.ModInfo.DisplayName ?? string.Empty,
+                        mod.ModInfo.Version ?? string.Empty
+                    }),
+                string.Join(";", mod.Files
+                    .OrderBy(file => file.RelativePath, StringComparer.Ordinal)
+                    .Select(file => string.Join(":", new[]
+                    {
+                        file.RelativePath,
+                        file.Size.ToString(),
+                        file.Sha256,
+                        file.Source.RelativePath
+                    }))),
+                string.Join(";", mod.XmlFiles
+                    .OrderBy(file => file.RelativePath, StringComparer.Ordinal)
+                    .Select(file => string.Join(":", new[]
+                    {
+                        file.RelativePath,
+                        file.ParseStatus.ToString(),
+                        file.Source.RelativePath,
+                        string.Join(",", file.PatchOperations
+                            .OrderBy(operation => operation.ElementPath, StringComparer.Ordinal)
+                            .Select(operation => string.Join("/", new[]
+                            {
+                                operation.ElementPath,
+                                operation.RawOperationName,
+                                operation.NormalizedKind?.ToString() ?? string.Empty
+                            })))
+                    })))
+            }))
+            .ToArray();
+        Assert.Equal(firstMods, secondMods);
+        Assert.Equal(first.Diagnostics, second.Diagnostics);
+        Assert.Equal(first.Index.ForwardReferences, second.Index.ForwardReferences);
+        Assert.Equal(first.Index.ReverseReferences, second.Index.ReverseReferences);
     }
 
     [Fact]

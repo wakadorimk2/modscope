@@ -94,8 +94,14 @@ public sealed class LocalKnowledgeQueryTests
             CreateProfile(profilesPath.FullName, "Alternate", "+Beta Mod");
             CreateProfile(root.FullName, "OutsideCatalog", "+Alpha Mod");
             var modsPath = Directory.CreateDirectory(Path.Combine(root.FullName, "mods"));
-            Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Alpha Mod"));
-            Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Beta Mod"));
+            var alphaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Alpha Mod"));
+            var betaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Beta Mod"));
+            File.WriteAllText(
+                Path.Combine(alphaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Alpha Mod\" /></xml>");
+            File.WriteAllText(
+                Path.Combine(betaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Beta Mod\" /></xml>");
 
             var query = CreateQuery();
             query.Load(new Mo2SourceInput(
