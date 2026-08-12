@@ -15,6 +15,65 @@ public sealed record Mo2SourceDefinition(
     string ProfilePath,
     string ModsPath);
 
+public enum Mo2SourceCandidateReadiness
+{
+    Ready,
+    ProfileSelectionRequired,
+    UnsupportedGame,
+    Invalid
+}
+
+public enum Mo2SourceDiscoveryEvidenceKind
+{
+    RunningProcess,
+    Remembered,
+    GlobalInstance,
+    NativePicker
+}
+
+public sealed record Mo2SourceDiscoveryEvidence(
+    Mo2SourceDiscoveryEvidenceKind Kind,
+    EvidenceKind EvidenceKind);
+
+public sealed record Mo2SourceCandidate(
+    string CandidateId,
+    string GameName,
+    Mo2SourceDefinition Source,
+    Mo2SourceCandidateReadiness Readiness,
+    IReadOnlyList<Mo2SourceDiscoveryEvidence> Evidence,
+    IReadOnlyList<Diagnostic> Diagnostics);
+
+public sealed record Mo2SourcePreference(
+    string InstanceRootPath,
+    string ProfileName);
+
+public sealed record Mo2SourceDiscoveryRequest(
+    Mo2SourcePreference? RememberedSource,
+    IReadOnlyList<string> SelectedRoots);
+
+public interface IMo2DiscoveryEnvironment
+{
+    string? LocalAppDataPath { get; }
+
+    IReadOnlyList<string> GetRunningModOrganizerExecutablePaths();
+
+    string? GetLastUsedInstanceName();
+}
+
+public interface IMo2SourceDiscovery
+{
+    IReadOnlyList<Mo2SourceCandidate> Discover(
+        Mo2SourceDiscoveryRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IMo2SourcePreferenceStore
+{
+    Mo2SourcePreference? Read();
+
+    void Write(Mo2SourcePreference preference);
+}
+
 public sealed record Mo2ProfileDefinition(
     string Name,
     string ProfilePath);
@@ -65,6 +124,7 @@ public enum EvidenceKind
 public enum SourceReferenceKind
 {
     ProfileFile,
+    InstanceFile,
     ModDirectory,
     ModFile
 }
