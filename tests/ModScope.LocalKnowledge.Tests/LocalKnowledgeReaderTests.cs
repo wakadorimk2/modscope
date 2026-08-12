@@ -299,6 +299,85 @@ public sealed class LocalKnowledgeReaderTests
     }
 
     [Fact]
+    public void ReusesStaticKnowledgeAcrossProfilesAndInvalidatesOnMetadataChanges()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-cache-");
+        try
+        {
+            CopyDirectory(FixtureRoot, root.FullName);
+            var alternateProfilePath = Directory.CreateDirectory(Path.Combine(root.FullName, "alternate"));
+            File.WriteAllText(
+                Path.Combine(alternateProfilePath.FullName, "modlist.txt"),
+                "-Alpha Mod\n+Beta Mod\n");
+
+            var reader = new Mo2SnapshotReader();
+            var first = reader.Read(CreateSource(root.FullName));
+            var alternate = reader.Read(new Mo2SourceDefinition(
+                "synthetic-instance",
+                "alternate",
+                root.FullName,
+                alternateProfilePath.FullName,
+                Path.Combine(root.FullName, "mods")));
+
+            Assert.NotEqual(first.SnapshotId, alternate.SnapshotId);
+            Assert.NotEqual(first.ProfileEntries[0].RawLine, alternate.ProfileEntries[0].RawLine);
+            Assert.Equal(first.Index.ForwardReferences, alternate.Index.ForwardReferences);
+            Assert.Equal(first.Index.ReverseReferences, alternate.Index.ReverseReferences);
+            Assert.Equal(
+                first.Mods
+                    .Where(mod => mod.ResolvedDirectoryRelativePath is not null)
+                    .OrderBy(mod => mod.ModKey, StringComparer.Ordinal)
+                    .Select(mod => string.Join(
+                        "|",
+                        mod.ModKey,
+                        mod.ModInfo?.Name ?? string.Empty,
+                        string.Join(",", mod.Files.Select(file => $"{file.RelativePath}:{file.Sha256}")))),
+                alternate.Mods
+                    .Where(mod => mod.ResolvedDirectoryRelativePath is not null)
+                    .OrderBy(mod => mod.ModKey, StringComparer.Ordinal)
+                    .Select(mod => string.Join(
+                        "|",
+                        mod.ModKey,
+                        mod.ModInfo?.Name ?? string.Empty,
+                        string.Join(",", mod.Files.Select(file => $"{file.RelativePath}:{file.Sha256}")))));
+
+            var alphaInfoPath = Path.Combine(root.FullName, "mods", "Alpha Mod", "ModInfo.xml");
+            var beforeHash = first.Mods
+                .Single(mod => mod.ModKey == "Alpha Mod")
+                .Files
+                .Single(file => file.RelativePath.Equals("ModInfo.xml", StringComparison.OrdinalIgnoreCase))
+                .Sha256;
+            File.AppendAllText(alphaInfoPath, "\n");
+
+            var changed = reader.Read(CreateSource(root.FullName));
+            var afterHash = changed.Mods
+                .Single(mod => mod.ModKey == "Alpha Mod")
+                .Files
+                .Single(file => file.RelativePath.Equals("ModInfo.xml", StringComparison.OrdinalIgnoreCase))
+                .Sha256;
+
+            Assert.NotEqual(beforeHash, afterHash);
+
+            var extraFilePath = Path.Combine(root.FullName, "mods", "Alpha Mod", "cache-test.txt");
+            File.WriteAllText(extraFilePath, "cache metadata");
+            var added = reader.Read(CreateSource(root.FullName));
+            Assert.Contains(
+                added.Mods.Single(mod => mod.ModKey == "Alpha Mod").Files,
+                file => file.RelativePath.Equals("cache-test.txt", StringComparison.Ordinal));
+
+            File.Delete(extraFilePath);
+            var removed = reader.Read(CreateSource(root.FullName));
+            Assert.DoesNotContain(
+                removed.Mods.Single(mod => mod.ModKey == "Alpha Mod").Files,
+                file => file.RelativePath.Equals("cache-test.txt", StringComparison.Ordinal));
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
+    [Fact]
     public void SnapshotIdIsStableForTheSameInput()
     {
         var first = ReadFixture();

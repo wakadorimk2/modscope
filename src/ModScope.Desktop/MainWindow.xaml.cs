@@ -51,7 +51,9 @@ public partial class MainWindow : Window
             if (!_sourceDiscoveryStarted)
             {
                 _sourceDiscoveryStarted = true;
-                await _controller.DiscoverSourcesAsync();
+                var discoveryTask = _controller.DiscoverSourcesAsync();
+                SendState();
+                await discoveryTask;
                 SendState();
             }
 
@@ -186,32 +188,42 @@ public partial class MainWindow : Window
                 await ObservePageAsync(command.RequestId);
                 break;
             case "knowledge.useFixture":
-                _controller.UseFixture();
+            {
+                var fixtureTask = _controller.UseFixtureAsync();
+                SendState();
+                await fixtureTask;
                 SendState(command.RequestId);
                 break;
+            }
             case "knowledge.loadSource":
             {
                 var payload = BridgeProtocol.ReadPayload<LoadSourcePayload>(command.Payload);
-                _controller.LoadSource(new Mo2SourceInput(
+                var loadTask = _controller.LoadSourceAsync(new Mo2SourceInput(
                     payload.InstanceName,
                     payload.ProfileName,
                     payload.InstanceRootPath,
                     payload.ProfilePath,
                     payload.ModsPath));
+                SendState();
+                await loadTask;
                 SendState(command.RequestId);
                 break;
             }
             case "knowledge.discoverSources":
             {
                 var payload = BridgeProtocol.ReadPayload<DiscoverSourcesPayload>(command.Payload);
-                await _controller.DiscoverSourcesAsync(payload.SelectedRoots);
+                var discoveryTask = _controller.DiscoverSourcesAsync(payload.SelectedRoots);
+                SendState();
+                await discoveryTask;
                 SendState(command.RequestId);
                 break;
             }
             case "knowledge.selectSource":
             {
                 var payload = BridgeProtocol.ReadPayload<SelectSourcePayload>(command.Payload);
-                await _controller.LoadSourceCandidateAsync(payload.CandidateId);
+                var loadTask = _controller.LoadSourceCandidateAsync(payload.CandidateId);
+                SendState();
+                await loadTask;
                 SendState(command.RequestId);
                 break;
             }
@@ -220,7 +232,9 @@ public partial class MainWindow : Window
                 var root = ChooseMo2Root();
                 if (root is not null)
                 {
-                    await _controller.DiscoverSourcesAsync(new[] { root });
+                    var discoveryTask = _controller.DiscoverSourcesAsync(new[] { root });
+                    SendState();
+                    await discoveryTask;
                 }
 
                 SendState(command.RequestId);
@@ -234,7 +248,9 @@ public partial class MainWindow : Window
                     throw new BridgeProtocolException("The profile name is required.");
                 }
 
-                _controller.SwitchProfile(payload.ProfileName);
+                var switchTask = _controller.SwitchProfileAsync(payload.ProfileName);
+                SendState();
+                await switchTask;
                 SendState(command.RequestId);
                 break;
             }

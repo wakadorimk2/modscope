@@ -7,6 +7,7 @@ namespace ModScope.Desktop;
 public sealed class DesktopSessionController
 {
     private readonly ILocalKnowledgeQuery _query;
+    private readonly SemaphoreSlim _operationGate = new(1, 1);
     private KnowledgeSessionReadModel? _session;
     private PageObservation? _observation;
     private IReadOnlyList<ModCandidateSummary> _candidates = Array.Empty<ModCandidateSummary>();
@@ -19,6 +20,7 @@ public sealed class DesktopSessionController
     private string? _selectedLocalModKey;
     private string _statusMessage = "Load a source and observe the current page.";
     private bool _contextVisible = true;
+    private KnowledgeOperationUiState _operation = KnowledgeOperationUiState.Idle;
 
     public DesktopSessionController()
         : this(LocalKnowledgeQueryService.CreateDefault())
@@ -40,6 +42,23 @@ public sealed class DesktopSessionController
             Path.Combine(root, "profile"),
             Path.Combine(root, "mods")));
         _statusMessage = "Synthetic Local Knowledge fixture loaded.";
+    }
+
+    public async Task<bool> UseFixtureAsync()
+    {
+        var root = Path.Combine(AppContext.BaseDirectory, "Fixtures", "7dtd-mo2-minimal");
+        var loaded = await LoadSourceAsync(new Mo2SourceInput(
+            "synthetic-instance",
+            "default",
+            root,
+            Path.Combine(root, "profile"),
+            Path.Combine(root, "mods")));
+        if (loaded)
+        {
+            _statusMessage = "Synthetic Local Knowledge fixture loaded.";
+        }
+
+        return loaded;
     }
 
     public void DiscoverSources(IReadOnlyList<string>? selectedRoots = null)
@@ -69,27 +88,45 @@ public sealed class DesktopSessionController
 
     public async Task DiscoverSourcesAsync(IReadOnlyList<string>? selectedRoots = null)
     {
-        var sourceDiscovery = await Task.Run(() => _query.DiscoverSources(selectedRoots));
-        _sourceDiscovery = sourceDiscovery;
-        _selectedSourceCandidateId = null;
-
-        var readyCandidates = sourceDiscovery.Candidates
-            .Where(candidate => candidate.IsReady)
-            .ToList();
-        if (readyCandidates.Count == 1)
+        await _operationGate.WaitAsync();
+        BeginOperation("source-discovery", null);
+        try
         {
-            if (await LoadSourceCandidateAsync(readyCandidates[0].CandidateId))
+            try
             {
-                _statusMessage = $"Detected MO2 source {readyCandidates[0].InstanceName} / {readyCandidates[0].ProfileName}.";
+                var sourceDiscovery = await Task.Run(() => _query.DiscoverSources(selectedRoots));
+                _sourceDiscovery = sourceDiscovery;
+                _selectedSourceCandidateId = null;
+
+                var readyCandidates = sourceDiscovery.Candidates
+                    .Where(candidate => candidate.IsReady)
+                    .ToList();
+                if (readyCandidates.Count == 1)
+                {
+                    BeginOperation("source-load", readyCandidates[0].ProfileName);
+                    if (await LoadSourceCandidateCoreAsync(readyCandidates[0].CandidateId))
+                    {
+                        _statusMessage = $"Detected MO2 source {readyCandidates[0].InstanceName} / {readyCandidates[0].ProfileName}.";
+                    }
+                }
+                else if (readyCandidates.Count > 1)
+                {
+                    _statusMessage = $"Found {readyCandidates.Count} MO2 source candidates. Choose one.";
+                }
+                else
+                {
+                    _statusMessage = "No ready 7 Days to Die MO2 source was found.";
+                }
+            }
+            catch (Exception exception)
+            {
+                _statusMessage = $"MO2 source discovery failed. {exception.Message}";
             }
         }
-        else if (readyCandidates.Count > 1)
+        finally
         {
-            _statusMessage = $"Found {readyCandidates.Count} MO2 source candidates. Choose one.";
-        }
-        else
-        {
-            _statusMessage = "No ready 7 Days to Die MO2 source was found.";
+            EndOperation();
+            _operationGate.Release();
         }
     }
 
@@ -112,16 +149,43 @@ public sealed class DesktopSessionController
     public async Task<bool> LoadSourceCandidateAsync(string candidateId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(candidateId);
+        await _operationGate.WaitAsync();
+        BeginOperation("source-load", null);
         try
         {
-            var session = await Task.Run(() => _query.LoadSourceCandidate(candidateId));
-            ApplyLoadedSession(session, candidateId.Trim());
-            return true;
+            return await LoadSourceCandidateCoreAsync(candidateId);
         }
-        catch (Exception exception)
+        finally
         {
-            MarkCandidateLoadFailure(candidateId.Trim(), exception);
-            return false;
+            EndOperation();
+            _operationGate.Release();
+        }
+    }
+
+    public async Task<bool> LoadSourceAsync(Mo2SourceInput source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        await _operationGate.WaitAsync();
+        BeginOperation("source-load", source.ProfileName);
+        try
+        {
+            try
+            {
+                var session = await Task.Run(() => _query.Load(source));
+                ApplyLoadedSession(session, null);
+                _sourceDiscovery = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                _statusMessage = $"MO2 source loading failed. Existing session was kept. {exception.Message}";
+                return false;
+            }
+        }
+        finally
+        {
+            EndOperation();
+            _operationGate.Release();
         }
     }
 
@@ -152,6 +216,32 @@ public sealed class DesktopSessionController
         _inspector = null;
         _selectedSourceCandidateId = null;
         _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
+    }
+
+    public async Task<bool> SwitchProfileAsync(string profileName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
+        await _operationGate.WaitAsync();
+        BeginOperation("profile-switch", profileName.Trim());
+        try
+        {
+            try
+            {
+                var session = await Task.Run(() => _query.SwitchProfile(profileName));
+                ApplyProfileSession(session);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                _statusMessage = $"Profile loading failed. Existing session was kept. {exception.Message}";
+                return false;
+            }
+        }
+        finally
+        {
+            EndOperation();
+            _operationGate.Release();
+        }
     }
 
     public void SetContextVisible(bool visible)
@@ -228,7 +318,49 @@ public sealed class DesktopSessionController
             _localContext,
             _inspector,
             new LayoutUiState(_contextVisible),
-            _statusMessage);
+            _statusMessage,
+            _operation);
+    }
+
+    private async Task<bool> LoadSourceCandidateCoreAsync(string candidateId)
+    {
+        try
+        {
+            var session = await Task.Run(() => _query.LoadSourceCandidate(candidateId));
+            ApplyLoadedSession(session, candidateId.Trim());
+            return true;
+        }
+        catch (Exception exception)
+        {
+            MarkCandidateLoadFailure(candidateId.Trim(), exception);
+            return false;
+        }
+    }
+
+    private void BeginOperation(string kind, string? targetProfileName)
+    {
+        _operation = new KnowledgeOperationUiState(kind, true, targetProfileName);
+        _statusMessage = targetProfileName is null
+            ? "Loading local MO2 knowledge."
+            : $"Loading profile {targetProfileName}.";
+    }
+
+    private void EndOperation()
+    {
+        _operation = KnowledgeOperationUiState.Idle;
+    }
+
+    private void ApplyProfileSession(KnowledgeSessionReadModel session)
+    {
+        _session = session;
+        _candidates = _query.GetModCandidates();
+        _profiles = _query.GetProfiles();
+        _candidateIdentity = string.Empty;
+        _selectedLocalModKey = null;
+        _localContext = null;
+        _inspector = null;
+        _selectedSourceCandidateId = null;
+        _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
     }
 
     private void MarkCandidateLoadFailure(string candidateId, Exception exception)

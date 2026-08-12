@@ -252,7 +252,16 @@ public sealed record ProfileUiState(string Name);
 public sealed record KnowledgeUiState(
     KnowledgeSessionUiState? Session,
     IReadOnlyList<ModCandidateUiState> Candidates,
-    IReadOnlyList<ProfileUiState> Profiles);
+    IReadOnlyList<ProfileUiState> Profiles,
+    KnowledgeOperationUiState Operation);
+
+public sealed record KnowledgeOperationUiState(
+    string Kind,
+    bool IsBusy,
+    string? TargetProfileName)
+{
+    public static KnowledgeOperationUiState Idle { get; } = new("idle", false, null);
+}
 
 public sealed record SourceCandidateUiState(
     string CandidateId,

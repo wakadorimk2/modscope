@@ -17,7 +17,8 @@ internal static class DesktopStateMapper
         LocalContextReadModel? localContext,
         InspectorReadModel? inspector,
         LayoutUiState layout,
-        string statusMessage)
+        string statusMessage,
+        KnowledgeOperationUiState operation)
     {
         return new UiState(
             browser,
@@ -28,7 +29,8 @@ internal static class DesktopStateMapper
             new KnowledgeUiState(
                 session is null ? null : KnowledgeSession(session),
                 candidates.Select(Candidate).ToList().AsReadOnly(),
-                profiles.Select(Profile).ToList().AsReadOnly()),
+                profiles.Select(Profile).ToList().AsReadOnly(),
+                operation),
             identity,
             localContext is null ? null : LocalContext(localContext),
             inspector is null ? null : Inspector(inspector),

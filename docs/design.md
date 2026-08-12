@@ -904,6 +904,29 @@ reparse pointと、MO2設定にない暗黙のglobal pathは読み取りませ�
 Profile switchは新しいsnapshotをread-onlyで生成します。
 Profile pathの絶対値はfrontendへ送信しません。
 
+### 24.3 読み込み性能とProfile投影
+
+静的MOD knowledgeとProfile projectionを分離します。
+静的MOD knowledgeは、MOD record、file inventory、XML observation、diagnostic、LocalKnowledgeIndexを含みます。
+Profile projectionは、`modlist.txt`のraw line、enabled state、priority、Profile state、profile hash、snapshot IDを含みます。
+
+`Mo2SnapshotReader`は、正規化した`ModsPath`、parser version、schema versionをkeyにprocess-scoped static catalogを保持します。
+cacheはMO2のsource of truthを置き換えません。
+cacheはメモリ上の再生成可能な派生データです。
+
+cache hitの判定では、MOD treeをcontent readせずにrelative path、file size、最終更新時刻、reparse stateを比較します。
+metadataが変わった場合はstatic catalogを破棄し、静的MOD knowledgeを再生成します。
+cache missではouter MOD単位のscanを最大2並列で実行します。
+並列結果はouter path、inner path、file path、diagnosticの決定的な順序でmergeします。
+`ModInfo.xml`と`Config/**/*.xml`は、scan時に取得したbyte bufferからhashとXML observationを生成します。
+
+初回読み込みとProfile switchはDesktop UI threadの外で実行します。
+bridge stateはoperation kind、busy state、target profile nameを保持します。
+読み込み中は現在のsession、candidate、page observationを保持します。
+成功後だけProfile stateとlocal contextを更新します。
+失敗時は既存stateを保持し、statusまたはsource cardへ要約を表示します。
+Profile dropdownとsource操作はbusy中だけ無効にします。
+
 ### 24.4 Frontend build
 
 Web frontendはSvelte、TypeScript、Viteを使用します。

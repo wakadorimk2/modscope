@@ -4,6 +4,10 @@ namespace ModScope.LocalKnowledge;
 
 public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 {
+    private static readonly object StaticCatalogCacheGate = new();
+    private static readonly Dictionary<string, StaticModCatalog> StaticCatalogCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
     public LocalModSnapshot Read(
         Mo2SourceDefinition source,
         CancellationToken cancellationToken = default)
@@ -35,85 +39,16 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         var profileEntries = ParseProfileEntries(decodedModList.Text);
         diagnostics.AddRange(profileEntries.SelectMany(entry => entry.Diagnostics));
 
-        var directories = EnumerateModDirectories(paths.ModsPath, diagnostics);
-        var directoryLookup = directories
-            .GroupBy(directory => directory.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-
-        var firstProfileEntryByName = profileEntries
-            .Where(entry => entry.NormalizedModName is not null)
-            .GroupBy(entry => entry.NormalizedModName!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-
-        var records = new List<LocalModRecord>();
-        var manifestInventory = new List<FileInventoryItem>();
-        var recordedDirectoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var profileEntry in firstProfileEntryByName.Values.OrderBy(entry => entry.Priority))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var requestedName = profileEntry.NormalizedModName!;
-            if (!directoryLookup.TryGetValue(requestedName, out var directory))
-            {
-                var unresolvedDiagnostic = new Diagnostic(
-                    "mod.unresolved",
-                    DiagnosticSeverity.Warning,
-                    $"The profile entry '{requestedName}' has no matching directory under the explicit mods path.",
-                    profileEntry.Source,
-                    requestedName);
-                diagnostics.Add(unresolvedDiagnostic);
-                records.Add(new LocalModRecord(
-                    requestedName,
-                    requestedName,
-                    ModProfileState.Unresolved,
-                    profileEntry.EnabledState,
-                    profileEntry.Priority,
-                    null,
-                    null,
-                    Array.Empty<ModFileRecord>(),
-                    Array.Empty<XmlFileReference>(),
-                    new[] { unresolvedDiagnostic },
-                    profileEntry.Source));
-                continue;
-            }
-
-            recordedDirectoryNames.Add(directory.Name);
-            var parsed = BuildModRecordsForDirectory(
-                directory,
-                ModProfileState.Listed,
-                profileEntry.EnabledState,
-                profileEntry.Priority,
-                cancellationToken);
-            records.AddRange(parsed.Records);
-            manifestInventory.AddRange(parsed.Inventory);
-            diagnostics.AddRange(parsed.Diagnostics);
-        }
-
-        foreach (var directory in directoryLookup.Values.OrderBy(item => item.Name, StringComparer.Ordinal))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (recordedDirectoryNames.Contains(directory.Name))
-            {
-                continue;
-            }
-
-            var parsed = BuildModRecordsForDirectory(
-                directory,
-                ModProfileState.Unlisted,
-                ModEnabledState.Unknown,
-                null,
-                cancellationToken);
-            records.AddRange(parsed.Records);
-            manifestInventory.AddRange(parsed.Inventory);
-            diagnostics.AddRange(parsed.Diagnostics);
-        }
+        var staticCatalog = GetStaticCatalog(paths, cancellationToken);
+        diagnostics.AddRange(staticCatalog.Diagnostics);
+        var records = ProjectRecords(staticCatalog, profileEntries, diagnostics, cancellationToken);
 
         var manifestFiles = new List<InputManifestFile>
         {
             new("profile/modlist.txt", modListBytes.LongLength, modListHash)
         };
 
-        foreach (var file in manifestInventory
+        foreach (var file in staticCatalog.Inventory
                      .OrderBy(item => item.Source.RelativePath, StringComparer.Ordinal)
                      .ThenBy(item => item.RelativePath, StringComparer.Ordinal))
         {
@@ -142,8 +77,245 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             manifest,
             CollectionHelpers.ReadOnly(diagnostics))
         {
-            Index = LocalKnowledgeIndexBuilder.Build(records)
+            Index = staticCatalog.Index
         };
+    }
+
+    private static StaticModCatalog GetStaticCatalog(
+        ValidatedSourcePaths paths,
+        CancellationToken cancellationToken)
+    {
+        var cacheKey = BuildStaticCatalogCacheKey(paths.ModsPath);
+
+        lock (StaticCatalogCacheGate)
+        {
+            if (StaticCatalogCache.TryGetValue(cacheKey, out var cached)
+                && IsStaticCatalogCurrent(cached, paths.ModsPath, cancellationToken))
+            {
+                return cached;
+            }
+
+            var rebuilt = BuildStaticCatalog(paths, cancellationToken);
+            StaticCatalogCache[cacheKey] = rebuilt;
+            return rebuilt;
+        }
+    }
+
+    private static StaticModCatalog BuildStaticCatalog(
+        ValidatedSourcePaths paths,
+        CancellationToken cancellationToken)
+    {
+        var diagnostics = new List<Diagnostic>();
+        var directories = EnumerateModDirectories(paths.ModsPath, diagnostics)
+            .GroupBy(directory => directory.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(directory => directory.Name, StringComparer.Ordinal)
+            .ToList();
+        var results = new ModDirectoryReadResult[directories.Count];
+        var options = new ParallelOptions
+        {
+            CancellationToken = cancellationToken,
+            MaxDegreeOfParallelism = 2
+        };
+
+        Parallel.For(
+            0,
+            directories.Count,
+            options,
+            index =>
+            {
+                results[index] = BuildModRecordsForDirectory(
+                    directories[index],
+                    cancellationToken);
+            });
+
+        var records = results
+            .SelectMany(result => result.Records)
+            .ToList()
+            .AsReadOnly();
+        var inventory = results
+            .SelectMany(result => result.Inventory)
+            .ToList()
+            .AsReadOnly();
+        diagnostics.AddRange(results.SelectMany(result => result.Diagnostics));
+        IReadOnlyList<MetadataFingerprintEntry> metadataFingerprint;
+        try
+        {
+            metadataFingerprint = CaptureMetadataFingerprint(paths.ModsPath, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            diagnostics.Add(new Diagnostic(
+                "mods.metadata.enumeration_failed",
+                DiagnosticSeverity.Warning,
+                $"The MOD metadata fingerprint could not be captured: {exception.Message}",
+                new SourceReference(SourceReferenceKind.ModDirectory, "mods")));
+            metadataFingerprint = Array.Empty<MetadataFingerprintEntry>();
+        }
+
+        return new StaticModCatalog(
+            directories.Select(directory => directory.Name).ToList().AsReadOnly(),
+            records,
+            inventory,
+            diagnostics.AsReadOnly(),
+            metadataFingerprint,
+            LocalKnowledgeIndexBuilder.Build(records));
+    }
+
+    private static IReadOnlyList<LocalModRecord> ProjectRecords(
+        StaticModCatalog catalog,
+        IReadOnlyList<ProfileModEntry> profileEntries,
+        List<Diagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        var directoryNames = new HashSet<string>(catalog.DirectoryNames, StringComparer.OrdinalIgnoreCase);
+        var recordsByOuterDirectory = catalog.Records
+            .Where(record => record.Mo2OuterDirectoryName is not null)
+            .GroupBy(record => record.Mo2OuterDirectoryName!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        var firstProfileEntryByName = profileEntries
+            .Where(entry => entry.NormalizedModName is not null)
+            .GroupBy(entry => entry.NormalizedModName!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var records = new List<LocalModRecord>();
+        var recordedDirectoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var profileEntry in firstProfileEntryByName.Values.OrderBy(entry => entry.Priority))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var requestedName = profileEntry.NormalizedModName!;
+            if (!directoryNames.Contains(requestedName))
+            {
+                var unresolvedDiagnostic = new Diagnostic(
+                    "mod.unresolved",
+                    DiagnosticSeverity.Warning,
+                    $"The profile entry '{requestedName}' has no matching directory under the explicit mods path.",
+                    profileEntry.Source,
+                    requestedName);
+                diagnostics.Add(unresolvedDiagnostic);
+                records.Add(new LocalModRecord(
+                    requestedName,
+                    requestedName,
+                    ModProfileState.Unresolved,
+                    profileEntry.EnabledState,
+                    profileEntry.Priority,
+                    null,
+                    null,
+                    Array.Empty<ModFileRecord>(),
+                    Array.Empty<XmlFileReference>(),
+                    new[] { unresolvedDiagnostic },
+                    profileEntry.Source));
+                continue;
+            }
+
+            recordedDirectoryNames.Add(requestedName);
+            if (!recordsByOuterDirectory.TryGetValue(requestedName, out var staticRecords))
+            {
+                continue;
+            }
+
+            records.AddRange(staticRecords.Select(record => record with
+            {
+                ProfileState = ModProfileState.Listed,
+                EnabledState = profileEntry.EnabledState,
+                Priority = profileEntry.Priority
+            }));
+        }
+
+        records.AddRange(catalog.Records
+            .Where(record => record.Mo2OuterDirectoryName is not null
+                && !recordedDirectoryNames.Contains(record.Mo2OuterDirectoryName))
+            .OrderBy(record => record.Mo2OuterDirectoryName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(record => record.ModKey, StringComparer.Ordinal));
+
+        return records.AsReadOnly();
+    }
+
+    private static bool IsStaticCatalogCurrent(
+        StaticModCatalog catalog,
+        string modsPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var current = CaptureMetadataFingerprint(modsPath, cancellationToken);
+            return current.SequenceEqual(catalog.MetadataFingerprint);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static IReadOnlyList<MetadataFingerprintEntry> CaptureMetadataFingerprint(
+        string modsPath,
+        CancellationToken cancellationToken)
+    {
+        var root = new DirectoryInfo(modsPath);
+        var entries = new List<MetadataFingerprintEntry>();
+        var pending = new Stack<DirectoryInfo>();
+        pending.Push(root);
+
+        while (pending.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var directory = pending.Pop();
+            var childDirectories = directory
+                .EnumerateDirectories("*", SearchOption.TopDirectoryOnly)
+                .OrderBy(item => item.Name, StringComparer.Ordinal)
+                .ToList();
+            var childFiles = directory
+                .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+                .OrderBy(item => item.Name, StringComparer.Ordinal)
+                .ToList();
+
+            foreach (var childDirectory in childDirectories)
+            {
+                var isReparsePoint = childDirectory.Attributes.HasFlag(FileAttributes.ReparsePoint);
+                entries.Add(CreateMetadataFingerprintEntry(root, childDirectory, isReparsePoint));
+                if (!isReparsePoint)
+                {
+                    pending.Push(childDirectory);
+                }
+            }
+
+            foreach (var file in childFiles)
+            {
+                var isReparsePoint = file.Attributes.HasFlag(FileAttributes.ReparsePoint);
+                entries.Add(CreateMetadataFingerprintEntry(root, file, isReparsePoint));
+            }
+        }
+
+        return entries
+            .OrderBy(entry => entry.RelativePath, StringComparer.Ordinal)
+            .ThenBy(entry => entry.IsDirectory)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    private static MetadataFingerprintEntry CreateMetadataFingerprintEntry(
+        DirectoryInfo root,
+        FileSystemInfo entry,
+        bool isReparsePoint)
+    {
+        var relativePath = ParsingUtilities.NormalizeRelativePath(
+            Path.GetRelativePath(root.FullName, entry.FullName));
+        return new MetadataFingerprintEntry(
+            relativePath,
+            entry is DirectoryInfo,
+            entry is FileInfo file ? file.Length : 0,
+            entry.LastWriteTimeUtc.Ticks,
+            isReparsePoint);
+    }
+
+    private static string BuildStaticCatalogCacheKey(string modsPath)
+    {
+        var normalizedPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(modsPath));
+        return string.Join(
+            "\n",
+            normalizedPath,
+            ParserMetadata.ParserVersion,
+            ParserMetadata.SchemaVersion.ToString());
     }
 
     private static IReadOnlyList<ProfileModEntry> ParseProfileEntries(string text)
@@ -348,9 +520,6 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 
     private static ModDirectoryReadResult BuildModRecordsForDirectory(
         DirectoryInfo outerDirectory,
-        ModProfileState profileState,
-        ModEnabledState enabledState,
-        int? priority,
         CancellationToken cancellationToken)
     {
         var discovery = DiscoverModRoots(outerDirectory, cancellationToken);
@@ -383,9 +552,6 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             var parsed = BuildModRecord(
                 outerDirectory,
                 root,
-                profileState,
-                enabledState,
-                priority,
                 cancellationToken);
             records.Add(parsed.Record);
             inventory.AddRange(parsed.Inventory);
@@ -563,9 +729,6 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
     private static (LocalModRecord Record, IReadOnlyList<FileInventoryItem> Inventory) BuildModRecord(
         DirectoryInfo outerDirectory,
         ModRootCandidate root,
-        ModProfileState profileState,
-        ModEnabledState enabledState,
-        int? priority,
         CancellationToken cancellationToken)
     {
         var scan = ScanFiles(root.Directory, root.InnerSource.RelativePath, cancellationToken);
@@ -578,7 +741,10 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                 new EvidenceReference(EvidenceKind.Source, file.Source)))
             .ToList()
             .AsReadOnly();
-        var parsed = SevenDaysToDieParsing.Parse(root.InnerDirectoryRelativePath, scan.Files);
+        var parsed = SevenDaysToDieParsing.Parse(
+            root.InnerDirectoryRelativePath,
+            scan.Files,
+            scan.XmlContents);
         var diagnostics = scan.Diagnostics.Concat(parsed.Diagnostics).ToList();
         var rootResolution = new ModRootResolution(
             root.OuterDirectoryRelativePath,
@@ -591,9 +757,9 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             new LocalModRecord(
                 root.Directory.Name,
                 root.InnerDirectoryRelativePath,
-                profileState,
-                enabledState,
-                priority,
+                ModProfileState.Unlisted,
+                ModEnabledState.Unknown,
+                null,
                 root.InnerDirectoryRelativePath,
                 parsed.ModInfo,
                 fileRecords,
@@ -615,6 +781,7 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
     {
         var files = new List<FileInventoryItem>();
         var diagnostics = new List<Diagnostic>();
+        var xmlContents = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         var pending = new Stack<DirectoryInfo>();
         pending.Push(root);
 
@@ -681,11 +848,20 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 
                 try
                 {
+                    byte[]? xmlBytes = null;
+                    var sha256 = IsXmlInputFile(relativePath)
+                        ? ReadXmlBytesAndHash(file.FullName, out xmlBytes)
+                        : ParsingUtilities.Sha256File(file.FullName);
+                    if (xmlBytes is not null)
+                    {
+                        xmlContents[file.FullName] = xmlBytes;
+                    }
+
                     files.Add(new FileInventoryItem(
                         file.FullName,
                         relativePath,
                         file.Length,
-                        ParsingUtilities.Sha256File(file.FullName),
+                        sha256,
                         source));
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -701,7 +877,21 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 
         return new FileInventoryScanResult(
             files.OrderBy(file => file.RelativePath, StringComparer.Ordinal).ToList().AsReadOnly(),
-            diagnostics.AsReadOnly());
+            diagnostics.AsReadOnly(),
+            xmlContents);
+    }
+
+    private static bool IsXmlInputFile(string relativePath)
+    {
+        return relativePath.Equals("ModInfo.xml", StringComparison.OrdinalIgnoreCase)
+            || (relativePath.StartsWith("Config/", StringComparison.OrdinalIgnoreCase)
+                && relativePath.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string ReadXmlBytesAndHash(string fullPath, out byte[] bytes)
+    {
+        bytes = File.ReadAllBytes(fullPath);
+        return ParsingUtilities.Sha256Hex(bytes);
     }
 
     private static string CreateSnapshotId(
@@ -801,7 +991,8 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 
     private sealed record FileInventoryScanResult(
         IReadOnlyList<FileInventoryItem> Files,
-        IReadOnlyList<Diagnostic> Diagnostics);
+        IReadOnlyList<Diagnostic> Diagnostics,
+        IReadOnlyDictionary<string, byte[]> XmlContents);
 
     private sealed record ModRootCandidate(
         DirectoryInfo Directory,
@@ -819,4 +1010,19 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         IReadOnlyList<LocalModRecord> Records,
         IReadOnlyList<FileInventoryItem> Inventory,
         IReadOnlyList<Diagnostic> Diagnostics);
+
+    private sealed record StaticModCatalog(
+        IReadOnlyList<string> DirectoryNames,
+        IReadOnlyList<LocalModRecord> Records,
+        IReadOnlyList<FileInventoryItem> Inventory,
+        IReadOnlyList<Diagnostic> Diagnostics,
+        IReadOnlyList<MetadataFingerprintEntry> MetadataFingerprint,
+        LocalKnowledgeIndex Index);
+
+    private sealed record MetadataFingerprintEntry(
+        string RelativePath,
+        bool IsDirectory,
+        long Size,
+        long LastWriteTimeUtcTicks,
+        bool IsReparsePoint);
 }

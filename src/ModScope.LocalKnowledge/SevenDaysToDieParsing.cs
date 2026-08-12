@@ -18,7 +18,8 @@ internal static class SevenDaysToDieParsing
 {
     public static ParsedModData Parse(
         string directoryName,
-        IReadOnlyList<FileInventoryItem> files)
+        IReadOnlyList<FileInventoryItem> files,
+        IReadOnlyDictionary<string, byte[]>? xmlContents = null)
     {
         var diagnostics = new List<Diagnostic>();
         var modDirectorySource = new SourceReference(
@@ -41,13 +42,13 @@ internal static class SevenDaysToDieParsing
         }
         else
         {
-            modInfo = ParseModInfo(modInfoFile, diagnostics);
+            modInfo = ParseModInfo(modInfoFile, diagnostics, xmlContents);
         }
 
         var xmlFiles = new List<XmlFileReference>();
         foreach (var file in files.Where(IsConfigXml))
         {
-            xmlFiles.Add(ParseConfigXml(file, diagnostics));
+            xmlFiles.Add(ParseConfigXml(file, diagnostics, xmlContents));
         }
 
         return new ParsedModData(
@@ -64,14 +65,17 @@ internal static class SevenDaysToDieParsing
 
     private static ModInfoMetadata ParseModInfo(
         FileInventoryItem file,
-        List<Diagnostic> aggregateDiagnostics)
+        List<Diagnostic> aggregateDiagnostics,
+        IReadOnlyDictionary<string, byte[]>? xmlContents)
     {
         var diagnostics = new List<Diagnostic>();
         byte[] bytes;
 
         try
         {
-            bytes = File.ReadAllBytes(file.FullPath);
+            bytes = xmlContents is not null && xmlContents.TryGetValue(file.FullPath, out var cachedBytes)
+                ? cachedBytes
+                : File.ReadAllBytes(file.FullPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -153,12 +157,15 @@ internal static class SevenDaysToDieParsing
 
     private static XmlFileReference ParseConfigXml(
         FileInventoryItem file,
-        List<Diagnostic> aggregateDiagnostics)
+        List<Diagnostic> aggregateDiagnostics,
+        IReadOnlyDictionary<string, byte[]>? xmlContents)
     {
         byte[] bytes;
         try
         {
-            bytes = File.ReadAllBytes(file.FullPath);
+            bytes = xmlContents is not null && xmlContents.TryGetValue(file.FullPath, out var cachedBytes)
+                ? cachedBytes
+                : File.ReadAllBytes(file.FullPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
