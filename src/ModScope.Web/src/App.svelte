@@ -193,10 +193,6 @@
     return status === 'installed' || status === 'notInstalled';
   }
 
-  function showRecognitionFallback(): boolean {
-    return Boolean(state.observation) && !hasConclusion();
-  }
-
   function formatLabel(value: string | null | undefined): string {
     if (!value) {
       return 'Unknown';
@@ -493,7 +489,7 @@
         {#if state.localContext.status === 'installed' && state.localContext.localModKey}
           <button class="primary-button action-button" onclick={openInspector}>Inspect</button>
         {/if}
-      {:else if showRecognitionFallback()}
+      {:else if state.observation && !hasConclusion()}
         <div class="exception-card">
           <span class="eyebrow">RECOGNIZE</span>
           <h2>Couldn’t recognize this page</h2>

@@ -27,6 +27,7 @@ public static class BridgeProtocol
         "browser.forward",
         "browser.reload",
         "browser.observe",
+        "frontend.ready",
         "knowledge.useFixture",
         "knowledge.loadSource",
         "knowledge.discoverSources",

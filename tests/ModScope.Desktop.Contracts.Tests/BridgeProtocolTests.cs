@@ -119,6 +119,23 @@ public sealed class BridgeProtocolTests
     }
 
     [Fact]
+    public void ParsesFrontendReadyCommand()
+    {
+        var envelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "frontend-1",
+              "command": "frontend.ready",
+              "payload": {}
+            }
+            """);
+
+        Assert.Equal("frontend.ready", envelope.Command);
+        Assert.Equal(JsonValueKind.Object, envelope.Payload.ValueKind);
+    }
+
+    [Fact]
     public void ParsesSourceDiscoveryCommandsWithoutAbsolutePaths()
     {
         var discover = BridgeProtocol.ParseCommand(

@@ -121,6 +121,12 @@ export function createBridge(onMessage: (message: HostMessage) => void): Bridge 
     connect() {
       if (webview) {
         webview.addEventListener('message', handleMessage);
+        webview.postMessage({
+          contractVersion: 1,
+          requestId: 'web-' + String(++mockRequestId),
+          command: 'frontend.ready',
+          payload: {}
+        });
         return () => webview.removeEventListener('message', handleMessage);
       }
 
