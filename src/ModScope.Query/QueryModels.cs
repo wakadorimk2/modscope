@@ -69,7 +69,10 @@ public sealed record Mo2SourceInput(
     string ProfileName,
     string InstanceRootPath,
     string ProfilePath,
-    string ModsPath);
+    string ModsPath)
+{
+    public string? ProfilesPath { get; init; }
+}
 
 public sealed record Mo2SourceCandidateReadModel(
     string CandidateId,

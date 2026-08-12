@@ -149,6 +149,7 @@ public sealed class Mo2SourceDiscoveryTests
 
             Assert.Equal(Mo2SourceCandidateReadiness.Ready, candidate.Readiness);
             Assert.Equal(Path.Combine(container.FullName, "external-data", "mods"), candidate.Source.ModsPath);
+            Assert.Equal(Path.Combine(container.FullName, "external-data", "profiles"), candidate.Source.ProfilesPath);
             Assert.Equal(Path.Combine(container.FullName, "external-data", "profiles", "Default"), candidate.Source.ProfilePath);
         }
         finally

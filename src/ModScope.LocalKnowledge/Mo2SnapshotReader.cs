@@ -451,7 +451,7 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         var paths = ValidateSource(source);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var profilesPath = Path.Combine(paths.InstanceRootPath, "profiles");
+        var profilesPath = paths.ProfilesPath;
         var profiles = new List<Mo2ProfileDefinition>();
 
         var profilesDirectory = new DirectoryInfo(profilesPath);
@@ -990,7 +990,11 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             throw new IOException($"The explicit MO2 mods path is a reparse point: {modsPath}");
         }
 
-        return new ValidatedSourcePaths(instanceRoot, profilePath, modsPath);
+        var profilesPath = source.ProfilesPath is null
+            ? Path.Combine(instanceRoot, "profiles")
+            : GetAbsolutePath(source.ProfilesPath, nameof(source.ProfilesPath));
+
+        return new ValidatedSourcePaths(instanceRoot, profilePath, modsPath, profilesPath);
     }
 
     private static bool IsReparsePoint(string path)
@@ -1011,7 +1015,8 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
     private sealed record ValidatedSourcePaths(
         string InstanceRootPath,
         string ProfilePath,
-        string ModsPath);
+        string ModsPath,
+        string ProfilesPath);
 
     private sealed record FileInventoryScanResult(
         IReadOnlyList<FileInventoryItem> Files,

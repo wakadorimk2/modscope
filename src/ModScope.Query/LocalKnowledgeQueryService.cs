@@ -103,7 +103,10 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             candidate.Source.ProfileName,
             candidate.Source.InstanceRootPath,
             candidate.Source.ProfilePath,
-            candidate.Source.ModsPath);
+            candidate.Source.ModsPath)
+        {
+            ProfilesPath = candidate.Source.ProfilesPath
+        };
         var session = Load(source, cancellationToken, progress);
         TryWritePreference(source);
         return session;
@@ -316,7 +319,10 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             source.ProfileName,
             source.InstanceRootPath,
             source.ProfilePath,
-            source.ModsPath);
+            source.ModsPath)
+        {
+            ProfilesPath = source.ProfilesPath
+        };
     }
 
     private static SourceDiscoveryReadModel ToSourceDiscovery(
