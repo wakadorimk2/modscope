@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     private readonly DesktopSessionController _controller = new();
     private bool _toolbarReady;
     private bool _contextReady;
+    private bool _sourceDiscoveryStarted;
 
     public MainWindow()
     {
@@ -46,6 +47,13 @@ public partial class MainWindow : Window
 
             ConfigureFrontend(ToolbarShell, webAssetsPath, "toolbar");
             ConfigureFrontend(ContextWebView, webAssetsPath, "context");
+
+            if (!_sourceDiscoveryStarted)
+            {
+                _sourceDiscoveryStarted = true;
+                await _controller.DiscoverSourcesAsync();
+                SendState();
+            }
 
             var demoPage = Path.Combine(AppContext.BaseDirectory, "Fixtures", "alpha-mod.html");
             Browser.Source = File.Exists(demoPage)
@@ -190,6 +198,31 @@ public partial class MainWindow : Window
                     payload.InstanceRootPath,
                     payload.ProfilePath,
                     payload.ModsPath));
+                SendState(command.RequestId);
+                break;
+            }
+            case "knowledge.discoverSources":
+            {
+                var payload = BridgeProtocol.ReadPayload<DiscoverSourcesPayload>(command.Payload);
+                await _controller.DiscoverSourcesAsync(payload.SelectedRoots);
+                SendState(command.RequestId);
+                break;
+            }
+            case "knowledge.selectSource":
+            {
+                var payload = BridgeProtocol.ReadPayload<SelectSourcePayload>(command.Payload);
+                await _controller.LoadSourceCandidateAsync(payload.CandidateId);
+                SendState(command.RequestId);
+                break;
+            }
+            case "knowledge.selectRoot":
+            {
+                var root = ChooseMo2Root();
+                if (root is not null)
+                {
+                    await _controller.DiscoverSourcesAsync(new[] { root });
+                }
+
                 SendState(command.RequestId);
                 break;
             }
@@ -338,6 +371,16 @@ public partial class MainWindow : Window
             Browser.CanGoForward);
         var state = _controller.BuildState(browserState);
         SendMessage("state", state, requestId);
+    }
+
+    private static string? ChooseMo2Root()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Select the MO2 instance or portable root"
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FolderName : null;
     }
 
     private void SendError(string code, string message, string? requestId = null)
