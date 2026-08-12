@@ -330,6 +330,13 @@ outer直下のrootは`Source`で記録します。
 outer直下の子directoryのrootは`Inference`で記録します。
 depth 2以上の候補はdiagnosticだけを残します。
 rootを解決できないouterは、MOD recordを作らず、raw inventoryとmanifestへ保持します。
+MO2 source discoveryを追加します。
+実行中MO2、remembered source、`%LOCALAPPDATA%\ModOrganizer`、last-used instance情報、native pickerを既知の探索対象にします。
+portable instanceとglobal instanceをcandidateとして統合します。
+candidateにはreadiness、discovery evidence、diagnosticを保持します。
+ready candidateが1件なら自動読込します。
+複数件ならsource cardで選択します。
+external Mods / Profiles pathは、MO2設定から解決したread-only pathだけを扱います。
 RuntimeOCDの実行時結果、semantic conflict、effective result、MO2 writeは後続Phaseで扱います。
 
 ### Phase 3：Query、Inspector、必要なSite Adapter
@@ -416,7 +423,7 @@ ModScopeは、次の状態を目指します。
 
 現在のUIは、Global Browser chromeを上段に置き、Browser ContentとContextを下段に分ける3面構成です。
 
-- Toolbar WebView2はURL、navigation、explicit instance内のProfile dropdown、Context toggleを表示します。
+- Toolbar WebView2はURL、navigation、resolved source内のProfile dropdown、Context toggleを表示します。
 - Browser WebView2は外部Web pageだけを表示します。
 - Context WebView2はLocal context、例外確認、Developer tools、Inspectorを表示します。
 
@@ -441,9 +448,10 @@ v0.1では、次を保留します。
 - identity確認は通常工程ではなく、認識失敗時の例外導線です。
 - Developer toolsはfixtureと明示sourceを検証するために残しますが、初期状態では閉じます。
 - Browser navigation完了後のObserveはDesktop hostが実行します。
-- Profile dropdownは、明示されたinstance rootの`profiles`直下にあるprofileだけをread-onlyで切り替えます。
+- Profile dropdownは、MO2設定から解決したProfiles directoryにあるprofileだけをread-onlyで切り替えます。
 - Profile switch後はsession、candidates、profile nameを更新し、page observationは維持します。
 
-この段階では、MO2 profile自動検出、global path探索、page identity自動認識を実装しません。
-Profile切替はexplicit instance内に限定します。
-起動時のMO2自動検出とpage identity自動認識は、Queryと認識境界を拡張した後に検討します。
+起動時にMO2 source discoveryを実行します。
+候補がない場合は再探索とnative folder pickerを使用します。
+Frontendにはabsolute pathを送信しません。
+page identity自動認識は実装しません。
