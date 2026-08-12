@@ -1,7 +1,10 @@
 # Synthetic ModScope fixture. This line is preserved as raw input.
- +Alpha Mod
++Alpha Mod
 -Beta Mod
 
 +Missing Mod
 +Alpha Mod
 this is not a supported MO2 entry
+-Wrapped Outer
++Multi Outer
+-Deep Outer

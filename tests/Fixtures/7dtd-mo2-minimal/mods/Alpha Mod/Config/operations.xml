@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configs>
+  <set xpath="/items/item[@name='Alpha']/property[@name='Health']/@value" targetXml="items.xml" entity="item" property="Health" attribute="value">42</set>
+  <setattribute xpath="/items/item[@name='Alpha']" name="group">Tools</setattribute>
+  <remove xpath="/items/item[@name='Obsolete']" />
+  <removeattribute xpath="/items/item[@name='Alpha']/@deprecated" name="deprecated" />
+  <append xpath="/items">
+    <item name="AddedItem">
+      <property name="Tags" value="tool" />
+    </item>
+  </append>
+  <prepend xpath="/items" />
+  <insertBefore xpath="/items/item[@name='Alpha']" />
+  <insertAfter xpath="/items/item[@name='Alpha']" />
+  <mystery xpath="/items/item[@name='Alpha']" custom="preserve">unknown operation</mystery>
+  <csv xpath="/items/item[@name='Alpha']/property[@name='Tags']/@value" op="remove">tool</csv>
+</configs>

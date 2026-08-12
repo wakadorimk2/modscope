@@ -316,15 +316,21 @@ Write planeが追加されても、ModScopeはMod Managerにはなりません�
 
 source boundary、page observation、MOD identity confirmation、Local context、evidence modelを定義します。
 
-### Phase 1：v0.1 Browser-first vertical slice（実装中）
+### Phase 1：v0.1 Browser-first vertical slice（完了）
 
 7DTD + MO2の1 profileをread-onlyで読み取ります。WPF + WebView2上でpage observationを取得します。ユーザー確認したMOD identityとcurrent profileを照合します。Inspectorで根拠を表示します。
 
 v0.1は、site固有Adapter、複数game、完全なsemantic conflict、RuntimeOCD、MO2 write、特定agent backendを含めません。
 
-### Phase 2：Structured Local Mod Knowledge
+### Phase 2：Structured Local Mod Knowledge（実装中）
 
 ModInfo、Config XML、patch operation、target、XPath、reverse indexを拡張します。
+MO2のouter directoryと、7DTDが読むinner MOD rootを分離して保持します。
+outer直下のrootは`Source`で記録します。
+outer直下の子directoryのrootは`Inference`で記録します。
+depth 2以上の候補はdiagnosticだけを残します。
+rootを解決できないouterは、MOD recordを作らず、raw inventoryとmanifestへ保持します。
+RuntimeOCDの実行時結果、semantic conflict、effective result、MO2 writeは後続Phaseで扱います。
 
 ### Phase 3：Query、Inspector、必要なSite Adapter
 
