@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _controller.OperationStateChanged += Controller_OperationStateChanged;
         Loaded += MainWindow_Loaded;
     }
 
@@ -387,6 +388,17 @@ public partial class MainWindow : Window
             Browser.CanGoForward);
         var state = _controller.BuildState(browserState);
         SendMessage("state", state, requestId);
+    }
+
+    private void Controller_OperationStateChanged(object? sender, EventArgs e)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            SendState();
+            return;
+        }
+
+        _ = Dispatcher.InvokeAsync(() => SendState());
     }
 
     private static string? ChooseMo2Root()

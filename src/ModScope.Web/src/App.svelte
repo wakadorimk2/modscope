@@ -21,6 +21,8 @@
   let developerToolsOpen = false;
   let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
+  let operationRailTimer: number | undefined;
+  let operationRailVisible = false;
   let source = {
     instanceName: 'explicit-instance',
     profileName: 'default',
@@ -28,6 +30,24 @@
     profilePath: '',
     modsPath: ''
   };
+
+  $: {
+    const operationBusy = state.knowledge.operation.isBusy;
+    if (operationBusy && !operationRailVisible && operationRailTimer === undefined) {
+      operationRailTimer = window.setTimeout(() => {
+        operationRailTimer = undefined;
+        if (state.knowledge.operation.isBusy) {
+          operationRailVisible = true;
+        }
+      }, 150);
+    } else if (!operationBusy) {
+      if (operationRailTimer !== undefined) {
+        window.clearTimeout(operationRailTimer);
+        operationRailTimer = undefined;
+      }
+      operationRailVisible = false;
+    }
+  }
 
   type DiagnosticGroup = {
     diagnostic: DiagnosticUiState;
@@ -67,6 +87,9 @@
 
     return () => {
       disconnect();
+      if (operationRailTimer !== undefined) {
+        window.clearTimeout(operationRailTimer);
+      }
       window.removeEventListener('keydown', handleShortcut);
     };
   });
@@ -189,6 +212,48 @@
     return 'status-' + (status ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
   }
 
+  function operationLabel(): string {
+    const operation = state.knowledge.operation;
+    const profile = operation.targetProfileName ? ` ${operation.targetProfileName}` : '';
+
+    switch (operation.phase) {
+      case 'discovering-source':
+        return 'Finding MO2 source';
+      case 'reading-profile':
+        return `Reading profile${profile}`;
+      case 'checking-cache':
+        return 'Checking static MOD knowledge';
+      case 'scanning-mod-folders':
+        return `Scanning MOD folders${profile}`;
+      case 'reusing-static-knowledge':
+        return 'Reusing static MOD knowledge';
+      case 'building-index':
+        return 'Building local knowledge index';
+      case 'projecting-profile':
+        return `Applying profile${profile}`;
+      default:
+        return 'Loading local MO2 knowledge';
+    }
+  }
+
+  function operationProgress(): number | null {
+    const { completed, total } = state.knowledge.operation;
+    if (typeof completed !== 'number' || typeof total !== 'number' || total <= 0) {
+      return null;
+    }
+
+    return Math.min(100, Math.max(0, (completed / total) * 100));
+  }
+
+  function operationCountLabel(): string | null {
+    const { completed, total } = state.knowledge.operation;
+    if (typeof completed !== 'number' || typeof total !== 'number') {
+      return null;
+    }
+
+    return `${completed} / ${total} MOD folders`;
+  }
+
   function sizeLabel(size: number): string {
     if (size < 1024) {
       return size + ' B';
@@ -203,6 +268,28 @@
 
 {#if surface === 'toolbar'}
   <main class="toolbar-surface">
+    {#if operationRailVisible}
+      <div class="operation-rail">
+        <div
+          class="operation-progress-track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={operationProgress() ?? undefined}
+          aria-label={operationLabel()}
+        >
+          <div
+            class="operation-progress-fill"
+            class:operation-progress-indeterminate={operationProgress() === null}
+            style:width={operationProgress() === null ? undefined : `${operationProgress()}%`}
+          ></div>
+        </div>
+        <div class="operation-rail-meta" role="status" aria-live="polite">
+          <span class="operation-rail-label">{operationLabel()}…</span>
+          {#if operationCountLabel()}<span class="operation-rail-count">{operationCountLabel()}</span>{/if}
+        </div>
+      </div>
+    {/if}
     <div class="toolbar-row">
       <div class="toolbar-navigation" aria-label="Browser navigation">
         <button class="icon-button" title="Back" aria-label="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
@@ -234,12 +321,6 @@
           {/if}
         </select>
       </label>
-      {#if state.knowledge.operation.isBusy}
-        <span class="subtle operation-status" role="status" aria-live="polite">
-          Loading{state.knowledge.operation.targetProfileName ? ` ${state.knowledge.operation.targetProfileName}` : ''}…
-        </span>
-      {/if}
-
       <button class="toolbar-context-button" onclick={toggleContext}>
         {state.layout.contextVisible ? 'Context' : 'Show context'}
       </button>
@@ -252,6 +333,28 @@
   </main>
 {:else}
   <main class="shell">
+    {#if operationRailVisible}
+      <div class="operation-rail">
+        <div
+          class="operation-progress-track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={operationProgress() ?? undefined}
+          aria-label={operationLabel()}
+        >
+          <div
+            class="operation-progress-fill"
+            class:operation-progress-indeterminate={operationProgress() === null}
+            style:width={operationProgress() === null ? undefined : `${operationProgress()}%`}
+          ></div>
+        </div>
+        <div class="operation-rail-meta" role="status" aria-live="polite">
+          <span class="operation-rail-label">{operationLabel()}…</span>
+          {#if operationCountLabel()}<span class="operation-rail-count">{operationCountLabel()}</span>{/if}
+        </div>
+      </div>
+    {/if}
     <header class="brand-bar">
       <div>
         <span class="eyebrow">MOD WORKSPACE</span>

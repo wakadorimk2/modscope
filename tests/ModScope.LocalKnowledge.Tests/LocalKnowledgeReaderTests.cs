@@ -378,6 +378,50 @@ public sealed class LocalKnowledgeReaderTests
     }
 
     [Fact]
+    public void ReportsDeterministicScanAndCacheProgress()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-progress-");
+        try
+        {
+            CopyDirectory(FixtureRoot, root.FullName);
+            var reader = new Mo2SnapshotReader();
+            var firstProgress = new RecordingProgress();
+
+            reader.Read(CreateSource(root.FullName), progress: firstProgress);
+
+            var scanProgress = firstProgress.Values
+                .Where(progress => progress.Phase == "scanning-mod-folders")
+                .ToList();
+            Assert.NotEmpty(scanProgress);
+            Assert.Equal(0, scanProgress[0].Completed);
+            Assert.Equal(scanProgress[0].Total, scanProgress[^1].Total);
+            Assert.Equal(scanProgress[^1].Total, scanProgress[^1].Completed);
+            Assert.Equal(
+                scanProgress.Select(progress => progress.Completed),
+                scanProgress.Select(progress => progress.Completed).OrderBy(value => value));
+            Assert.Contains(firstProgress.Values, progress => progress.Phase == "building-index");
+            Assert.Contains(firstProgress.Values, progress => progress.Phase == "projecting-profile");
+
+            var cachedProgress = new RecordingProgress();
+            reader.Read(CreateSource(root.FullName), progress: cachedProgress);
+
+            Assert.DoesNotContain(
+                cachedProgress.Values,
+                progress => progress.Phase == "scanning-mod-folders");
+            Assert.Contains(
+                cachedProgress.Values,
+                progress => progress.Phase == "reusing-static-knowledge");
+            Assert.Contains(
+                cachedProgress.Values,
+                progress => progress.Phase == "projecting-profile");
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
+    [Fact]
     public void SnapshotIdIsStableForTheSameInput()
     {
         var first = ReadFixture();
@@ -598,6 +642,16 @@ public sealed class LocalKnowledgeReaderTests
         AppContext.BaseDirectory,
         "Fixtures",
         "7dtd-mo2-minimal");
+
+    private sealed class RecordingProgress : IProgress<LocalKnowledgeProgress>
+    {
+        public List<LocalKnowledgeProgress> Values { get; } = new();
+
+        public void Report(LocalKnowledgeProgress value)
+        {
+            Values.Add(value);
+        }
+    }
 
     private sealed record FixtureFileState(string Sha256, DateTime LastWriteTimeUtc);
 }

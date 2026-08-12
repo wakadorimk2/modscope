@@ -66,6 +66,9 @@ export type KnowledgeOperationUiState = {
   kind: string;
   isBusy: boolean;
   targetProfileName?: string | null;
+  phase: string;
+  completed?: number | null;
+  total?: number | null;
 };
 
 export type KnowledgeUiState = {
@@ -220,7 +223,10 @@ export const initialState: UiState = {
     operation: {
       kind: 'idle',
       isBusy: false,
-      targetProfileName: null
+      targetProfileName: null,
+      phase: 'idle',
+      completed: null,
+      total: null
     }
   },
   sourceDiscovery: {

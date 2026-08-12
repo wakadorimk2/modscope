@@ -70,7 +70,10 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
       operation: {
         kind: 'idle',
         isBusy: false,
-        targetProfileName: null
+        targetProfileName: null,
+        phase: 'idle',
+        completed: null,
+        total: null
       }
     };
     next.statusMessage = 'Mock Local Knowledge loaded.';

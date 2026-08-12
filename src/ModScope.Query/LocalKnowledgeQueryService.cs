@@ -10,11 +10,13 @@ public interface ILocalKnowledgeQuery
 
     KnowledgeSessionReadModel LoadSourceCandidate(
         string candidateId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null);
 
     KnowledgeSessionReadModel Load(
         Mo2SourceInput source,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null);
 
     IReadOnlyList<ModCandidateSummary> GetModCandidates();
 
@@ -22,7 +24,8 @@ public interface ILocalKnowledgeQuery
 
     KnowledgeSessionReadModel SwitchProfile(
         string profileName,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null);
 
     LocalContextReadModel ConfirmIdentity(IdentityConfirmation confirmation);
 
@@ -78,7 +81,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
 
     public KnowledgeSessionReadModel LoadSourceCandidate(
         string candidateId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(candidateId);
         var candidate = _sourceCandidates.FirstOrDefault(item =>
@@ -100,18 +104,19 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             candidate.Source.InstanceRootPath,
             candidate.Source.ProfilePath,
             candidate.Source.ModsPath);
-        var session = Load(source, cancellationToken);
+        var session = Load(source, cancellationToken, progress);
         TryWritePreference(source);
         return session;
     }
 
     public KnowledgeSessionReadModel Load(
         Mo2SourceInput source,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         var definition = ToDefinition(source);
-        var snapshot = _snapshotReader.Read(definition, cancellationToken);
+        var snapshot = _snapshotReader.Read(definition, cancellationToken, progress);
         var profiles = _snapshotReader.ListProfiles(definition, cancellationToken);
 
         _source = source;
@@ -145,7 +150,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
 
     public KnowledgeSessionReadModel SwitchProfile(
         string profileName,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
         var source = _source ?? throw new InvalidOperationException(
@@ -164,7 +170,7 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             ProfileName = profile.Name,
             ProfilePath = profile.ProfilePath
         };
-        var snapshot = _snapshotReader.Read(ToDefinition(nextSource), cancellationToken);
+        var snapshot = _snapshotReader.Read(ToDefinition(nextSource), cancellationToken, progress);
 
         _source = nextSource;
         _snapshot = snapshot;

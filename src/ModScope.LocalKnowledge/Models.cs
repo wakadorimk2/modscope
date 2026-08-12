@@ -78,11 +78,17 @@ public sealed record Mo2ProfileDefinition(
     string Name,
     string ProfilePath);
 
+public sealed record LocalKnowledgeProgress(
+    string Phase,
+    int? Completed = null,
+    int? Total = null);
+
 public interface IMo2SnapshotReader
 {
     LocalModSnapshot Read(
         Mo2SourceDefinition source,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null);
 
     IReadOnlyList<Mo2ProfileDefinition> ListProfiles(
         Mo2SourceDefinition source,
