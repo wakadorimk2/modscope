@@ -29,6 +29,9 @@ public static class BridgeProtocol
         "browser.observe",
         "knowledge.useFixture",
         "knowledge.loadSource",
+        "knowledge.discoverSources",
+        "knowledge.selectSource",
+        "knowledge.selectRoot",
         "knowledge.switchProfile",
         "identity.confirm",
         "inspector.open",
@@ -175,6 +178,10 @@ public sealed record LoadSourcePayload(
     string ProfilePath,
     string ModsPath);
 
+public sealed record DiscoverSourcesPayload(IReadOnlyList<string>? SelectedRoots = null);
+
+public sealed record SelectSourcePayload(string CandidateId);
+
 public sealed record ConfirmIdentityPayload(
     string CandidateIdentity,
     string? LocalModKey);
@@ -245,7 +252,39 @@ public sealed record ProfileUiState(string Name);
 public sealed record KnowledgeUiState(
     KnowledgeSessionUiState? Session,
     IReadOnlyList<ModCandidateUiState> Candidates,
-    IReadOnlyList<ProfileUiState> Profiles);
+    IReadOnlyList<ProfileUiState> Profiles,
+    KnowledgeOperationUiState Operation);
+
+public sealed record KnowledgeOperationUiState(
+    string Kind,
+    bool IsBusy,
+    string? TargetProfileName,
+    string Phase,
+    int? Completed,
+    int? Total)
+{
+    public static KnowledgeOperationUiState Idle { get; } = new(
+        "idle",
+        false,
+        null,
+        "idle",
+        null,
+        null);
+}
+
+public sealed record SourceCandidateUiState(
+    string CandidateId,
+    string InstanceName,
+    string GameName,
+    string ProfileName,
+    string Readiness,
+    bool IsReady,
+    IReadOnlyList<string> Evidence,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record SourceDiscoveryUiState(
+    IReadOnlyList<SourceCandidateUiState> Candidates,
+    string? SelectedCandidateId);
 
 public sealed record IdentityUiState(
     string CandidateIdentity,
@@ -330,6 +369,7 @@ public sealed record LayoutUiState(bool ContextVisible);
 public sealed record UiState(
     BrowserUiState Browser,
     PageObservationUiState? Observation,
+    SourceDiscoveryUiState SourceDiscovery,
     KnowledgeUiState Knowledge,
     IdentityUiState Identity,
     LocalContextUiState? LocalContext,

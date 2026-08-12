@@ -59,6 +59,76 @@ button:disabled {
   min-height: 46px;
 }
 
+.operation-rail {
+  display: grid;
+  gap: 5px;
+}
+
+.toolbar-surface > .operation-rail {
+  margin: -10px -12px 8px;
+  padding: 0 12px 4px;
+}
+
+.shell > .operation-rail {
+  margin: -18px -18px 14px;
+  padding: 0 18px 4px;
+}
+
+.operation-progress-track {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(51, 65, 85, 0.7);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.12);
+}
+
+.operation-progress-fill {
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #a78bfa 55%, #f0abfc);
+  box-shadow: 0 0 12px rgba(125, 211, 252, 0.72);
+  transition: width 160ms ease-out;
+}
+
+.operation-progress-indeterminate {
+  width: 34%;
+  animation: operation-progress-sheen 1.15s ease-in-out infinite;
+}
+
+.operation-rail-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 14px;
+  color: #bae6fd;
+  font-size: 10px;
+}
+
+.operation-rail-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operation-rail-count {
+  flex: 0 0 auto;
+  color: #94a3b8;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+}
+
+@keyframes operation-progress-sheen {
+  0% {
+    transform: translateX(-115%);
+  }
+  55%,
+  100% {
+    transform: translateX(310%);
+  }
+}
+
 .toolbar-navigation {
   display: flex;
   flex: 0 0 auto;
@@ -237,6 +307,49 @@ h2 {
   color: #fda4af;
 }
 
+.diagnostic-warning {
+  border-color: #fbbf24;
+  background: rgba(120, 53, 15, 0.16);
+  color: #fde68a;
+}
+
+.diagnostic-info {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.16);
+  color: #bae6fd;
+}
+
+.diagnostic-count {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.4);
+  color: #e2e8f0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.diagnostic-raw,
+.diagnostic-source {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: currentColor;
+  font-size: 10px;
+  opacity: 0.82;
+}
+
+.diagnostic-source {
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.diagnostic-summary {
+  margin-top: 6px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
 .subtle,
 .empty-state,
 .page-url,
@@ -334,6 +447,40 @@ select:focus {
 
 .context-summary-panel {
   min-height: 168px;
+}
+
+.source-discovery-panel {
+  border-color: rgba(125, 211, 252, 0.28);
+}
+
+.source-candidate-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.source-candidate-card {
+  padding: 11px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.42);
+}
+
+.source-candidate-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.source-candidate-header strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.source-candidate-header .subtle {
+  margin-top: 4px;
 }
 
 .diagnostics-panel {
@@ -668,5 +815,17 @@ dd {
   .page-details-grid,
   .source-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .operation-progress-fill {
+    transition: none;
+  }
+
+  .operation-progress-indeterminate {
+    width: 100%;
+    animation: none;
+    opacity: 0.78;
   }
 }

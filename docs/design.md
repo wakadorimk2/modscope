@@ -130,7 +130,7 @@ MODの発見と評価は、MOD一覧から始まるとは限りません。ラ�
 - v0.1での完全なsemantic conflict判定
 - v0.1でのRuntimeOCD連携
 - v0.1でのMO2 write
-- explicit instance外のprofile探索
+- MO2設定にない外部profile pathの探索
 - v0.1での複数Site Adapter
 
 ## 6. Conceptual architecture
@@ -167,7 +167,7 @@ Optional future write plane
 
 各矢印は責務境界を示します。
 
-- MO2 Adapterは、明示されたMO2 sourceを読み取ります。
+- MO2 Adapterは、解決済みのMO2 sourceを読み取ります。
 - 7DTD Adapterは、7DTD固有のmetadataとXML形式を解釈します。
 - Local Mod Knowledgeは、MO2 sourceから生成する再生成可能な派生データです。
 - Browsing Layerは、Web pageとpage observationを扱います。
@@ -181,7 +181,7 @@ Local Mod Knowledgeは、ModScopeのcore assetです。GUIだけの内部デー�
 
 ### 7.1 v0.1の入力境界
 
-ユーザーが明示した、7DTD + MO2の1 instanceと1 profileを読み取ります。
+解決した、7DTD + MO2の1 instanceと1 profileを読み取ります。
 
 - profileの`modlist.txt`
 - `mods/`内のMOD directory
@@ -192,7 +192,21 @@ Local Mod Knowledgeは、ModScopeのcore assetです。GUIだけの内部デー�
 
 MO2のdownloads、virtual filesystem、他profileは、v0.1の必須入力にしません。
 
-source pathは明示します。暗黙の探索範囲を広げません。
+MO2 sourceは、既知の場所と実行中MO2からread-onlyで候補化します。
+全ドライブの再帰探索は行いません。探索範囲と待ち時間を予測可能にするためです。
+候補は、実行中MO2、前回成功したsource、`%LOCALAPPDATA%\ModOrganizer`直下、last-used instance情報、native pickerの順で追加します。
+portable instanceはMO2実行ファイルの親directoryまたはpickerで選択したrootから解決します。
+global instanceは`%LOCALAPPDATA%\ModOrganizer\<instance>`から解決します。
+候補のreadinessは、`gameName`、well-formedな`ModOrganizer.ini`、`mods`、`profiles`、selected profileの`modlist.txt`で判定します。
+候補のevidenceは、`RunningProcess`、`Remembered`、`GlobalInstance`、`NativePicker`と、`Source`または`Inference`を分離して保持します。
+候補IDと候補順は、正規化したroot、profile、evidenceの規則から決定します。
+前回成功したsourceは`%LOCALAPPDATA%\\ModScope\\mo2-source.json`へrootとprofileだけを保存します。
+保存pathは起動時に再検証します。無効な保存pathは自動選択しません。
+Developer toolsでは、明示的なsource path入力を引き続き使用できます。
+
+MO2設定がinstance外のModsまたはProfiles directoryを指定する場合があります。
+ModScopeは、INIに明示され、正規化後に存在し、reparse pointでなく、Profiles側に`modlist.txt`があるpathだけをread-onlyで扱います。
+ModScopeは、解決したpathへ書き込みません。
 
 ### 7.2 保持する事実
 
@@ -213,13 +227,16 @@ source pathは明示します。暗黙の探索範囲を広げません。
 - normalized MOD identity
 - enabled / disabled
 - priority
-- resolved MOD directory
+- MO2 outer directory
+- resolved 7DTD inner root
 - unresolved reason
 
 #### MOD record
 
 - stable MOD id候補
-- directory name
+- MO2 outer directoryとroot resolution
+- resolved inner root directory name
+- root discoveryのevidence種別
 - display name候補
 - enabled状態
 - priority
@@ -227,7 +244,28 @@ source pathは明示します。暗黙の探索範囲を広げません。
 - file references
 - diagnostics
 
-MOD名だけをstable idとしません。directory、profile、source identityの関係を保持します。
+MO2 profile entryはouter directory単位で保持します。
+7DTD MOD recordはresolved inner root単位で生成します。
+outer直下の`ModInfo.xml`は`Source`としてrootを解決します。
+outer直下の子directoryにある`ModInfo.xml`は`Inference`としてrootを解決します。
+子directoryのrootは、1つのouterから複数生成できます。
+2階層以上の`ModInfo.xml`候補はraw path付きdiagnosticだけを保持します。
+rootを解決できないouterはMOD recordを生成しません。
+そのouterのraw inventory、manifest hash、`mod.root.not_found`を保持します。
+stable MOD keyは`mods/`からのnormalizedな`outer`または`outer/inner` pathです。
+`ModInfo.Name`はmetadataであり、stable MOD keyに使いません。
+
+#### MO2 source candidate
+
+- instance name
+- game name
+- profile name
+- candidate readiness
+- discovery evidence
+- diagnostic
+
+Frontendにはabsolute pathを送信しません。
+Desktop hostはcandidate IDから内部保持したpathを解決します。
 
 #### File record
 
@@ -277,10 +315,14 @@ source path、page URL、取得時刻、parser version、snapshot idなど、再
 
 MO2 Adapterは、次だけを担当します。
 
-- 明示されたinstance、profile、mods pathの読み取り
+- MO2 source candidateの発見と検証
+- portable instanceとglobal instanceの境界の保持
+- 明示されたinstance、profile、Mods、Profiles pathのread-only読み取り
 - modlistのraw保持とnormalized projection
 - enabled状態とpriorityの取得
-- MOD directoryとrelative pathの解決
+- MO2 outer directoryと7DTD inner rootの解決
+- depth 0 / depth 1のroot discoveryと、depth 2以上のdiagnostic化
+- inner rootを基準にしたMOD fileとsource referenceの解決
 - 欠落、重複、未解決入力のdiagnostic化
 
 MO2 Adapterは、MO2のファイルを書き換えません。7DTDのXML semanticsを解釈しません。
@@ -537,7 +579,6 @@ Write planeは、将来必要性が確認できた場合だけ追加します。
 - 完全なsemantic conflict判定
 - RuntimeOCD連携
 - MO2へのwrite
-- global MO2 profile自動探索
 - 常時表示の高密度Mod一覧
 - 特定AI製品への専用統合
 - agent Web backendの固定
@@ -712,9 +753,15 @@ Browser、Local Mod Knowledge、context projection、analysis、mutationを分�
 
 1 profileをread-onlyで読み取ります。Local Mod Knowledgeを生成します。WPF + WebView2上でpage observationを取得し、ユーザー確認したMOD identityとLocal contextを結びます。Inspectorで根拠を開きます。WebView2はbrowser engineの実装資産ではなく、Browsing Layerのhostです。
 
-### Phase 2：structured Local Mod Knowledge
+### Phase 2：structured Local Mod Knowledge（実装中）
 
 ModInfo、Config XML、patch operation、target、XPath、reverse indexを拡張します。
+既存のPhase 1 Local Knowledgeを、raw、normalized、inference、diagnostic付きの静的なstructured modelへ拡張します。
+MO2 source discoveryを追加します。
+portable instanceとglobal instanceを、実行中MO2、remembered source、AppData、native pickerのevidence付きで候補化します。
+候補が1件なら自動読込します。複数件ならPickerで選択します。
+external Mods / Profiles pathは、MO2設定から解決したread-only pathだけを扱います。
+RuntimeOCD、semantic conflict、effective result、MO2 writeはこのPhaseの対象外です。
 
 ### Phase 3：queryとSite Adapter
 
@@ -744,7 +791,7 @@ Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡
 
 ### v0.1
 
-- 明示した7DTD + MO2の1 instanceと1 profileをread-onlyで読み取れる
+- 解決した7DTD + MO2の1 instanceと1 profileをread-onlyで読み取れる
 - modlistからenabled状態とpriorityを取得できる
 - MODのfile list、ModInfo metadata、軽量なXML referenceを取得できる
 - raw情報、normalized value、source reference、diagnosticを保持できる
@@ -825,6 +872,9 @@ frontendからhostへ送るcommandは次です。
 - browser.observe
 - knowledge.useFixture
 - knowledge.loadSource
+- knowledge.discoverSources
+- knowledge.selectSource
+- knowledge.selectRoot
 - knowledge.switchProfile
 - identity.confirm
 - inspector.open
@@ -847,12 +897,57 @@ Browser WebView2へlocal context、absolute MO2 path、LocalModSnapshotを送信
 Observeは固定scriptでbody textをbounded previewとして取得します。
 Inspectorはinspector.open commandの後に取得します。
 
-Profile catalogは、ユーザーが明示したinstance rootの`profiles`直下だけを読み取ります。
+Profile catalogは、MO2設定から解決したProfiles directoryだけをread-onlyで読み取ります。
 `modlist.txt`を持つ通常directoryだけを候補にします。
-reparse pointとglobal MO2 default pathは読み取りません。
+reparse pointと、MO2設定にない暗黙のglobal pathは読み取りません。
 `profiles` directoryがない場合は、現在のexplicit profileだけを候補にします。
 Profile switchは新しいsnapshotをread-onlyで生成します。
 Profile pathの絶対値はfrontendへ送信しません。
+
+### 24.3 読み込み性能とProfile投影
+
+静的MOD knowledgeとProfile projectionを分離します。
+静的MOD knowledgeは、MOD record、file inventory、XML observation、diagnostic、LocalKnowledgeIndexを含みます。
+Profile projectionは、`modlist.txt`のraw line、enabled state、priority、Profile state、profile hash、snapshot IDを含みます。
+
+`Mo2SnapshotReader`は、正規化した`ModsPath`、parser version、schema versionをkeyにprocess-scoped static catalogを保持します。
+cacheはMO2のsource of truthを置き換えません。
+cacheはメモリ上の再生成可能な派生データです。
+
+cache hitの判定では、MOD treeをcontent readせずにrelative path、file size、最終更新時刻、reparse stateを比較します。
+metadataが変わった場合はstatic catalogを破棄し、静的MOD knowledgeを再生成します。
+cache missではouter MOD単位のscanを最大2並列で実行します。
+並列結果はouter path、inner path、file path、diagnosticの決定的な順序でmergeします。
+`ModInfo.xml`と`Config/**/*.xml`は、scan時に取得したbyte bufferからhashとXML observationを生成します。
+
+初回読み込みとProfile switchはDesktop UI threadの外で実行します。
+bridge stateはoperation kind、busy state、target profile nameを保持します。
+読み込み中は現在のsession、candidate、page observationを保持します。
+成功後だけProfile stateとlocal contextを更新します。
+失敗時は既存stateを保持し、statusまたはsource cardへ要約を表示します。
+Profile dropdownとsource操作はbusy中だけ無効にします。
+
+### 24.3.1 Operation progress rail
+
+初回ロード、source load、Profile switchは、派生UI stateとしてoperation progressを公開します。
+Progress stateはsnapshot ID、manifest、normalized data、LocalKnowledgeIndexへ含めません。
+
+`KnowledgeOperationUiState`はoperation kind、busy state、対象Profile、phase、completed、totalを持ちます。
+実数を安全に取得できないphaseではcompletedとtotalをnullにします。
+
+outer MOD folderの並列scanだけは、folder数をtotalとして決定的な進捗を報告します。
+inner MOD recordの数とは区別します。
+cache hitではstatic knowledgeを再利用するphaseを報告します。
+index構築とProfile projectionは不定形phaseとして表示します。
+
+Desktop hostはoperation tokenでstale callbackを破棄します。
+progress通知は最大20回/秒へ間引きます。
+Web UIは150msを超えたoperationだけ、画面上端のprogress railを表示します。
+短時間のcache hitでは、progress railを表示しません。
+
+progress railは現在のBrowser pageとLocal contextを隠しません。
+operation失敗時は既存stateを保持し、既存のstatus summaryを表示します。
+MO2のsource of truthとread-only境界は変更しません。
 
 ### 24.4 Frontend build
 
@@ -886,6 +981,11 @@ node_modules、frontend dist、生成済みDesktop assetsはGit管理対象外�
 - raw observationはPage detailsへ折りたたみます。
 - fixture、explicit MO2 source path、手動ObserveはDeveloper toolsへ移します。
 
-通常画面のProfile dropdownは、explicit instance内のread-only profile switchだけを実行します。
-MO2自動検出、global path探索、page identity自動認識、overlap判定は追加しません。
+起動時にMO2 source discoveryを実行します。
+ready候補が1件なら自動読込します。
+ready候補が複数件ならsource cardで選択します。
+candidateがない場合は再探索とnative folder pickerを表示します。
+unsupported candidateとload failureはsource cardへ要約表示します。
+通常画面のProfile dropdownは、解決済みsource内のread-only profile switchだけを実行します。
+page identity自動認識とoverlap判定は追加しません。
 既存のQuery modelとread-only境界を維持し、profile catalogとlayout stateを明示的なread modelへ追加します。

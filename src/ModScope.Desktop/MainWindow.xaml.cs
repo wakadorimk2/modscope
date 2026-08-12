@@ -13,10 +13,12 @@ public partial class MainWindow : Window
     private readonly DesktopSessionController _controller = new();
     private bool _toolbarReady;
     private bool _contextReady;
+    private bool _sourceDiscoveryStarted;
 
     public MainWindow()
     {
         InitializeComponent();
+        _controller.OperationStateChanged += Controller_OperationStateChanged;
         Loaded += MainWindow_Loaded;
     }
 
@@ -46,6 +48,15 @@ public partial class MainWindow : Window
 
             ConfigureFrontend(ToolbarShell, webAssetsPath, "toolbar");
             ConfigureFrontend(ContextWebView, webAssetsPath, "context");
+
+            if (!_sourceDiscoveryStarted)
+            {
+                _sourceDiscoveryStarted = true;
+                var discoveryTask = _controller.DiscoverSourcesAsync();
+                SendState();
+                await discoveryTask;
+                SendState();
+            }
 
             var demoPage = Path.Combine(AppContext.BaseDirectory, "Fixtures", "alpha-mod.html");
             Browser.Source = File.Exists(demoPage)
@@ -178,18 +189,55 @@ public partial class MainWindow : Window
                 await ObservePageAsync(command.RequestId);
                 break;
             case "knowledge.useFixture":
-                _controller.UseFixture();
+            {
+                var fixtureTask = _controller.UseFixtureAsync();
+                SendState();
+                await fixtureTask;
                 SendState(command.RequestId);
                 break;
+            }
             case "knowledge.loadSource":
             {
                 var payload = BridgeProtocol.ReadPayload<LoadSourcePayload>(command.Payload);
-                _controller.LoadSource(new Mo2SourceInput(
+                var loadTask = _controller.LoadSourceAsync(new Mo2SourceInput(
                     payload.InstanceName,
                     payload.ProfileName,
                     payload.InstanceRootPath,
                     payload.ProfilePath,
                     payload.ModsPath));
+                SendState();
+                await loadTask;
+                SendState(command.RequestId);
+                break;
+            }
+            case "knowledge.discoverSources":
+            {
+                var payload = BridgeProtocol.ReadPayload<DiscoverSourcesPayload>(command.Payload);
+                var discoveryTask = _controller.DiscoverSourcesAsync(payload.SelectedRoots);
+                SendState();
+                await discoveryTask;
+                SendState(command.RequestId);
+                break;
+            }
+            case "knowledge.selectSource":
+            {
+                var payload = BridgeProtocol.ReadPayload<SelectSourcePayload>(command.Payload);
+                var loadTask = _controller.LoadSourceCandidateAsync(payload.CandidateId);
+                SendState();
+                await loadTask;
+                SendState(command.RequestId);
+                break;
+            }
+            case "knowledge.selectRoot":
+            {
+                var root = ChooseMo2Root();
+                if (root is not null)
+                {
+                    var discoveryTask = _controller.DiscoverSourcesAsync(new[] { root });
+                    SendState();
+                    await discoveryTask;
+                }
+
                 SendState(command.RequestId);
                 break;
             }
@@ -201,7 +249,9 @@ public partial class MainWindow : Window
                     throw new BridgeProtocolException("The profile name is required.");
                 }
 
-                _controller.SwitchProfile(payload.ProfileName);
+                var switchTask = _controller.SwitchProfileAsync(payload.ProfileName);
+                SendState();
+                await switchTask;
                 SendState(command.RequestId);
                 break;
             }
@@ -338,6 +388,27 @@ public partial class MainWindow : Window
             Browser.CanGoForward);
         var state = _controller.BuildState(browserState);
         SendMessage("state", state, requestId);
+    }
+
+    private void Controller_OperationStateChanged(object? sender, EventArgs e)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            SendState();
+            return;
+        }
+
+        _ = Dispatcher.InvokeAsync(() => SendState());
+    }
+
+    private static string? ChooseMo2Root()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Select the MO2 instance or portable root"
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FolderName : null;
     }
 
     private void SendError(string code, string message, string? requestId = null)

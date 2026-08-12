@@ -1,3 +1,4 @@
+using ModScope.LocalKnowledge;
 using ModScope.Query;
 using Xunit;
 
@@ -94,24 +95,40 @@ public sealed class LocalKnowledgeQueryTests
             CreateProfile(profilesPath.FullName, "Alternate", "+Beta Mod");
             CreateProfile(root.FullName, "OutsideCatalog", "+Alpha Mod");
             var modsPath = Directory.CreateDirectory(Path.Combine(root.FullName, "mods"));
-            Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Alpha Mod"));
-            Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Beta Mod"));
+            var alphaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Alpha Mod"));
+            var betaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Beta Mod"));
+            File.WriteAllText(
+                Path.Combine(alphaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Alpha Mod\" /></xml>");
+            File.WriteAllText(
+                Path.Combine(betaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Beta Mod\" /></xml>");
 
             var query = CreateQuery();
+            var loadProgress = new RecordingProgress();
             query.Load(new Mo2SourceInput(
                 "synthetic-instance",
                 "Default",
                 root.FullName,
                 defaultProfile,
-                modsPath.FullName));
+                modsPath.FullName),
+                progress: loadProgress);
+
+            Assert.Contains(
+                loadProgress.Values,
+                progress => progress.Phase == "scanning-mod-folders");
 
             Assert.Equal(
                 new[] { "Alternate", "Default" },
                 query.GetProfiles().Select(profile => profile.ProfileName));
 
-            var switched = query.SwitchProfile("Alternate");
+            var switchProgress = new RecordingProgress();
+            var switched = query.SwitchProfile("Alternate", progress: switchProgress);
 
             Assert.Equal("Alternate", switched.ProfileName);
+            Assert.Contains(
+                switchProgress.Values,
+                progress => progress.Phase == "projecting-profile");
             Assert.Contains(query.GetModCandidates(), candidate => candidate.DirectoryName == "Beta Mod");
             Assert.DoesNotContain(query.GetProfiles(), profile => profile.ProfileName == "OutsideCatalog");
             Assert.Throws<ArgumentException>(() => query.SwitchProfile("OutsideCatalog"));
@@ -148,6 +165,47 @@ public sealed class LocalKnowledgeQueryTests
         {
             root.Delete(true);
         }
+    }
+
+    [Fact]
+    public void ProjectsSourceDiscoveryDiagnosticsWithInstanceFileReferences()
+    {
+        var source = new Mo2SourceDefinition(
+            "synthetic-instance",
+            "Default",
+            Path.GetFullPath("C:/synthetic-mo2"),
+            Path.GetFullPath("C:/synthetic-mo2/profiles/Default"),
+            Path.GetFullPath("C:/synthetic-mo2/mods"));
+        var candidate = new Mo2SourceCandidate(
+            "candidate-1",
+            "7 Days to Die",
+            source,
+            Mo2SourceCandidateReadiness.Invalid,
+            new[]
+            {
+                new Mo2SourceDiscoveryEvidence(
+                    Mo2SourceDiscoveryEvidenceKind.NativePicker,
+                    EvidenceKind.Source)
+            },
+            new[]
+            {
+                new Diagnostic(
+                    "mo2.ini.malformed",
+                    DiagnosticSeverity.Error,
+                    "Malformed INI.",
+                    new SourceReference(SourceReferenceKind.InstanceFile, "ModOrganizer.ini", 2))
+            });
+        var query = new LocalKnowledgeQueryService(
+            new Mo2SnapshotReader(),
+            new FakeSourceDiscovery(candidate),
+            new FakePreferenceStore());
+
+        var discovery = query.DiscoverSources();
+        var diagnostic = Assert.Single(Assert.Single(discovery.Candidates).Diagnostics);
+
+        Assert.Equal(QuerySourceReferenceKind.InstanceFile, diagnostic.Source?.Kind);
+        Assert.Equal("ModOrganizer.ini", diagnostic.Source?.RelativePath);
+        Assert.Equal(2, diagnostic.Source?.LineNumber);
     }
 
     private static ILocalKnowledgeQuery CreateQuery()
@@ -187,5 +245,38 @@ public sealed class LocalKnowledgeQueryTests
         var profilePath = Directory.CreateDirectory(Path.Combine(profilesRoot, name));
         File.WriteAllText(Path.Combine(profilePath.FullName, "modlist.txt"), modList);
         return profilePath.FullName;
+    }
+
+    private sealed class RecordingProgress : IProgress<LocalKnowledgeProgress>
+    {
+        public List<LocalKnowledgeProgress> Values { get; } = new();
+
+        public void Report(LocalKnowledgeProgress value)
+        {
+            Values.Add(value);
+        }
+    }
+
+    private sealed class FakeSourceDiscovery : IMo2SourceDiscovery
+    {
+        private readonly IReadOnlyList<Mo2SourceCandidate> _candidates;
+
+        public FakeSourceDiscovery(params Mo2SourceCandidate[] candidates)
+        {
+            _candidates = candidates;
+        }
+
+        public IReadOnlyList<Mo2SourceCandidate> Discover(
+            Mo2SourceDiscoveryRequest request,
+            CancellationToken cancellationToken = default) => _candidates;
+    }
+
+    private sealed class FakePreferenceStore : IMo2SourcePreferenceStore
+    {
+        public Mo2SourcePreference? Read() => null;
+
+        public void Write(Mo2SourcePreference preference)
+        {
+        }
     }
 }

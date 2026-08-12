@@ -62,10 +62,36 @@ export type ProfileUiState = {
   name: string;
 };
 
+export type KnowledgeOperationUiState = {
+  kind: string;
+  isBusy: boolean;
+  targetProfileName?: string | null;
+  phase: string;
+  completed?: number | null;
+  total?: number | null;
+};
+
 export type KnowledgeUiState = {
   session?: KnowledgeSessionUiState | null;
   candidates: ModCandidateUiState[];
   profiles: ProfileUiState[];
+  operation: KnowledgeOperationUiState;
+};
+
+export type SourceCandidateUiState = {
+  candidateId: string;
+  instanceName: string;
+  gameName: string;
+  profileName: string;
+  readiness: string;
+  isReady: boolean;
+  evidence: string[];
+  diagnostics: DiagnosticUiState[];
+};
+
+export type SourceDiscoveryUiState = {
+  candidates: SourceCandidateUiState[];
+  selectedCandidateId?: string | null;
 };
 
 export type IdentityUiState = {
@@ -163,6 +189,7 @@ export type UiState = {
   browser: BrowserUiState;
   observation?: PageObservationUiState | null;
   knowledge: KnowledgeUiState;
+  sourceDiscovery: SourceDiscoveryUiState;
   identity: IdentityUiState;
   localContext?: LocalContextUiState | null;
   inspector?: InspectorUiState | null;
@@ -192,7 +219,19 @@ export const initialState: UiState = {
   knowledge: {
     session: null,
     candidates: [],
-    profiles: []
+    profiles: [],
+    operation: {
+      kind: 'idle',
+      isBusy: false,
+      targetProfileName: null,
+      phase: 'idle',
+      completed: null,
+      total: null
+    }
+  },
+  sourceDiscovery: {
+    candidates: [],
+    selectedCandidateId: null
   },
   identity: {
     candidateIdentity: '',

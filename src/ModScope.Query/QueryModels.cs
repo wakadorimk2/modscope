@@ -51,6 +51,7 @@ public enum QueryEvidenceKind
 public enum QuerySourceReferenceKind
 {
     ProfileFile,
+    InstanceFile,
     ModDirectory,
     ModFile
 }
@@ -69,6 +70,19 @@ public sealed record Mo2SourceInput(
     string InstanceRootPath,
     string ProfilePath,
     string ModsPath);
+
+public sealed record Mo2SourceCandidateReadModel(
+    string CandidateId,
+    string InstanceName,
+    string GameName,
+    string ProfileName,
+    string Readiness,
+    bool IsReady,
+    IReadOnlyList<string> Evidence,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+
+public sealed record SourceDiscoveryReadModel(
+    IReadOnlyList<Mo2SourceCandidateReadModel> Candidates);
 
 public sealed record SourceReferenceReadModel(
     QuerySourceReferenceKind Kind,
