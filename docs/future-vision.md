@@ -322,7 +322,7 @@ source boundary、page observation、MOD identity confirmation、Local context�
 
 v0.1は、site固有Adapter、複数game、完全なsemantic conflict、RuntimeOCD、MO2 write、特定agent backendを含めません。
 
-### Phase 2：Structured Local Mod Knowledge（実装中）
+### Phase 2：Structured Local Mod Knowledge（完了）
 
 ModInfo、Config XML、patch operation、target、XPath、reverse indexを拡張します。
 MO2のouter directoryと、7DTDが読むinner MOD rootを分離して保持します。

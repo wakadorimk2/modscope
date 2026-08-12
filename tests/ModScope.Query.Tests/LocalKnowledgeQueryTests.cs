@@ -141,6 +141,111 @@ public sealed class LocalKnowledgeQueryTests
     }
 
     [Fact]
+    public void ListsAndSwitchesProfilesFromExternalProfilesPath()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-external-profiles-");
+        try
+        {
+            var externalRoot = Directory.CreateDirectory(Path.Combine(root.FullName, "external-data"));
+            var profilesPath = Directory.CreateDirectory(Path.Combine(externalRoot.FullName, "profiles"));
+            var defaultProfile = CreateProfile(profilesPath.FullName, "Default", "+Alpha Mod");
+            CreateProfile(profilesPath.FullName, "Alternate", "+Beta Mod");
+            var modsPath = Directory.CreateDirectory(Path.Combine(externalRoot.FullName, "mods"));
+            var alphaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Alpha Mod"));
+            var betaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Beta Mod"));
+            File.WriteAllText(
+                Path.Combine(alphaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Alpha Mod\" /></xml>");
+            File.WriteAllText(
+                Path.Combine(betaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Beta Mod\" /></xml>");
+
+            var query = CreateQuery();
+            query.Load(new Mo2SourceInput(
+                "synthetic-instance",
+                "Default",
+                root.FullName,
+                defaultProfile,
+                modsPath.FullName)
+            {
+                ProfilesPath = profilesPath.FullName
+            });
+
+            Assert.Equal(
+                new[] { "Alternate", "Default" },
+                query.GetProfiles().Select(profile => profile.ProfileName));
+
+            var switched = query.SwitchProfile("Alternate");
+
+            Assert.Equal("Alternate", switched.ProfileName);
+            Assert.Contains(query.GetModCandidates(), candidate => candidate.DirectoryName == "Beta Mod");
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void LoadsAndSwitchesProfilesFromDiscoveredExternalProfilesPath()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-discovered-external-profiles-");
+        try
+        {
+            var externalRoot = Directory.CreateDirectory(Path.Combine(root.FullName, "external-data"));
+            var profilesPath = Directory.CreateDirectory(Path.Combine(externalRoot.FullName, "profiles"));
+            var defaultProfile = CreateProfile(profilesPath.FullName, "Default", "+Alpha Mod");
+            CreateProfile(profilesPath.FullName, "Alternate", "+Beta Mod");
+            var modsPath = Directory.CreateDirectory(Path.Combine(externalRoot.FullName, "mods"));
+            var alphaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Alpha Mod"));
+            var betaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Beta Mod"));
+            File.WriteAllText(
+                Path.Combine(alphaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Alpha Mod\" /></xml>");
+            File.WriteAllText(
+                Path.Combine(betaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Beta Mod\" /></xml>");
+
+            var source = new Mo2SourceDefinition(
+                "synthetic-instance",
+                "Default",
+                root.FullName,
+                defaultProfile,
+                modsPath.FullName)
+            {
+                ProfilesPath = profilesPath.FullName
+            };
+            var candidate = new Mo2SourceCandidate(
+                "external-profile-candidate",
+                "7 Days to Die",
+                source,
+                Mo2SourceCandidateReadiness.Ready,
+                Array.Empty<Mo2SourceDiscoveryEvidence>(),
+                Array.Empty<Diagnostic>());
+            var query = new LocalKnowledgeQueryService(
+                new Mo2SnapshotReader(),
+                new FakeSourceDiscovery(candidate),
+                new FakePreferenceStore());
+
+            query.DiscoverSources(new[] { root.FullName });
+            query.LoadSourceCandidate("external-profile-candidate");
+
+            Assert.Equal(
+                new[] { "Alternate", "Default" },
+                query.GetProfiles().Select(profile => profile.ProfileName));
+
+            var switched = query.SwitchProfile("Alternate");
+
+            Assert.Equal("Alternate", switched.ProfileName);
+            Assert.Contains(query.GetModCandidates(), candidate => candidate.DirectoryName == "Beta Mod");
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
+    [Fact]
     public void FallsBackToCurrentExplicitProfileWhenProfilesDirectoryIsMissing()
     {
         var root = Directory.CreateTempSubdirectory("modscope-profile-fallback-");

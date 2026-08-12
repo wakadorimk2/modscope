@@ -374,7 +374,8 @@ public sealed class Mo2SourceDiscovery : IMo2SourceDiscovery
             var invalidSource = CreateDefaultSource(instanceName, rootPath, string.Empty) with
             {
                 ProfilePath = profilesPath,
-                ModsPath = modsPath
+                ModsPath = modsPath,
+                ProfilesPath = profilesPath
             };
             return new[]
             {
@@ -457,7 +458,8 @@ public sealed class Mo2SourceDiscovery : IMo2SourceDiscovery
             var source = CreateDefaultSource(instanceName, rootPath, string.Empty) with
             {
                 ProfilePath = profilesPath,
-                ModsPath = modsPath
+                ModsPath = modsPath,
+                ProfilesPath = profilesPath
             };
             return new[]
             {
@@ -482,7 +484,10 @@ public sealed class Mo2SourceDiscovery : IMo2SourceDiscovery
                     profileName,
                     rootPath,
                     profilePath,
-                    modsPath);
+                    modsPath)
+                {
+                    ProfilesPath = profilesPath
+                };
                 return CreateCandidate(
                     rootPath,
                     instanceName,

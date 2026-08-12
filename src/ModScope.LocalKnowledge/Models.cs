@@ -13,7 +13,10 @@ public sealed record Mo2SourceDefinition(
     string ProfileName,
     string InstanceRootPath,
     string ProfilePath,
-    string ModsPath);
+    string ModsPath)
+{
+    public string? ProfilesPath { get; init; }
+}
 
 public enum Mo2SourceCandidateReadiness
 {

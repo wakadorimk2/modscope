@@ -753,7 +753,7 @@ Browser、Local Mod Knowledge、context projection、analysis、mutationを分�
 
 1 profileをread-onlyで読み取ります。Local Mod Knowledgeを生成します。WPF + WebView2上でpage observationを取得し、ユーザー確認したMOD identityとLocal contextを結びます。Inspectorで根拠を開きます。WebView2はbrowser engineの実装資産ではなく、Browsing Layerのhostです。
 
-### Phase 2：structured Local Mod Knowledge（実装中）
+### Phase 2：structured Local Mod Knowledge（完了）
 
 ModInfo、Config XML、patch operation、target、XPath、reverse indexを拡張します。
 既存のPhase 1 Local Knowledgeを、raw、normalized、inference、diagnostic付きの静的なstructured modelへ拡張します。
