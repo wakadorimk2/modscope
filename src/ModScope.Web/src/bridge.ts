@@ -66,7 +66,15 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
           diagnostics: []
         }
       ],
-      profiles: [{ name: 'default' }]
+      profiles: [{ name: 'default' }],
+      operation: {
+        kind: 'idle',
+        isBusy: false,
+        targetProfileName: null,
+        phase: 'idle',
+        completed: null,
+        total: null
+      }
     };
     next.statusMessage = 'Mock Local Knowledge loaded.';
   } else if (command === 'knowledge.switchProfile' && typeof payload === 'object' && payload !== null) {

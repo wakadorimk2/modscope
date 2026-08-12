@@ -4,9 +4,19 @@ namespace ModScope.Query;
 
 public interface ILocalKnowledgeQuery
 {
+    SourceDiscoveryReadModel DiscoverSources(
+        IReadOnlyList<string>? selectedRoots = null,
+        CancellationToken cancellationToken = default);
+
+    KnowledgeSessionReadModel LoadSourceCandidate(
+        string candidateId,
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null);
+
     KnowledgeSessionReadModel Load(
         Mo2SourceInput source,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null);
 
     IReadOnlyList<ModCandidateSummary> GetModCandidates();
 
@@ -14,7 +24,8 @@ public interface ILocalKnowledgeQuery
 
     KnowledgeSessionReadModel SwitchProfile(
         string profileName,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null);
 
     LocalContextReadModel ConfirmIdentity(IdentityConfirmation confirmation);
 
@@ -24,27 +35,88 @@ public interface ILocalKnowledgeQuery
 public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
 {
     private readonly IMo2SnapshotReader _snapshotReader;
+    private readonly IMo2SourceDiscovery _sourceDiscovery;
+    private readonly IMo2SourcePreferenceStore _preferenceStore;
     private LocalModSnapshot? _snapshot;
     private Mo2SourceInput? _source;
     private IReadOnlyList<Mo2ProfileDefinition> _profiles = Array.Empty<Mo2ProfileDefinition>();
+    private IReadOnlyList<Mo2SourceCandidate> _sourceCandidates = Array.Empty<Mo2SourceCandidate>();
 
     public LocalKnowledgeQueryService(IMo2SnapshotReader snapshotReader)
+        : this(
+            snapshotReader,
+            new Mo2SourceDiscovery(),
+            new JsonMo2SourcePreferenceStore())
+    {
+    }
+
+    public LocalKnowledgeQueryService(
+        IMo2SnapshotReader snapshotReader,
+        IMo2SourceDiscovery sourceDiscovery,
+        IMo2SourcePreferenceStore preferenceStore)
     {
         _snapshotReader = snapshotReader ?? throw new ArgumentNullException(nameof(snapshotReader));
+        _sourceDiscovery = sourceDiscovery ?? throw new ArgumentNullException(nameof(sourceDiscovery));
+        _preferenceStore = preferenceStore ?? throw new ArgumentNullException(nameof(preferenceStore));
     }
 
     public static LocalKnowledgeQueryService CreateDefault()
     {
-        return new LocalKnowledgeQueryService(new Mo2SnapshotReader());
+        return new LocalKnowledgeQueryService(
+            new Mo2SnapshotReader(),
+            new Mo2SourceDiscovery(),
+            new JsonMo2SourcePreferenceStore());
+    }
+
+    public SourceDiscoveryReadModel DiscoverSources(
+        IReadOnlyList<string>? selectedRoots = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new Mo2SourceDiscoveryRequest(
+            _preferenceStore.Read(),
+            selectedRoots ?? Array.Empty<string>());
+        _sourceCandidates = _sourceDiscovery.Discover(request, cancellationToken);
+        return ToSourceDiscovery(_sourceCandidates);
+    }
+
+    public KnowledgeSessionReadModel LoadSourceCandidate(
+        string candidateId,
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(candidateId);
+        var candidate = _sourceCandidates.FirstOrDefault(item =>
+            string.Equals(item.CandidateId, candidateId.Trim(), StringComparison.Ordinal));
+        if (candidate is null)
+        {
+            throw new KeyNotFoundException($"The MO2 source candidate '{candidateId}' does not exist.");
+        }
+
+        if (candidate.Readiness != Mo2SourceCandidateReadiness.Ready)
+        {
+            throw new InvalidOperationException(
+                $"The MO2 source candidate '{candidateId}' is not ready: {candidate.Readiness}.");
+        }
+
+        var source = new Mo2SourceInput(
+            candidate.Source.InstanceName,
+            candidate.Source.ProfileName,
+            candidate.Source.InstanceRootPath,
+            candidate.Source.ProfilePath,
+            candidate.Source.ModsPath);
+        var session = Load(source, cancellationToken, progress);
+        TryWritePreference(source);
+        return session;
     }
 
     public KnowledgeSessionReadModel Load(
         Mo2SourceInput source,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         var definition = ToDefinition(source);
-        var snapshot = _snapshotReader.Read(definition, cancellationToken);
+        var snapshot = _snapshotReader.Read(definition, cancellationToken, progress);
         var profiles = _snapshotReader.ListProfiles(definition, cancellationToken);
 
         _source = source;
@@ -78,7 +150,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
 
     public KnowledgeSessionReadModel SwitchProfile(
         string profileName,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
         var source = _source ?? throw new InvalidOperationException(
@@ -97,10 +170,11 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             ProfileName = profile.Name,
             ProfilePath = profile.ProfilePath
         };
-        var snapshot = _snapshotReader.Read(ToDefinition(nextSource), cancellationToken);
+        var snapshot = _snapshotReader.Read(ToDefinition(nextSource), cancellationToken, progress);
 
         _source = nextSource;
         _snapshot = snapshot;
+        TryWritePreference(nextSource);
         return ToSession(snapshot);
     }
 
@@ -243,6 +317,43 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             source.InstanceRootPath,
             source.ProfilePath,
             source.ModsPath);
+    }
+
+    private static SourceDiscoveryReadModel ToSourceDiscovery(
+        IReadOnlyList<Mo2SourceCandidate> candidates)
+    {
+        return new SourceDiscoveryReadModel(
+            candidates
+                .Select(candidate => new Mo2SourceCandidateReadModel(
+                    candidate.CandidateId,
+                    candidate.Source.InstanceName,
+                    candidate.GameName,
+                    candidate.Source.ProfileName,
+                    candidate.Readiness.ToString(),
+                    candidate.Readiness == Mo2SourceCandidateReadiness.Ready,
+                    candidate.Evidence
+                        .Select(evidence => $"{evidence.Kind}:{evidence.EvidenceKind}")
+                        .ToList()
+                        .AsReadOnly(),
+                    QueryProjection.Diagnostics(candidate.Diagnostics)))
+                .ToList()
+                .AsReadOnly());
+    }
+
+    private void TryWritePreference(Mo2SourceInput source)
+    {
+        try
+        {
+            _preferenceStore.Write(new Mo2SourcePreference(
+                source.InstanceRootPath,
+                source.ProfileName));
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static KnowledgeSessionReadModel ToSession(LocalModSnapshot snapshot)
@@ -396,10 +507,11 @@ internal static class QueryProjection
 
     public static SourceReferenceReadModel Source(SourceReference source)
     {
-        return new SourceReferenceReadModel(
+            return new SourceReferenceReadModel(
             source.Kind switch
             {
                 SourceReferenceKind.ProfileFile => QuerySourceReferenceKind.ProfileFile,
+                SourceReferenceKind.InstanceFile => QuerySourceReferenceKind.InstanceFile,
                 SourceReferenceKind.ModDirectory => QuerySourceReferenceKind.ModDirectory,
                 SourceReferenceKind.ModFile => QuerySourceReferenceKind.ModFile,
                 _ => throw new ArgumentOutOfRangeException(nameof(source), source.Kind, null)

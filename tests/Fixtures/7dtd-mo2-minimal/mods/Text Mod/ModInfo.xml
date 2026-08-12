@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<modInfo schemaVariant="text-values">
+  <Name>Text Mod</Name>
+  <Name>Duplicate Text Mod</Name>
+  <DisplayName value="Text Display" />
+  <Version>2.0</Version>
+  <UnknownField extra="keep">unknown text</UnknownField>
+</modInfo>

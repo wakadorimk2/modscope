@@ -18,7 +18,8 @@ internal static class SevenDaysToDieParsing
 {
     public static ParsedModData Parse(
         string directoryName,
-        IReadOnlyList<FileInventoryItem> files)
+        IReadOnlyList<FileInventoryItem> files,
+        IReadOnlyDictionary<string, byte[]>? xmlContents = null)
     {
         var diagnostics = new List<Diagnostic>();
         var modDirectorySource = new SourceReference(
@@ -32,22 +33,22 @@ internal static class SevenDaysToDieParsing
         if (modInfoFile is null)
         {
             var missingDiagnostic = new Diagnostic(
-                "modinfo.missing",
+                "mod.root.not_found",
                 DiagnosticSeverity.Warning,
-                "The MOD directory does not contain a root ModInfo.xml file.",
+                "The resolved 7DTD MOD root does not contain a root ModInfo.xml file.",
                 modDirectorySource);
             diagnostics.Add(missingDiagnostic);
             modInfo = null;
         }
         else
         {
-            modInfo = ParseModInfo(modInfoFile, diagnostics);
+            modInfo = ParseModInfo(modInfoFile, diagnostics, xmlContents);
         }
 
         var xmlFiles = new List<XmlFileReference>();
         foreach (var file in files.Where(IsConfigXml))
         {
-            xmlFiles.Add(ParseConfigXml(file, diagnostics));
+            xmlFiles.Add(ParseConfigXml(file, diagnostics, xmlContents));
         }
 
         return new ParsedModData(
@@ -64,14 +65,17 @@ internal static class SevenDaysToDieParsing
 
     private static ModInfoMetadata ParseModInfo(
         FileInventoryItem file,
-        List<Diagnostic> aggregateDiagnostics)
+        List<Diagnostic> aggregateDiagnostics,
+        IReadOnlyDictionary<string, byte[]>? xmlContents)
     {
         var diagnostics = new List<Diagnostic>();
         byte[] bytes;
 
         try
         {
-            bytes = File.ReadAllBytes(file.FullPath);
+            bytes = xmlContents is not null && xmlContents.TryGetValue(file.FullPath, out var cachedBytes)
+                ? cachedBytes
+                : File.ReadAllBytes(file.FullPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -97,7 +101,7 @@ internal static class SevenDaysToDieParsing
                 file.Source);
         }
 
-        var parsed = XmlParsing.Parse(bytes, file.Source, collectAllObservations: false);
+        var parsed = XmlParsing.Parse(bytes, file.Source, collectAllObservations: true);
         diagnostics.AddRange(parsed.Diagnostics);
         aggregateDiagnostics.AddRange(parsed.Diagnostics);
 
@@ -114,7 +118,10 @@ internal static class SevenDaysToDieParsing
                 null,
                 Array.Empty<RawXmlObservation>(),
                 diagnostics.AsReadOnly(),
-                file.Source);
+                file.Source)
+            {
+                RawObservations = parsed.Observations
+            };
         }
 
         if (!parsed.Document.Root.Name.LocalName.Equals("xml", StringComparison.OrdinalIgnoreCase))
@@ -129,6 +136,8 @@ internal static class SevenDaysToDieParsing
         }
 
         var unknown = XmlParsing.CollectUnknownModInfoObservations(parsed.Document, file.Source);
+        AddDuplicateModInfoDiagnostics(parsed.Document.Root, file.Source, diagnostics, aggregateDiagnostics);
+
         return new ModInfoMetadata(
             file.RelativePath,
             parsed.Status,
@@ -140,17 +149,23 @@ internal static class SevenDaysToDieParsing
             XmlParsing.GetModInfoValue(parsed.Document.Root, "Website"),
             unknown,
             diagnostics.AsReadOnly(),
-            file.Source);
+            file.Source)
+        {
+            RawObservations = parsed.Observations
+        };
     }
 
     private static XmlFileReference ParseConfigXml(
         FileInventoryItem file,
-        List<Diagnostic> aggregateDiagnostics)
+        List<Diagnostic> aggregateDiagnostics,
+        IReadOnlyDictionary<string, byte[]>? xmlContents)
     {
         byte[] bytes;
         try
         {
-            bytes = File.ReadAllBytes(file.FullPath);
+            bytes = xmlContents is not null && xmlContents.TryGetValue(file.FullPath, out var cachedBytes)
+                ? cachedBytes
+                : File.ReadAllBytes(file.FullPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -174,7 +189,32 @@ internal static class SevenDaysToDieParsing
         }
 
         var parsed = XmlParsing.Parse(bytes, file.Source, collectAllObservations: true);
-        aggregateDiagnostics.AddRange(parsed.Diagnostics);
+        var operationDiagnostics = parsed.PatchOperations
+            .SelectMany(operation => operation.Diagnostics)
+            .ToList();
+        var diagnostics = parsed.Diagnostics
+            .Concat(operationDiagnostics)
+            .ToList()
+            .AsReadOnly();
+        aggregateDiagnostics.AddRange(diagnostics);
+
+        var inferredTarget = new XmlReferenceCandidate(
+            file.RelativePath,
+            NormalizeInferredTarget(file.RelativePath),
+            string.Empty,
+            EvidenceKind.Inference,
+            file.Source);
+        var patchOperations = parsed.PatchOperations
+            .Select(operation => operation with
+            {
+                TargetXmlCandidates = operation.TargetXmlCandidates
+                    .Concat(new[] { inferredTarget })
+                    .ToList()
+                    .AsReadOnly()
+            })
+            .ToList()
+            .AsReadOnly();
+
         return new XmlFileReference(
             file.RelativePath,
             parsed.Status,
@@ -184,7 +224,58 @@ internal static class SevenDaysToDieParsing
             parsed.AttributeCount,
             parsed.XPathCandidates,
             parsed.Observations,
-            parsed.Diagnostics,
-            file.Source);
+            diagnostics,
+            file.Source)
+        {
+            PatchOperations = patchOperations
+        };
+    }
+
+    private static void AddDuplicateModInfoDiagnostics(
+        XElement root,
+        SourceReference source,
+        ICollection<Diagnostic> diagnostics,
+        ICollection<Diagnostic> aggregateDiagnostics)
+    {
+        var knownNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Name",
+            "DisplayName",
+            "Version",
+            "Description",
+            "Author",
+            "Website"
+        };
+
+        foreach (var group in root.Elements()
+                     .Where(element => knownNames.Contains(element.Name.LocalName))
+                     .GroupBy(element => element.Name.LocalName, StringComparer.OrdinalIgnoreCase)
+                     .Where(group => group.Count() > 1))
+        {
+            foreach (var duplicate in group.Skip(1))
+            {
+                var duplicateSource = source with
+                {
+                    LineNumber = ParsingUtilities.GetLineNumber(duplicate),
+                    ColumnNumber = ParsingUtilities.GetColumnNumber(duplicate)
+                };
+                var diagnostic = new Diagnostic(
+                    "modinfo.duplicate_field",
+                    DiagnosticSeverity.Warning,
+                    $"The ModInfo.xml field '{group.Key}' appears more than once. The first value is used for the normalized field.",
+                    duplicateSource,
+                    group.Key);
+                diagnostics.Add(diagnostic);
+                aggregateDiagnostics.Add(diagnostic);
+            }
+        }
+    }
+
+    private static string? NormalizeInferredTarget(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').Trim();
+        return normalized.StartsWith("Config/", StringComparison.OrdinalIgnoreCase)
+            ? normalized["Config/".Length..]
+            : normalized.Length == 0 ? null : normalized;
     }
 }

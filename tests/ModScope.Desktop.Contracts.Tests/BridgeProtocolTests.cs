@@ -117,4 +117,74 @@ public sealed class BridgeProtocolTests
         Assert.Equal("Alternate", profilePayload.ProfileName);
         Assert.False(layoutPayload.Visible);
     }
+
+    [Fact]
+    public void ParsesSourceDiscoveryCommandsWithoutAbsolutePaths()
+    {
+        var discover = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "discover-1",
+              "command": "knowledge.discoverSources",
+              "payload": { "selectedRoots": ["C:\\MO2"] }
+            }
+            """);
+        var select = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "select-1",
+              "command": "knowledge.selectSource",
+              "payload": { "candidateId": "mo2-candidate" }
+            }
+            """);
+        var root = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "root-1",
+              "command": "knowledge.selectRoot",
+              "payload": {}
+            }
+            """);
+
+        var selectedRoots = BridgeProtocol.ReadPayload<DiscoverSourcesPayload>(discover.Payload);
+        var selectedSource = BridgeProtocol.ReadPayload<SelectSourcePayload>(select.Payload);
+
+        Assert.Equal(new[] { "C:\\MO2" }, selectedRoots.SelectedRoots);
+        Assert.Equal("mo2-candidate", selectedSource.CandidateId);
+        Assert.Equal("knowledge.selectRoot", root.Command);
+    }
+
+    [Fact]
+    public void SerializesKnowledgeOperationStateInCamelCase()
+    {
+        var message = BridgeProtocol.SerializeMessage(
+            "state",
+            new KnowledgeUiState(
+                null,
+                Array.Empty<ModCandidateUiState>(),
+                Array.Empty<ProfileUiState>(),
+                new KnowledgeOperationUiState(
+                    "profile-switch",
+                    true,
+                    "Alternate",
+                    "scanning-mod-folders",
+                    3,
+                    89)));
+
+        Assert.Contains(
+            "\"operation\":{\"kind\":\"profile-switch\",\"isBusy\":true,\"targetProfileName\":\"Alternate\",\"phase\":\"scanning-mod-folders\",\"completed\":3,\"total\":89}",
+            message);
+    }
+
+    [Fact]
+    public void IdleKnowledgeOperationHasNoProgressValues()
+    {
+        Assert.Equal("idle", KnowledgeOperationUiState.Idle.Phase);
+        Assert.False(KnowledgeOperationUiState.Idle.IsBusy);
+        Assert.Null(KnowledgeOperationUiState.Idle.Completed);
+        Assert.Null(KnowledgeOperationUiState.Idle.Total);
+    }
 }

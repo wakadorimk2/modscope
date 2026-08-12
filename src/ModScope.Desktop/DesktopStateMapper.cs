@@ -8,6 +8,8 @@ internal static class DesktopStateMapper
     public static UiState Map(
         BrowserUiState browser,
         PageObservation? observation,
+        SourceDiscoveryReadModel? sourceDiscovery,
+        string? selectedSourceCandidateId,
         KnowledgeSessionReadModel? session,
         IReadOnlyList<ModCandidateSummary> candidates,
         IReadOnlyList<ProfileSummaryReadModel> profiles,
@@ -15,21 +17,48 @@ internal static class DesktopStateMapper
         LocalContextReadModel? localContext,
         InspectorReadModel? inspector,
         LayoutUiState layout,
-        string statusMessage)
+        string statusMessage,
+        KnowledgeOperationUiState operation)
     {
         return new UiState(
             browser,
             observation is null ? null : PageObservation(observation),
+            sourceDiscovery is null
+                ? new SourceDiscoveryUiState(Array.Empty<SourceCandidateUiState>(), selectedSourceCandidateId)
+                : SourceDiscovery(sourceDiscovery, selectedSourceCandidateId),
             new KnowledgeUiState(
                 session is null ? null : KnowledgeSession(session),
                 candidates.Select(Candidate).ToList().AsReadOnly(),
-                profiles.Select(Profile).ToList().AsReadOnly()),
+                profiles.Select(Profile).ToList().AsReadOnly(),
+                operation),
             identity,
             localContext is null ? null : LocalContext(localContext),
             inspector is null ? null : Inspector(inspector),
             layout,
             statusMessage,
             session is null ? Array.Empty<DiagnosticUiState>() : Diagnostics(session.Diagnostics));
+    }
+
+    private static SourceDiscoveryUiState SourceDiscovery(
+        SourceDiscoveryReadModel value,
+        string? selectedCandidateId)
+    {
+        return new SourceDiscoveryUiState(
+            value.Candidates.Select(SourceCandidate).ToList().AsReadOnly(),
+            selectedCandidateId);
+    }
+
+    private static SourceCandidateUiState SourceCandidate(Mo2SourceCandidateReadModel value)
+    {
+        return new SourceCandidateUiState(
+            value.CandidateId,
+            value.InstanceName,
+            value.GameName,
+            value.ProfileName,
+            value.Readiness,
+            value.IsReady,
+            value.Evidence,
+            Diagnostics(value.Diagnostics));
     }
 
     private static PageObservationUiState PageObservation(PageObservation value)

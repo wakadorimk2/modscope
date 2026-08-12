@@ -1,7 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { createBridge, type Bridge } from './bridge';
-  import { initialState, type BridgeErrorPayload, type HostMessage, type UiState } from './contracts';
+  import {
+    initialState,
+    type BridgeErrorPayload,
+    type DiagnosticUiState,
+    type HostMessage,
+    type UiState
+  } from './contracts';
 
   const surface = new URLSearchParams(window.location.search).get('surface') === 'toolbar'
     ? 'toolbar'
@@ -15,6 +21,8 @@
   let developerToolsOpen = false;
   let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
+  let operationRailTimer: number | undefined;
+  let operationRailVisible = false;
   let source = {
     instanceName: 'explicit-instance',
     profileName: 'default',
@@ -23,6 +31,55 @@
     modsPath: ''
   };
 
+  $: {
+    const operationBusy = state.knowledge.operation.isBusy;
+    if (operationBusy && !operationRailVisible && operationRailTimer === undefined) {
+      operationRailTimer = window.setTimeout(() => {
+        operationRailTimer = undefined;
+        if (state.knowledge.operation.isBusy) {
+          operationRailVisible = true;
+        }
+      }, 150);
+    } else if (!operationBusy) {
+      if (operationRailTimer !== undefined) {
+        window.clearTimeout(operationRailTimer);
+        operationRailTimer = undefined;
+      }
+      operationRailVisible = false;
+    }
+  }
+
+  type DiagnosticGroup = {
+    diagnostic: DiagnosticUiState;
+    count: number;
+  };
+
+  function groupDiagnostics(diagnostics: DiagnosticUiState[]): DiagnosticGroup[] {
+    const groups = new Map<string, DiagnosticGroup>();
+
+    for (const diagnostic of diagnostics) {
+      const key = [
+        diagnostic.code,
+        diagnostic.severity,
+        diagnostic.message,
+        diagnostic.rawValue ?? ''
+      ].join('\u0000');
+      const existing = groups.get(key);
+
+      if (existing) {
+        existing.count += 1;
+      } else {
+        groups.set(key, { diagnostic, count: 1 });
+      }
+    }
+
+    return Array.from(groups.values());
+  }
+
+  function diagnosticClass(severity: string): string {
+    return `diagnostic diagnostic-${severity.toLowerCase()}`;
+  }
+
   onMount(() => {
     bridge = createBridge(handleHostMessage);
     const disconnect = bridge.connect();
@@ -30,6 +87,9 @@
 
     return () => {
       disconnect();
+      if (operationRailTimer !== undefined) {
+        window.clearTimeout(operationRailTimer);
+      }
       window.removeEventListener('keydown', handleShortcut);
     };
   });
@@ -83,6 +143,18 @@
     send('knowledge.loadSource', source);
   }
 
+  function discoverSources() {
+    send('knowledge.discoverSources');
+  }
+
+  function selectSource(candidateId: string) {
+    send('knowledge.selectSource', { candidateId });
+  }
+
+  function selectRoot() {
+    send('knowledge.selectRoot');
+  }
+
   function pageIdentity(): string {
     return (
       state.localContext?.candidateIdentity ||
@@ -132,11 +204,54 @@
     return value
       .replace(/([a-z])([A-Z])/g, '$1 $2')
       .replace(/-/g, ' ')
+      .replace(/:/g, ' · ')
       .replace(/^./, (character) => character.toUpperCase());
   }
 
   function statusClass(status: string | undefined): string {
     return 'status-' + (status ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
+  }
+
+  function operationLabel(): string {
+    const operation = state.knowledge.operation;
+    const profile = operation.targetProfileName ? ` ${operation.targetProfileName}` : '';
+
+    switch (operation.phase) {
+      case 'discovering-source':
+        return 'Finding MO2 source';
+      case 'reading-profile':
+        return `Reading profile${profile}`;
+      case 'checking-cache':
+        return 'Checking static MOD knowledge';
+      case 'scanning-mod-folders':
+        return `Scanning MOD folders${profile}`;
+      case 'reusing-static-knowledge':
+        return 'Reusing static MOD knowledge';
+      case 'building-index':
+        return 'Building local knowledge index';
+      case 'projecting-profile':
+        return `Applying profile${profile}`;
+      default:
+        return 'Loading local MO2 knowledge';
+    }
+  }
+
+  function operationProgress(): number | null {
+    const { completed, total } = state.knowledge.operation;
+    if (typeof completed !== 'number' || typeof total !== 'number' || total <= 0) {
+      return null;
+    }
+
+    return Math.min(100, Math.max(0, (completed / total) * 100));
+  }
+
+  function operationCountLabel(): string | null {
+    const { completed, total } = state.knowledge.operation;
+    if (typeof completed !== 'number' || typeof total !== 'number') {
+      return null;
+    }
+
+    return `${completed} / ${total} MOD folders`;
   }
 
   function sizeLabel(size: number): string {
@@ -153,6 +268,28 @@
 
 {#if surface === 'toolbar'}
   <main class="toolbar-surface">
+    {#if operationRailVisible}
+      <div class="operation-rail">
+        <div
+          class="operation-progress-track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={operationProgress() ?? undefined}
+          aria-label={operationLabel()}
+        >
+          <div
+            class="operation-progress-fill"
+            class:operation-progress-indeterminate={operationProgress() === null}
+            style:width={operationProgress() === null ? undefined : `${operationProgress()}%`}
+          ></div>
+        </div>
+        <div class="operation-rail-meta" role="status" aria-live="polite">
+          <span class="operation-rail-label">{operationLabel()}…</span>
+          {#if operationCountLabel()}<span class="operation-rail-count">{operationCountLabel()}</span>{/if}
+        </div>
+      </div>
+    {/if}
     <div class="toolbar-row">
       <div class="toolbar-navigation" aria-label="Browser navigation">
         <button class="icon-button" title="Back" aria-label="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
@@ -172,7 +309,7 @@
         <select
           aria-label="Active profile"
           value={state.knowledge.session?.profileName ?? ''}
-          disabled={state.knowledge.profiles.length === 0}
+          disabled={state.knowledge.profiles.length === 0 || state.knowledge.operation.isBusy}
           onchange={switchProfile}
         >
           {#if state.knowledge.profiles.length === 0}
@@ -184,7 +321,6 @@
           {/if}
         </select>
       </label>
-
       <button class="toolbar-context-button" onclick={toggleContext}>
         {state.layout.contextVisible ? 'Context' : 'Show context'}
       </button>
@@ -197,6 +333,28 @@
   </main>
 {:else}
   <main class="shell">
+    {#if operationRailVisible}
+      <div class="operation-rail">
+        <div
+          class="operation-progress-track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={operationProgress() ?? undefined}
+          aria-label={operationLabel()}
+        >
+          <div
+            class="operation-progress-fill"
+            class:operation-progress-indeterminate={operationProgress() === null}
+            style:width={operationProgress() === null ? undefined : `${operationProgress()}%`}
+          ></div>
+        </div>
+        <div class="operation-rail-meta" role="status" aria-live="polite">
+          <span class="operation-rail-label">{operationLabel()}…</span>
+          {#if operationCountLabel()}<span class="operation-rail-count">{operationCountLabel()}</span>{/if}
+        </div>
+      </div>
+    {/if}
     <header class="brand-bar">
       <div>
         <span class="eyebrow">MOD WORKSPACE</span>
@@ -207,6 +365,72 @@
 
     {#if lastError}
       <p class="error-notice"><strong>{lastError.code}</strong> {lastError.message}</p>
+    {/if}
+
+    {#if state.sourceDiscovery.candidates.length > 0 || !state.knowledge.session}
+      <section class="panel source-discovery-panel">
+        <div class="summary-header">
+          <div>
+            <span class="eyebrow">MO2 SOURCE</span>
+            <h2>Choose a local source</h2>
+            <p class="summary-meta">ModScope checks known MO2 locations and keeps this read-only.</p>
+          </div>
+          <span class="muted-badge">No absolute paths sent to Web</span>
+        </div>
+
+        {#if state.sourceDiscovery.candidates.length === 0}
+          <p class="notice">No MO2 source is ready. Scan again or choose an MO2 instance folder.</p>
+        {:else}
+          <div class="source-candidate-list">
+            {#each state.sourceDiscovery.candidates as candidate (candidate.candidateId)}
+              <article class="source-candidate-card">
+                <div class="source-candidate-header">
+                  <div>
+                    <strong>{candidate.instanceName || 'Unknown instance'} · {candidate.profileName || 'Profile unknown'}</strong>
+                    <p class="subtle">{candidate.gameName || 'Game unknown'}</p>
+                  </div>
+                  <span class="status-chip {statusClass(candidate.readiness)}">{formatLabel(candidate.readiness)}</span>
+                </div>
+
+                {#if candidate.evidence.length > 0}
+                  <div class="evidence-strip">
+                    {#each candidate.evidence as evidence}
+                      <span class="evidence-tag">{formatLabel(evidence)}</span>
+                    {/each}
+                  </div>
+                {/if}
+
+                {#if candidate.diagnostics.length > 0}
+                  <div class="diagnostic-list">
+                    {#each groupDiagnostics(candidate.diagnostics) as group}
+                      <p class={diagnosticClass(group.diagnostic.severity)}>
+                        <strong>{group.diagnostic.code}</strong>
+                        {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
+                        {group.diagnostic.message}
+                      </p>
+                    {/each}
+                  </div>
+                {/if}
+
+                {#if candidate.isReady}
+                  <button
+                    class="primary-button action-button"
+                    disabled={state.knowledge.operation.isBusy}
+                    onclick={() => selectSource(candidate.candidateId)}
+                  >
+                    Use this source
+                  </button>
+                {/if}
+              </article>
+            {/each}
+          </div>
+        {/if}
+
+        <div class="action-row">
+          <button class="secondary-button" disabled={state.knowledge.operation.isBusy} onclick={discoverSources}>Scan again</button>
+          <button class="secondary-button" disabled={state.knowledge.operation.isBusy} onclick={selectRoot}>Select MO2 folder</button>
+        </div>
+      </section>
     {/if}
 
     <section class="panel context-summary-panel">
@@ -254,8 +478,14 @@
 
         {#if state.localContext.diagnostics.length > 0}
           <div class="diagnostic-list">
-            {#each state.localContext.diagnostics as diagnostic}
-              <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+            {#each groupDiagnostics(state.localContext.diagnostics) as group}
+              <p class={diagnosticClass(group.diagnostic.severity)}>
+                <strong>{group.diagnostic.code}</strong>
+                {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
+                {group.diagnostic.message}
+                {#if group.diagnostic.rawValue}<code class="diagnostic-raw">{group.diagnostic.rawValue}</code>{/if}
+                {#if group.diagnostic.source}<span class="diagnostic-source">Example: {group.diagnostic.source.relativePath}</span>{/if}
+              </p>
             {/each}
           </div>
         {/if}
@@ -307,8 +537,14 @@
 
           {#if state.localContext?.diagnostics.length}
             <div class="diagnostic-list">
-              {#each state.localContext.diagnostics as diagnostic}
-                <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+              {#each groupDiagnostics(state.localContext.diagnostics) as group}
+                <p class={diagnosticClass(group.diagnostic.severity)}>
+                  <strong>{group.diagnostic.code}</strong>
+                  {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
+                  {group.diagnostic.message}
+                  {#if group.diagnostic.rawValue}<code class="diagnostic-raw">{group.diagnostic.rawValue}</code>{/if}
+                  {#if group.diagnostic.source}<span class="diagnostic-source">Example: {group.diagnostic.source.relativePath}</span>{/if}
+                </p>
               {/each}
             </div>
           {/if}
@@ -323,10 +559,20 @@
     </section>
 
     {#if state.diagnostics.length > 0}
+      {@const diagnosticGroups = groupDiagnostics(state.diagnostics)}
       <section class="panel diagnostics-panel">
         <span class="eyebrow">DIAGNOSTICS</span>
-        {#each state.diagnostics as diagnostic}
-          <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+        <p class="diagnostic-summary">
+          {diagnosticGroups.length} types · {state.diagnostics.length} occurrences
+        </p>
+        {#each diagnosticGroups as group}
+          <p class={diagnosticClass(group.diagnostic.severity)}>
+            <strong>{group.diagnostic.code}</strong>
+            {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
+            {group.diagnostic.message}
+            {#if group.diagnostic.rawValue}<code class="diagnostic-raw">{group.diagnostic.rawValue}</code>{/if}
+            {#if group.diagnostic.source}<span class="diagnostic-source">Example: {group.diagnostic.source.relativePath}</span>{/if}
+          </p>
         {/each}
       </section>
     {/if}
@@ -360,8 +606,8 @@
       </summary>
 
       <div class="developer-actions">
-        <button class="secondary-button" onclick={() => send('knowledge.useFixture')}>Use fixture</button>
-        <button class="primary-button" onclick={loadSource}>Load source</button>
+        <button class="secondary-button" disabled={state.knowledge.operation.isBusy} onclick={() => send('knowledge.useFixture')}>Use fixture</button>
+        <button class="primary-button" disabled={state.knowledge.operation.isBusy} onclick={loadSource}>Load source</button>
         <button class="secondary-button" onclick={() => send('browser.observe')}>Observe now</button>
       </div>
 
