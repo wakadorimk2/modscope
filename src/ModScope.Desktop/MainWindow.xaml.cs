@@ -128,6 +128,12 @@ public partial class MainWindow : Window
         object? sender,
         CoreWebView2WebMessageReceivedEventArgs e)
     {
+        var sourceWebView = ResolveSourceWebView(sender);
+        if (sourceWebView is null)
+        {
+            return;
+        }
+
         BridgeCommandEnvelope? command = null;
         try
         {
@@ -137,22 +143,42 @@ public partial class MainWindow : Window
             }
 
             command = BridgeProtocol.ParseCommand(e.WebMessageAsJson);
-            await HandleCommandAsync(command);
+            await HandleCommandAsync(sourceWebView, command);
         }
         catch (BridgeProtocolException exception)
         {
-            SendError("bridge.message.invalid", exception.Message, command?.RequestId);
+            SendError("bridge.message.invalid", exception.Message, command?.RequestId, sourceWebView);
         }
         catch (Exception exception)
         {
-            SendError("bridge.command.failed", exception.Message, command?.RequestId);
+            SendError("bridge.command.failed", exception.Message, command?.RequestId, sourceWebView);
         }
     }
 
-    private async Task HandleCommandAsync(BridgeCommandEnvelope command)
+    private Microsoft.Web.WebView2.Wpf.WebView2? ResolveSourceWebView(object? sender)
+    {
+        if (ReferenceEquals(sender, ToolbarShell.CoreWebView2))
+        {
+            return ToolbarShell;
+        }
+
+        if (ReferenceEquals(sender, ContextWebView.CoreWebView2))
+        {
+            return ContextWebView;
+        }
+
+        return null;
+    }
+
+    private async Task HandleCommandAsync(
+        Microsoft.Web.WebView2.Wpf.WebView2 sourceWebView,
+        BridgeCommandEnvelope command)
     {
         switch (command.Command)
         {
+            case "frontend.ready":
+                SendState(command.RequestId, sourceWebView);
+                break;
             case "browser.navigate":
             {
                 var payload = BridgeProtocol.ReadPayload<NavigatePayload>(command.Payload);
@@ -164,7 +190,7 @@ public partial class MainWindow : Window
 
                 _controller.SetStatus($"Navigating to {uri}.");
                 Browser.Source = uri;
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "browser.back":
@@ -172,28 +198,28 @@ public partial class MainWindow : Window
                 {
                     Browser.GoBack();
                 }
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             case "browser.forward":
                 if (Browser.CanGoForward)
                 {
                     Browser.GoForward();
                 }
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             case "browser.reload":
                 Browser.Reload();
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             case "browser.observe":
-                await ObservePageAsync(command.RequestId);
+                await ObservePageAsync(sourceWebView, command.RequestId);
                 break;
             case "knowledge.useFixture":
             {
                 var fixtureTask = _controller.UseFixtureAsync();
-                SendState();
+                SendState(targetWebView: sourceWebView);
                 await fixtureTask;
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "knowledge.loadSource":
@@ -205,27 +231,27 @@ public partial class MainWindow : Window
                     payload.InstanceRootPath,
                     payload.ProfilePath,
                     payload.ModsPath));
-                SendState();
+                SendState(targetWebView: sourceWebView);
                 await loadTask;
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "knowledge.discoverSources":
             {
                 var payload = BridgeProtocol.ReadPayload<DiscoverSourcesPayload>(command.Payload);
                 var discoveryTask = _controller.DiscoverSourcesAsync(payload.SelectedRoots);
-                SendState();
+                SendState(targetWebView: sourceWebView);
                 await discoveryTask;
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "knowledge.selectSource":
             {
                 var payload = BridgeProtocol.ReadPayload<SelectSourcePayload>(command.Payload);
                 var loadTask = _controller.LoadSourceCandidateAsync(payload.CandidateId);
-                SendState();
+                SendState(targetWebView: sourceWebView);
                 await loadTask;
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "knowledge.selectRoot":
@@ -234,11 +260,11 @@ public partial class MainWindow : Window
                 if (root is not null)
                 {
                     var discoveryTask = _controller.DiscoverSourcesAsync(new[] { root });
-                    SendState();
+                    SendState(targetWebView: sourceWebView);
                     await discoveryTask;
                 }
 
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "knowledge.switchProfile":
@@ -250,16 +276,16 @@ public partial class MainWindow : Window
                 }
 
                 var switchTask = _controller.SwitchProfileAsync(payload.ProfileName);
-                SendState();
+                SendState(targetWebView: sourceWebView);
                 await switchTask;
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "identity.confirm":
             {
                 var payload = BridgeProtocol.ReadPayload<ConfirmIdentityPayload>(command.Payload);
                 _controller.ConfirmIdentity(payload.CandidateIdentity, payload.LocalModKey);
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "layout.setContextVisible":
@@ -278,14 +304,14 @@ public partial class MainWindow : Window
                 ContextShell.Visibility = payload.Visible
                     ? Visibility.Visible
                     : Visibility.Collapsed;
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "inspector.open":
             {
                 var payload = BridgeProtocol.ReadPayload<InspectorOpenPayload>(command.Payload);
                 _controller.OpenInspector(payload.ModKey);
-                SendState(command.RequestId);
+                SendState(command.RequestId, sourceWebView);
                 break;
             }
             default:
@@ -293,7 +319,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task ObservePageAsync(string? requestId)
+    private async Task ObservePageAsync(
+        Microsoft.Web.WebView2.Wpf.WebView2? targetWebView,
+        string? requestId)
     {
         if (Browser.CoreWebView2 is null)
         {
@@ -319,7 +347,7 @@ public partial class MainWindow : Window
                 "WebView2",
                 extractionStatus,
                 Array.Empty<DiagnosticReadModel>()));
-            SendState(requestId);
+            SendState(requestId, targetWebView);
         }
         catch (Exception exception)
         {
@@ -338,7 +366,7 @@ public partial class MainWindow : Window
                         QueryDiagnosticSeverity.Error,
                         exception.Message)
                 }));
-            SendError("browser.observation.failed", exception.Message, requestId);
+            SendError("browser.observation.failed", exception.Message, requestId, targetWebView);
         }
     }
 
@@ -366,7 +394,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await ObservePageAsync(null);
+        await ObservePageAsync(null, null);
     }
 
     private void Browser_DocumentTitleChanged(object? sender, object e)
@@ -374,9 +402,12 @@ public partial class MainWindow : Window
         SendState();
     }
 
-    private void SendState(string? requestId = null)
+    private void SendState(
+        string? requestId = null,
+        Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
     {
-        if ((!_toolbarReady && !_contextReady) || Browser.CoreWebView2 is null)
+        if (Browser.CoreWebView2 is null
+            || ((!_toolbarReady && !_contextReady) && targetWebView?.CoreWebView2 is null))
         {
             return;
         }
@@ -387,7 +418,7 @@ public partial class MainWindow : Window
             Browser.CanGoBack,
             Browser.CanGoForward);
         var state = _controller.BuildState(browserState);
-        SendMessage("state", state, requestId);
+        SendMessage("state", state, requestId, targetWebView);
     }
 
     private void Controller_OperationStateChanged(object? sender, EventArgs e)
@@ -411,29 +442,49 @@ public partial class MainWindow : Window
         return dialog.ShowDialog() == true ? dialog.FolderName : null;
     }
 
-    private void SendError(string code, string message, string? requestId = null)
+    private void SendError(
+        string code,
+        string message,
+        string? requestId = null,
+        Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
     {
         _controller.SetStatus(message);
-        if (!_toolbarReady && !_contextReady)
+        if (targetWebView?.CoreWebView2 is null && !_toolbarReady && !_contextReady)
         {
             return;
         }
 
-        SendMessage("error", new BridgeErrorPayload(code, message), requestId);
-        SendState(requestId);
+        SendMessage("error", new BridgeErrorPayload(code, message), requestId, targetWebView);
+        SendState(requestId, targetWebView);
     }
 
-    private void SendMessage<T>(string kind, T payload, string? requestId = null)
+    private void SendMessage<T>(
+        string kind,
+        T payload,
+        string? requestId = null,
+        Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
     {
         var message = BridgeProtocol.SerializeMessage(kind, payload, requestId);
+
+        if (targetWebView?.CoreWebView2 is not null)
+        {
+            targetWebView.CoreWebView2.PostWebMessageAsJson(message);
+        }
+
         if (_toolbarReady && ToolbarShell.CoreWebView2 is not null)
         {
-            ToolbarShell.CoreWebView2.PostWebMessageAsJson(message);
+            if (!ReferenceEquals(targetWebView, ToolbarShell))
+            {
+                ToolbarShell.CoreWebView2.PostWebMessageAsJson(message);
+            }
         }
 
         if (_contextReady && ContextWebView.CoreWebView2 is not null)
         {
-            ContextWebView.CoreWebView2.PostWebMessageAsJson(message);
+            if (!ReferenceEquals(targetWebView, ContextWebView))
+            {
+                ContextWebView.CoreWebView2.PostWebMessageAsJson(message);
+            }
         }
     }
 
