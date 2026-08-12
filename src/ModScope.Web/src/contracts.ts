@@ -62,10 +62,17 @@ export type ProfileUiState = {
   name: string;
 };
 
+export type KnowledgeOperationUiState = {
+  kind: string;
+  isBusy: boolean;
+  targetProfileName?: string | null;
+};
+
 export type KnowledgeUiState = {
   session?: KnowledgeSessionUiState | null;
   candidates: ModCandidateUiState[];
   profiles: ProfileUiState[];
+  operation: KnowledgeOperationUiState;
 };
 
 export type SourceCandidateUiState = {
@@ -209,7 +216,12 @@ export const initialState: UiState = {
   knowledge: {
     session: null,
     candidates: [],
-    profiles: []
+    profiles: [],
+    operation: {
+      kind: 'idle',
+      isBusy: false,
+      targetProfileName: null
+    }
   },
   sourceDiscovery: {
     candidates: [],

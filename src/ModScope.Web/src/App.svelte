@@ -222,7 +222,7 @@
         <select
           aria-label="Active profile"
           value={state.knowledge.session?.profileName ?? ''}
-          disabled={state.knowledge.profiles.length === 0}
+          disabled={state.knowledge.profiles.length === 0 || state.knowledge.operation.isBusy}
           onchange={switchProfile}
         >
           {#if state.knowledge.profiles.length === 0}
@@ -234,6 +234,11 @@
           {/if}
         </select>
       </label>
+      {#if state.knowledge.operation.isBusy}
+        <span class="subtle operation-status" role="status" aria-live="polite">
+          Loading{state.knowledge.operation.targetProfileName ? ` ${state.knowledge.operation.targetProfileName}` : ''}…
+        </span>
+      {/if}
 
       <button class="toolbar-context-button" onclick={toggleContext}>
         {state.layout.contextVisible ? 'Context' : 'Show context'}
@@ -305,7 +310,11 @@
                 {/if}
 
                 {#if candidate.isReady}
-                  <button class="primary-button action-button" onclick={() => selectSource(candidate.candidateId)}>
+                  <button
+                    class="primary-button action-button"
+                    disabled={state.knowledge.operation.isBusy}
+                    onclick={() => selectSource(candidate.candidateId)}
+                  >
                     Use this source
                   </button>
                 {/if}
@@ -315,8 +324,8 @@
         {/if}
 
         <div class="action-row">
-          <button class="secondary-button" onclick={discoverSources}>Scan again</button>
-          <button class="secondary-button" onclick={selectRoot}>Select MO2 folder</button>
+          <button class="secondary-button" disabled={state.knowledge.operation.isBusy} onclick={discoverSources}>Scan again</button>
+          <button class="secondary-button" disabled={state.knowledge.operation.isBusy} onclick={selectRoot}>Select MO2 folder</button>
         </div>
       </section>
     {/if}
@@ -494,8 +503,8 @@
       </summary>
 
       <div class="developer-actions">
-        <button class="secondary-button" onclick={() => send('knowledge.useFixture')}>Use fixture</button>
-        <button class="primary-button" onclick={loadSource}>Load source</button>
+        <button class="secondary-button" disabled={state.knowledge.operation.isBusy} onclick={() => send('knowledge.useFixture')}>Use fixture</button>
+        <button class="primary-button" disabled={state.knowledge.operation.isBusy} onclick={loadSource}>Load source</button>
         <button class="secondary-button" onclick={() => send('browser.observe')}>Observe now</button>
       </div>
 

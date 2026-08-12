@@ -156,4 +156,18 @@ public sealed class BridgeProtocolTests
         Assert.Equal("mo2-candidate", selectedSource.CandidateId);
         Assert.Equal("knowledge.selectRoot", root.Command);
     }
+
+    [Fact]
+    public void SerializesKnowledgeOperationStateInCamelCase()
+    {
+        var message = BridgeProtocol.SerializeMessage(
+            "state",
+            new KnowledgeUiState(
+                null,
+                Array.Empty<ModCandidateUiState>(),
+                Array.Empty<ProfileUiState>(),
+                new KnowledgeOperationUiState("profile-switch", true, "Alternate")));
+
+        Assert.Contains("\"operation\":{\"kind\":\"profile-switch\",\"isBusy\":true,\"targetProfileName\":\"Alternate\"}", message);
+    }
 }
