@@ -20,8 +20,12 @@ public sealed class LocalKnowledgeQueryTests
         Assert.Equal(0, alpha.Priority);
         Assert.Equal("Alpha Display", alpha.DisplayName);
         Assert.Equal("1.2.3", alpha.Version);
+        Assert.Equal("https://example.test/alpha", alpha.Website);
         Assert.Equal(QuerySourceReferenceKind.ModDirectory, alpha.Source.Kind);
         Assert.Equal(QuerySourceReferenceKind.ProfileFile, alpha.PriorityEvidence?.Source.Kind);
+
+        var beta = query.GetModCandidates().Single(candidate => candidate.DirectoryName == "Beta Mod");
+        Assert.Null(beta.Website);
     }
 
     [Fact]

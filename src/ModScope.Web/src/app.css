@@ -266,7 +266,8 @@ h2 {
 
 .status-installed,
 .status-succeeded,
-.status-source {
+.status-source,
+.status-enabled {
   background: rgba(34, 197, 94, 0.15);
   color: #86efac;
 }
@@ -274,6 +275,21 @@ h2 {
 .status-not-installed {
   background: rgba(251, 191, 36, 0.14);
   color: #fde68a;
+}
+
+.status-disabled {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fde68a;
+}
+
+.status-listed {
+  background: rgba(14, 116, 144, 0.2);
+  color: #bae6fd;
+}
+
+.status-unlisted {
+  background: rgba(100, 116, 139, 0.25);
+  color: #cbd5e1;
 }
 
 .status-unresolved,
@@ -449,6 +465,126 @@ select:focus {
   min-height: 168px;
 }
 
+.profile-overview-panel {
+  border-color: rgba(125, 211, 252, 0.28);
+}
+
+.profile-count-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.profile-count-grid div {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.45);
+}
+
+.profile-count-grid span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.profile-count-grid strong {
+  display: block;
+  margin-top: 4px;
+  color: #f8fafc;
+  font-size: 15px;
+}
+
+.mod-summary-list,
+.mod-search-results {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.mod-summary-card,
+.mod-search-card {
+  padding: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.42);
+}
+
+.mod-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 2px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #e2e8f0;
+  text-align: left;
+}
+
+.mod-card-main:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.mod-card-main strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-card-main span {
+  flex: 0 0 auto;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mod-card-main-disabled {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px;
+}
+
+.mod-card-main-disabled strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-card-main-disabled span {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.mod-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 0 2px;
+}
+
+.mod-link-hint {
+  margin-left: auto;
+  color: #7dd3fc;
+  font-size: 10px;
+}
+
+.profile-overview-actions {
+  margin-top: 14px;
+}
+
 .source-discovery-panel {
   border-color: rgba(125, 211, 252, 0.28);
 }
@@ -523,8 +659,7 @@ select:focus {
 }
 
 .summary-grid span,
-.page-details-grid span,
-.select-label {
+.page-details-grid span {
   color: #94a3b8;
   font-size: 11px;
 }
@@ -600,16 +735,6 @@ select:focus {
 
 .exception-card > .status-chip {
   margin-top: 12px;
-}
-
-.select-label {
-  display: block;
-  margin-top: 14px;
-}
-
-.select-label select {
-  display: block;
-  margin-top: 5px;
 }
 
 .action-row,
@@ -695,6 +820,61 @@ label select {
 
 .developer-status {
   margin-top: 10px;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  border: 0;
+  background: rgba(2, 6, 23, 0.5);
+}
+
+.mod-search-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 4;
+  width: min(92vw, 560px);
+  padding: 20px;
+  overflow: auto;
+  border-left: 1px solid rgba(125, 211, 252, 0.3);
+  background: #111827;
+  box-shadow: -20px 0 50px rgba(2, 6, 23, 0.52);
+}
+
+.mod-search-description {
+  margin-top: 10px;
+}
+
+.mod-search-field {
+  display: block;
+  margin-top: 16px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mod-search-field input {
+  display: block;
+  margin-top: 5px;
+}
+
+.mod-search-empty {
+  margin-top: 16px;
+}
+
+.mod-search-results {
+  max-height: calc(100vh - 230px);
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.mod-search-result-count {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mod-recognition-button {
+  margin-top: 9px;
 }
 
 .inspector-drawer {
@@ -809,6 +989,13 @@ dd {
   .address-input {
     order: 4;
     flex-basis: 100%;
+  }
+
+  .summary-grid,
+  .profile-count-grid,
+  .page-details-grid,
+  .source-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .summary-grid,

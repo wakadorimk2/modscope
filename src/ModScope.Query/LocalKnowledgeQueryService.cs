@@ -658,6 +658,7 @@ internal static class QueryProjection
             record.DirectoryName,
             record.ModInfo?.DisplayName ?? record.ModInfo?.Name,
             record.ModInfo?.Version,
+            record.ModInfo?.Website,
             ProfileState(record.ProfileState),
             EnabledState(record.EnabledState),
             record.Priority,

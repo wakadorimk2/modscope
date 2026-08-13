@@ -6,6 +6,7 @@
     type BridgeErrorPayload,
     type DiagnosticUiState,
     type HostMessage,
+    type ModCandidateUiState,
     type UiState
   } from './contracts';
 
@@ -15,8 +16,10 @@
 
   let state: UiState = initialState;
   let address = initialState.browser.url;
-  let selectedModKey = '';
   let inspectorOpen = false;
+  let modSearchOpen = false;
+  let modSearchMode: 'browse' | 'recognition' = 'browse';
+  let modSearchQuery = '';
   let pageDetailsOpen = false;
   let developerToolsOpen = false;
   let lastError: BridgeErrorPayload | null = null;
@@ -48,6 +51,13 @@
       operationRailVisible = false;
     }
   }
+
+  $: profileCandidates = state.knowledge.candidates.filter((candidate) => candidate.profileState === 'listed');
+  $: enabledProfileCandidates = profileCandidates.filter((candidate) => candidate.enabledState === 'enabled');
+  $: disabledProfileCandidates = profileCandidates.filter((candidate) => candidate.enabledState === 'disabled');
+  $: unknownProfileCount = profileCandidates.length - enabledProfileCandidates.length - disabledProfileCandidates.length;
+  $: profileSummaryCandidates = enabledProfileCandidates.slice(0, 8);
+  $: modSearchResults = searchCandidates(state.knowledge.candidates, modSearchQuery);
 
   type DiagnosticGroup = {
     diagnostic: DiagnosticUiState;
@@ -98,7 +108,6 @@
     if (message.kind === 'state') {
       state = message.payload;
       address = state.browser.url;
-      selectedModKey = state.identity.selectedLocalModKey ?? '';
       lastError = null;
       inspectorOpen = Boolean(state.inspector);
       return;
@@ -133,6 +142,12 @@
   }
 
   function handleShortcut(event: KeyboardEvent) {
+    if (event.key === 'Escape' && modSearchOpen) {
+      event.preventDefault();
+      closeModSearch();
+      return;
+    }
+
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'i') {
       event.preventDefault();
       toggleContext();
@@ -185,6 +200,66 @@
     if (state.localContext?.localModKey) {
       inspectorOpen = true;
       send('inspector.open', { modKey: state.localContext.localModKey });
+    }
+  }
+
+  function openModSearch(mode: 'browse' | 'recognition' = 'browse') {
+    modSearchMode = mode;
+    modSearchQuery = '';
+    modSearchOpen = true;
+  }
+
+  function closeModSearch() {
+    modSearchOpen = false;
+    modSearchQuery = '';
+    modSearchMode = 'browse';
+  }
+
+  function modDisplayName(candidate: ModCandidateUiState): string {
+    return candidate.displayName || candidate.directoryName || candidate.modKey;
+  }
+
+  function isWebsiteUrl(value: string | null | undefined): value is string {
+    if (!value) {
+      return false;
+    }
+
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  function searchCandidates(candidates: ModCandidateUiState[], query: string): ModCandidateUiState[] {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.length === 0) {
+      return [];
+    }
+
+    return candidates.filter((candidate) => [
+      candidate.displayName,
+      candidate.directoryName,
+      candidate.modKey
+    ]
+      .filter((value): value is string => Boolean(value))
+      .some((value) => value.toLowerCase().includes(normalizedQuery)));
+  }
+
+  function openModPage(candidate: ModCandidateUiState) {
+    if (!isWebsiteUrl(candidate.website)) {
+      return;
+    }
+
+    closeModSearch();
+    send('browser.navigate', { url: candidate.website });
+  }
+
+  function chooseModForRecognition(candidate: ModCandidateUiState) {
+    confirmIdentity(candidate.modKey);
+    if (!lastError) {
+      closeModSearch();
     }
   }
 
@@ -429,6 +504,74 @@
       </section>
     {/if}
 
+    {#if state.knowledge.session}
+      <section class="panel profile-overview-panel">
+        <div class="summary-header">
+          <div>
+            <span class="eyebrow">CURRENT PROFILE</span>
+            <h2>{state.knowledge.session.profileName}</h2>
+            <p class="summary-meta">
+              {profileCandidates.length} MODs in this profile · {state.knowledge.session.instanceName || 'Instance unknown'}
+            </p>
+          </div>
+          <span class="muted-badge">Read-only</span>
+        </div>
+
+        <div class="profile-count-grid">
+          <div><span>In profile</span><strong>{profileCandidates.length}</strong></div>
+          <div><span>Enabled</span><strong>{enabledProfileCandidates.length}</strong></div>
+          <div><span>Disabled</span><strong>{disabledProfileCandidates.length}</strong></div>
+          <div><span>Unknown</span><strong>{unknownProfileCount}</strong></div>
+        </div>
+
+        {#if profileSummaryCandidates.length > 0}
+          <div class="mod-summary-list" aria-label="Enabled MOD summary">
+            {#each profileSummaryCandidates as candidate (candidate.modKey)}
+              <article class="mod-summary-card">
+                {#if isWebsiteUrl(candidate.website)}
+                  <button
+                    type="button"
+                    class="mod-card-main"
+                    aria-label={`Open ${modDisplayName(candidate)} page`}
+                    onclick={() => openModPage(candidate)}
+                  >
+                    <strong>{modDisplayName(candidate)}</strong>
+                    {#if candidate.version}<span>v{candidate.version}</span>{/if}
+                  </button>
+                {:else}
+                  <div class="mod-card-main mod-card-main-disabled">
+                    <strong>{modDisplayName(candidate)}</strong>
+                    {#if candidate.version}<span>v{candidate.version}</span>{/if}
+                  </div>
+                {/if}
+                <div class="mod-card-meta">
+                  <span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span>
+                  <span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span>
+                  {#if isWebsiteUrl(candidate.website)}
+                    <span class="mod-link-hint">Open page</span>
+                  {:else}
+                    <span class="mod-link-hint">No verified page</span>
+                  {/if}
+                </div>
+              </article>
+            {/each}
+          </div>
+        {:else}
+          <p class="notice">No enabled MOD is available in this profile summary.</p>
+        {/if}
+
+        <div class="action-row profile-overview-actions">
+          <button
+            type="button"
+            class="primary-button"
+            onclick={() => openModSearch('browse')}
+          >
+            Search all MODs · {state.knowledge.candidates.length}
+          </button>
+        </div>
+      </section>
+    {/if}
+
     <section class="panel context-summary-panel">
       {#if hasConclusion() && state.localContext}
         <div class="summary-header">
@@ -449,7 +592,6 @@
           <div><span>Enabled</span><strong>{formatLabel(state.localContext.enabledState)}</strong></div>
           <div><span>Priority</span><strong>{state.localContext.priority ?? 'Unknown'}</strong></div>
           <div><span>Version</span><strong>{state.localContext.knownVersion || 'Unknown'}</strong></div>
-          <div><span>Profile</span><strong>{state.localContext.profileName || 'Unknown'}</strong></div>
         </div>
 
         {#if state.localContext.evidence.length > 0}
@@ -502,25 +644,17 @@
           {/if}
 
           {#if state.knowledge.candidates.length > 0}
-            <label class="select-label">
-              Local MOD
-              <select bind:value={selectedModKey}>
-                <option value="">Choose a local MOD</option>
-                {#each state.knowledge.candidates as candidate (candidate.modKey)}
-                  <option value={candidate.modKey}>
-                    {candidate.displayName || candidate.directoryName}
-                    {candidate.version ? ' · v' + candidate.version : ''}
-                  </option>
-                {/each}
-              </select>
-            </label>
+            <p class="subtle">Search the local MOD catalog to confirm the page identity.</p>
             <div class="action-row">
-              <button class="primary-button" disabled={!selectedModKey} onclick={() => confirmIdentity(selectedModKey)}>Choose local mod</button>
-              <button class="secondary-button" onclick={() => confirmIdentity(null)}>Mark as not installed</button>
+              <button class="primary-button" type="button" onclick={() => openModSearch('recognition')}>Search local MODs</button>
+              <button class="secondary-button" type="button" onclick={() => confirmIdentity(null)}>Mark as not installed</button>
             </div>
           {:else}
             <p class="notice">No local MOD candidates are loaded. Open Developer tools to load a profile.</p>
-            <button class="secondary-button" onclick={() => (developerToolsOpen = true)}>Open Developer tools</button>
+            <div class="action-row">
+              <button class="secondary-button" type="button" onclick={() => (developerToolsOpen = true)}>Open Developer tools</button>
+              <button class="secondary-button" type="button" onclick={() => confirmIdentity(null)}>Mark as not installed</button>
+            </div>
           {/if}
 
           {#if state.localContext?.uncertainties.length}
@@ -629,6 +763,93 @@
         <p class="subtle developer-status">{state.statusMessage}</p>
       {/if}
     </details>
+
+    {#if modSearchOpen}
+      <button
+        type="button"
+        class="drawer-backdrop"
+        aria-label="Close MOD search"
+        onclick={closeModSearch}
+      ></button>
+      <aside
+        class="mod-search-drawer"
+        aria-labelledby="mod-search-title"
+      >
+        <div class="drawer-heading">
+          <div>
+            <span class="eyebrow">MOD CATALOG</span>
+            <h2 id="mod-search-title">
+              {modSearchMode === 'recognition' ? 'Choose a local MOD' : 'Search all MODs'}
+            </h2>
+          </div>
+          <button class="icon-button" type="button" title="Close MOD search" aria-label="Close MOD search" onclick={closeModSearch}>×</button>
+        </div>
+
+        <p class="subtle mod-search-description">
+          Search by display name, directory name, or MOD key. Website links use only verified ModInfo.xml values.
+        </p>
+
+        <label class="mod-search-field">
+          <span>Search MODs</span>
+          <input
+            bind:value={modSearchQuery}
+            aria-label="Search MODs"
+            placeholder="e.g. Alpha Mod"
+          />
+        </label>
+
+        {#if modSearchQuery.trim().length === 0}
+          <p class="empty-state mod-search-empty">Enter a search term to show matching MODs.</p>
+        {:else if modSearchResults.length === 0}
+          <p class="empty-state mod-search-empty">No matching MODs were found.</p>
+        {:else}
+          <div class="mod-search-results" aria-live="polite">
+            <p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>
+            {#each modSearchResults as candidate (candidate.modKey)}
+              <article class="mod-search-card">
+                {#if isWebsiteUrl(candidate.website)}
+                  <button
+                    type="button"
+                    class="mod-card-main"
+                    aria-label={`Open ${modDisplayName(candidate)} page`}
+                    onclick={() => openModPage(candidate)}
+                  >
+                    <strong>{modDisplayName(candidate)}</strong>
+                    <span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span>
+                  </button>
+                {:else}
+                  <div class="mod-card-main mod-card-main-disabled">
+                    <strong>{modDisplayName(candidate)}</strong>
+                    <span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span>
+                  </div>
+                {/if}
+
+                <div class="mod-card-meta">
+                  <span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span>
+                  <span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span>
+                  <span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span>
+                  {#if isWebsiteUrl(candidate.website)}
+                    <span class="mod-link-hint">Open page</span>
+                  {:else}
+                    <span class="mod-link-hint">No verified page</span>
+                  {/if}
+                </div>
+
+                {#if modSearchMode === 'recognition'}
+                  <button
+                    type="button"
+                    class="secondary-button mod-recognition-button"
+                    onclick={() => chooseModForRecognition(candidate)}
+                  >
+                    Use for recognition
+                  </button>
+                {/if}
+              </article>
+            {/each}
+          </div>
+        {/if}
+      </aside>
+    {/if}
 
     {#if inspectorOpen}
       <aside class="inspector-drawer">

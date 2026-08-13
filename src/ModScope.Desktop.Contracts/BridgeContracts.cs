@@ -241,6 +241,7 @@ public sealed record ModCandidateUiState(
     string DirectoryName,
     string? DisplayName,
     string? Version,
+    string? Website,
     string ProfileState,
     string EnabledState,
     int? Priority,

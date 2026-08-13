@@ -1011,3 +1011,12 @@ unsupported candidateとload failureはsource cardへ要約表示します。
 通常画面のProfile dropdownは、解決済みsource内のread-only profile switchだけを実行します。
 page identity自動認識とoverlap判定は追加しません。
 既存のQuery modelとread-only境界を維持し、profile catalogとlayout stateを明示的なread modelへ追加します。
+
+Profile要約とMODページ遷移のUI整理では、Context上部にcurrent profileの要約を表示します。
+要約はprofile内のMOD件数とenabled / disabled / unknown件数を表示します。
+代表表示はenabledかつpriority順の上位8件に限定します。
+全候補はfrontendへ保持しますが、初期画面には表示しません。
+必要な場合だけ、display name、directory name、MOD keyで検索します。
+`ModInfo.xml`から得たabsolute http / https Websiteだけを、既存の`browser.navigate`で開きます。
+WebsiteがないMODのURLは推測しません。
+認識失敗時のlocal MOD選択も、同じ検索結果から行います。

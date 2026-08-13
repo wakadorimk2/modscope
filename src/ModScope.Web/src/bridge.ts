@@ -1,4 +1,4 @@
-import { initialState, type HostMessage, type UiState } from './contracts';
+import { initialState, type HostMessage, type ModCandidateUiState, type UiState } from './contracts';
 
 type WebViewPort = {
   postMessage(message: unknown): void;
@@ -20,6 +20,55 @@ function getWebViewPort(): WebViewPort | null {
 
 function cloneState(state: UiState): UiState {
   return JSON.parse(JSON.stringify(state)) as UiState;
+}
+
+function mockCandidatesForProfile(profileName: string): ModCandidateUiState[] {
+  if (profileName === 'alternate') {
+    return [
+      {
+        modKey: 'Gamma Mod',
+        directoryName: 'Gamma Mod',
+        displayName: 'Gamma Mod',
+        version: '2.0.0',
+        website: null,
+        profileState: 'listed',
+        enabledState: 'enabled',
+        priority: 0,
+        source: { kind: 'modDirectory', relativePath: 'mods/Gamma Mod' },
+        priorityEvidence: null,
+        diagnostics: []
+      }
+    ];
+  }
+
+  return [
+    {
+      modKey: 'Alpha Mod',
+      directoryName: 'Alpha Mod',
+      displayName: 'Alpha Mod',
+      version: '1.2.3',
+      website: 'https://example.test/alpha',
+      profileState: 'listed',
+      enabledState: 'enabled',
+      priority: 0,
+      source: { kind: 'modDirectory', relativePath: 'mods/Alpha Mod' },
+      priorityEvidence: null,
+      diagnostics: []
+    },
+    {
+      modKey: 'Beta Mod',
+      directoryName: 'Beta Mod',
+      displayName: 'Beta Mod',
+      version: null,
+      website: null,
+      profileState: 'listed',
+      enabledState: 'disabled',
+      priority: 1,
+      source: { kind: 'modDirectory', relativePath: 'mods/Beta Mod' },
+      priorityEvidence: null,
+      diagnostics: []
+    }
+  ];
 }
 
 function mockStateForCommand(state: UiState, command: string, payload: unknown): UiState {
@@ -52,21 +101,8 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
         schemaVersion: 1,
         diagnostics: []
       },
-      candidates: [
-        {
-          modKey: 'Alpha Mod',
-          directoryName: 'Alpha Mod',
-          displayName: 'Alpha Mod',
-          version: '1.2.3',
-          profileState: 'listed',
-          enabledState: 'enabled',
-          priority: 0,
-          source: { kind: 'modDirectory', relativePath: 'mods/Alpha Mod' },
-          priorityEvidence: null,
-          diagnostics: []
-        }
-      ],
-      profiles: [{ name: 'default' }],
+      candidates: mockCandidatesForProfile('default'),
+      profiles: [{ name: 'default' }, { name: 'alternate' }],
       operation: {
         kind: 'idle',
         isBusy: false,
@@ -81,6 +117,7 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
     const profileName = (payload as { profileName?: unknown }).profileName;
     if (typeof profileName === 'string' && profileName.length > 0 && next.knowledge.session) {
       next.knowledge.session = { ...next.knowledge.session, profileName };
+      next.knowledge = { ...next.knowledge, candidates: mockCandidatesForProfile(profileName) };
       next.identity = { candidateIdentity: '', selectedLocalModKey: null };
       next.localContext = null;
       next.inspector = null;

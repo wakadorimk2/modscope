@@ -450,6 +450,11 @@ v0.1では、次を保留します。
 - Browser navigation完了後のObserveはDesktop hostが実行します。
 - Profile dropdownは、MO2設定から解決したProfiles directoryにあるprofileだけをread-onlyで切り替えます。
 - Profile switch後はsession、candidates、profile nameを更新し、page observationは維持します。
+- Context上部は、current profileの件数とenabled MODのpriority上位8件を要約表示します。
+- 全MODは、必要なときだけdisplay name、directory name、MOD keyで検索します。
+- `ModInfo.xml`の確認済みWebsiteだけを、内蔵Browserで開きます。
+- WebsiteがないMODは、URLを推測せずリンクなしで表示します。
+- 認識失敗時のlocal MOD選択も、同じ検索導線を使用します。
 
 起動時にMO2 source discoveryを実行します。
 候補がない場合は再探索とnative folder pickerを使用します。
