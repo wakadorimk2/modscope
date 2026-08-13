@@ -339,9 +339,16 @@ ready candidateが1件なら自動読込します。
 external Mods / Profiles pathは、MO2設定から解決したread-only pathだけを扱います。
 RuntimeOCDの実行時結果、semantic conflict、effective result、MO2 writeは後続Phaseで扱います。
 
-### Phase 3：Query、Inspector、必要なSite Adapter
+### Phase 3：Query、Inspector、必要なSite Adapter（完了）
 
 neutral read modelを安定させます。必要性が確認できたsiteだけAdapterを追加します。
+
+Phase 3完了メモ（2026-08-13）：
+
+Local Mod Knowledgeのforward / reverse queryとInspector read modelを完了しました。
+Query semanticsはsynthetic fixtureで再現可能に検証します。
+実MO2のread-only統合確認は、source load、profile projection、page observation、Local context、Inspectorを対象にしました。
+Site Adapter、agent transport、Compare UI、Runtime evidence、MO2 writeはPhase 3外として保留します。
 
 ### Phase 4：Semantic conflict
 
