@@ -434,7 +434,8 @@ h2 {
 .status-installed,
 .status-succeeded,
 .status-source,
-.status-enabled {
+.status-enabled,
+.status-ready {
   background: rgba(34, 197, 94, 0.15);
   color: #86efac;
 }
@@ -630,6 +631,219 @@ select:focus {
 
 .context-summary-panel {
   min-height: 168px;
+}
+
+.analysis-panel {
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+.analysis-input-status,
+.analysis-badges,
+.analysis-tool-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.analysis-input-status {
+  margin-top: 14px;
+}
+
+.analysis-section {
+  margin-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  padding-top: 12px;
+}
+
+.analysis-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.analysis-card-list,
+.diagnosis-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.analysis-card,
+.evidence-card,
+.diagnosis-row,
+.evidence-row,
+.runtime-comparison-row {
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.42);
+}
+
+.analysis-card-heading,
+.operation-heading,
+.evidence-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.analysis-card-heading strong,
+.diagnosis-row strong,
+.evidence-row strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 12px;
+}
+
+.analysis-card-heading code,
+.diagnosis-row code {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.analysis-status-match,
+.analysis-status-succeeded,
+.analysis-status-ready {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.analysis-status-different,
+.analysis-status-conflict {
+  background: rgba(251, 113, 133, 0.14);
+  color: #fda4af;
+}
+
+.analysis-status-possible,
+.analysis-status-inferred,
+.analysis-status-medium,
+.analysis-status-low {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fde68a;
+}
+
+.analysis-status-unknown,
+.analysis-status-not-assessed,
+.analysis-status-high {
+  background: rgba(100, 116, 139, 0.25);
+  color: #cbd5e1;
+}
+
+.analysis-meta,
+.provenance-line {
+  margin-top: 7px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.provenance-line {
+  overflow-wrap: anywhere;
+  color: #7dd3fc;
+}
+
+.static-evidence-card,
+.runtime-evidence-card {
+  margin-top: 10px;
+}
+
+.operation-sequence {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding-left: 22px;
+}
+
+.operation-sequence li {
+  padding-left: 3px;
+}
+
+.operation-heading span {
+  flex: 0 0 auto;
+  color: #cbd5e1;
+  font-size: 10px;
+}
+
+.analysis-code-pair {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 5px 8px;
+  margin-top: 7px;
+  font-size: 10px;
+}
+
+.analysis-code-pair span {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.analysis-code-pair code {
+  overflow-wrap: anywhere;
+}
+
+.evidence-detail,
+.patch-operation-list,
+.raw-detail {
+  margin-top: 9px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  padding-top: 8px;
+}
+
+.evidence-detail summary,
+.patch-operation-list summary,
+.raw-detail summary {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.diagnosis-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 10px;
+}
+
+.diagnosis-row .analysis-meta {
+  grid-column: 1 / -1;
+}
+
+.evidence-row {
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.evidence-row .provenance-line {
+  flex-basis: 100%;
+}
+
+.runtime-comparison-row {
+  margin-top: 9px;
+}
+
+.analysis-developer-tools {
+  margin-top: 14px;
+  padding: 11px;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  border-radius: 10px;
+  background: rgba(76, 29, 149, 0.1);
+}
+
+.analysis-tool-header {
+  justify-content: space-between;
+}
+
+.analysis-tool-header strong {
+  display: block;
+  margin-top: 3px;
+  color: #e2e8f0;
+  font-size: 12px;
+}
+
+.analysis-version-grid {
+  margin-top: 9px;
 }
 
 .profile-count-grid {
@@ -1105,6 +1319,21 @@ dd {
   font-size: 11px;
 }
 
+.patch-operation-item {
+  margin-top: 7px;
+  padding: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.24);
+}
+
+.patch-operation-item > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .block-code {
   display: block;
   margin: 5px 0;
@@ -1122,6 +1351,17 @@ dd {
   .summary-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .analysis-card-heading,
+  .analysis-tool-header,
+  .evidence-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .diagnosis-row {
+    grid-template-columns: 1fr;
   }
 
   .summary-header .status-chip {

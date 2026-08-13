@@ -26,6 +26,9 @@
     <None Include="..\..\tests\Fixtures\7dtd-mo2-minimal\**\*"
           Link="Fixtures\7dtd-mo2-minimal\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\tests\Fixtures\7dtd-mo2-phase4\**\*"
+          Link="Fixtures\7dtd-mo2-phase4\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Update="Fixtures\alpha-mod.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -150,11 +150,34 @@ export type RawXmlObservationUiState = {
   attributes: XmlAttributeObservationUiState[];
   innerText?: string | null;
   source: SourceReferenceUiState;
+  hasChildElements: boolean;
 };
 
 export type XmlXPathCandidateUiState = {
   rawValue: string;
   elementPath: string;
+  source: SourceReferenceUiState;
+};
+
+export type XmlReferenceCandidateUiState = {
+  rawValue: string;
+  normalizedValue?: string | null;
+  elementPath: string;
+  evidenceKind: string;
+  source: SourceReferenceUiState;
+};
+
+export type XmlPatchOperationUiState = {
+  elementPath: string;
+  rawOperationName: string;
+  normalizedKind?: string | null;
+  rawObservation: RawXmlObservationUiState;
+  xPathCandidates: XmlXPathCandidateUiState[];
+  targetXmlCandidates: XmlReferenceCandidateUiState[];
+  entityCandidates: XmlReferenceCandidateUiState[];
+  propertyCandidates: XmlReferenceCandidateUiState[];
+  attributeCandidates: XmlReferenceCandidateUiState[];
+  diagnostics: DiagnosticUiState[];
   source: SourceReferenceUiState;
 };
 
@@ -165,8 +188,9 @@ export type XmlFileUiState = {
   rootElementName?: string | null;
   elementCount: number;
   attributeCount: number;
-  xpathCandidates: XmlXPathCandidateUiState[];
+  xPathCandidates: XmlXPathCandidateUiState[];
   rawObservations: RawXmlObservationUiState[];
+  patchOperations: XmlPatchOperationUiState[];
   diagnostics: DiagnosticUiState[];
   source: SourceReferenceUiState;
 };
@@ -184,6 +208,124 @@ export type InspectorUiState = {
   source: SourceReferenceUiState;
 };
 
+export type BaseDataFileUiState = {
+  targetXml: string;
+  size: number;
+  sha256: string;
+  parseStatus?: string | null;
+  source: SourceReferenceUiState;
+  diagnostics: DiagnosticUiState[];
+};
+
+export type SemanticConflictOperationUiState = {
+  operationKey: string;
+  modKey: string;
+  priority?: number | null;
+  xmlFileRelativePath: string;
+  elementPath: string;
+  rawOperationName: string;
+  normalizedKind?: string | null;
+  targetXml?: string | null;
+  xPath?: string | null;
+  attributeName?: string | null;
+  value?: string | null;
+  source: SourceReferenceUiState;
+  evidence: EvidenceReferenceUiState[];
+  diagnostics: DiagnosticUiState[];
+  hasChildElements: boolean;
+};
+
+export type EffectiveChangeUiState = {
+  matchPath: string;
+  attributeName?: string | null;
+  beforeValue?: string | null;
+  afterValue?: string | null;
+  existedBefore: boolean;
+  existsAfter: boolean;
+  source: SourceReferenceUiState;
+};
+
+export type SemanticConflictGroupUiState = {
+  targetXml?: string | null;
+  xPath?: string | null;
+  assessment: string;
+  confidence: string;
+  effectiveStatus: string;
+  operations: SemanticConflictOperationUiState[];
+  effectiveChanges: EffectiveChangeUiState[];
+  evidence: EvidenceReferenceUiState[];
+  uncertainties: string[];
+  diagnostics: DiagnosticUiState[];
+};
+
+export type ConflictAnalysisUiState = {
+  snapshotId: string;
+  instanceName: string;
+  profileName: string;
+  baseFiles: BaseDataFileUiState[];
+  groups: SemanticConflictGroupUiState[];
+  diagnostics: DiagnosticUiState[];
+};
+
+export type RuntimeEvidenceObservationUiState = {
+  modKey?: string | null;
+  targetXml?: string | null;
+  xPath?: string | null;
+  observedOperation?: string | null;
+  observedCategory?: string | null;
+  normalizedAssessment?: string | null;
+  diagnostics: DiagnosticUiState[];
+};
+
+export type RuntimeEvidenceUiState = {
+  snapshotId: string;
+  instanceName: string;
+  profileName: string;
+  toolName: string;
+  toolVersion?: string | null;
+  gameVersion?: string | null;
+  capturedAtUtc: string;
+  observations: RuntimeEvidenceObservationUiState[];
+  diagnostics: DiagnosticUiState[];
+};
+
+export type RuntimeEvidenceComparisonItemUiState = {
+  targetXml?: string | null;
+  xPath?: string | null;
+  status: string;
+  staticAssessment?: string | null;
+  runtimeAssessment?: string | null;
+  observations: RuntimeEvidenceObservationUiState[];
+  diagnostics: DiagnosticUiState[];
+};
+
+export type RuntimeEvidenceComparisonUiState = {
+  snapshotId: string;
+  instanceName: string;
+  profileName: string;
+  runtimeEvidence: RuntimeEvidenceUiState;
+  items: RuntimeEvidenceComparisonItemUiState[];
+  diagnostics: DiagnosticUiState[];
+};
+
+export type AnalysisInputUiState = {
+  baseDataReady: boolean;
+  runtimeLogsReady: boolean;
+};
+
+export type AnalysisOperationUiState = {
+  kind: string;
+  isBusy: boolean;
+};
+
+export type AnalysisUiState = {
+  inputs: AnalysisInputUiState;
+  conflict?: ConflictAnalysisUiState | null;
+  runtimeComparison?: RuntimeEvidenceComparisonUiState | null;
+  operation: AnalysisOperationUiState;
+  diagnostics: DiagnosticUiState[];
+};
+
 export type LayoutUiState = {
   contextVisible: boolean;
   modListVisible: boolean;
@@ -197,6 +339,7 @@ export type UiState = {
   identity: IdentityUiState;
   localContext?: LocalContextUiState | null;
   inspector?: InspectorUiState | null;
+  analysis: AnalysisUiState;
   layout: LayoutUiState;
   statusMessage: string;
   diagnostics: DiagnosticUiState[];
@@ -244,6 +387,19 @@ export const initialState: UiState = {
   },
   localContext: null,
   inspector: null,
+  analysis: {
+    inputs: {
+      baseDataReady: false,
+      runtimeLogsReady: false
+    },
+    conflict: null,
+    runtimeComparison: null,
+    operation: {
+      kind: 'idle',
+      isBusy: false
+    },
+    diagnostics: []
+  },
   layout: {
     contextVisible: true,
     modListVisible: true

@@ -888,6 +888,13 @@ Phase 5-Bでは、Runtime comparisonだけを対象にしたLocal-only RuntimeOC
 
 Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡張します。高密度Mod Manager UIは作りません。
 
+Phase6のvertical sliceでは、Desktop bridgeへanalysis commandと`UiState.Analysis`を追加しました。
+native folder pickerでbase Data/ConfigとRuntimeOCD logsを選択し、pathをDesktop sessionだけに保持します。
+Context WebViewへstatic conflict、runtime comparison、evidence、provenance、uncertainty、diagnosticを段階表示します。
+Compareは確認済みcandidate MODに絞り、Diagnosisはactive profile全体を表示します。
+Phase4 synthetic fixtureとPhase6 RuntimeOCD logをDesktop outputへpackし、Developer toolsから再現できます。
+MO2 write、AI chat、MCP、browser engine変更、browser syncは実装しません。
+
 ### Phase 7：controlled write
 
 必要性が確認できた場合に、dry-runと明示承認付きのMO2操作を追加します。
@@ -996,6 +1003,11 @@ frontendからhostへ送るcommandは次です。
 - knowledge.switchProfile
 - identity.confirm
 - inspector.open
+- analysis.selectBaseData
+- analysis.selectRuntimeLogs
+- analysis.analyzeConflicts
+- analysis.compareRuntimeEvidence
+- analysis.useFixture
 - layout.setContextVisible
 - layout.setModListVisible
 
@@ -1022,6 +1034,33 @@ reparse pointと、MO2設定にない暗黙のglobal pathは読み取りませ�
 `profiles` directoryがない場合は、現在のexplicit profileだけを候補にします。
 Profile switchは新しいsnapshotをread-onlyで生成します。
 Profile pathの絶対値はfrontendへ送信しません。
+
+### 24.3.2 Phase6 analysis bridge and display rules
+
+Phase6は既存Queryの`AnalyzeConflicts`と`CompareRuntimeOcdEvidence`をDesktop hostから呼び出します。
+Desktop hostは、選択したbase Data/Config directoryとRuntimeOCD logs directoryをsession-onlyで保持します。
+native folder pickerはabsolute pathを受け取ります。
+absolute pathはWeb state、diagnostic、frontend messageへ返しません。
+runtime log本文、raw RuntimeOCD result、raw result pathはWeb stateへ返しません。
+
+`UiState.Analysis`は、入力ready state、static conflict result、runtime comparison result、analysis operation stateを持ちます。
+analysis resultはprofileまたはsourceを変更した時に破棄します。
+analysis failureでは既存resultを保持し、statusとdiagnosticを更新します。
+解析中は重複実行、profile変更、source変更を無効にします。
+runtime comparisonのcapture timeはDesktop hostがUTCで生成します。
+tool versionとgame versionがない場合は`Unknown`として表示します。
+
+Context WebViewはLocal contextを最上段に表示します。
+Compareは確認済みcandidate MODに関係するgroupだけを表示します。
+Diagnosisはactive profile全体のgroupを表示します。
+static evidenceとruntime evidenceは別カードに表示します。
+target XML、XPath、MOD、priority、operation sequence、confidence、uncertainty、diagnostic、source referenceを段階的に表示します。
+assessmentは`Match`、`Different`、`Possible`、`Unknown`、`Not assessed`、`Inferred`を文字で表示します。
+解析前は`未確認`と表示します。
+resultが空でも`競合なし`とは表示しません。
+Inspectorは確認済みcandidate MOD以外のreadable MODも開けます。
+raw XML、XPath、attribute、patch detailは折りたたんで表示します。
+MO2はread-onlyのまま維持します。
 
 ### 24.3 読み込み性能とProfile投影
 

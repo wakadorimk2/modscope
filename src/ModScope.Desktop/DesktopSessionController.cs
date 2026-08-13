@@ -9,6 +9,7 @@ public sealed class DesktopSessionController
 {
     private readonly ILocalKnowledgeQuery _query;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
+    private readonly SemaphoreSlim _analysisGate = new(1, 1);
     private KnowledgeSessionReadModel? _session;
     private PageObservation? _observation;
     private IReadOnlyList<ModCandidateSummary> _candidates = Array.Empty<ModCandidateSummary>();
@@ -29,6 +30,12 @@ public sealed class DesktopSessionController
     private CancellationTokenSource? _profilePreloadCancellation;
     private Task? _profilePreloadTask;
     private bool _startProfilePreloadAfterOperation;
+    private string? _baseDataPath;
+    private string? _runtimeLogsPath;
+    private ConflictAnalysisReadModel? _conflictAnalysis;
+    private RuntimeEvidenceComparisonReadModel? _runtimeComparison;
+    private AnalysisOperationUiState _analysisOperation = AnalysisOperationUiState.Idle;
+    private IReadOnlyList<DiagnosticUiState> _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
 
     internal event EventHandler? OperationStateChanged;
 
@@ -71,8 +78,159 @@ public sealed class DesktopSessionController
         return loaded;
     }
 
+    public async Task<bool> UseAnalysisFixtureAsync()
+    {
+        var root = Path.Combine(AppContext.BaseDirectory, "Fixtures", "7dtd-mo2-phase4");
+        var loaded = await LoadSourceAsync(new Mo2SourceInput(
+            "synthetic-instance",
+            "default",
+            root,
+            Path.Combine(root, "profile"),
+            Path.Combine(root, "mods")));
+        if (!loaded)
+        {
+            return false;
+        }
+
+        SetBaseDataPath(Path.Combine(root, "base", "Data", "Config"));
+        SetRuntimeLogsPath(Path.Combine(root, "runtime-logs"));
+        var conflicts = await AnalyzeConflictsAsync();
+        var runtime = await CompareRuntimeEvidenceAsync("0.15.2", "7DTD-synthetic");
+        return conflicts && runtime;
+    }
+
+    public void SetBaseDataPath(string path)
+    {
+        ThrowIfAnalysisBusy();
+        _baseDataPath = ValidateDirectoryPath(path, "The base Data/Config path");
+        _conflictAnalysis = null;
+        _runtimeComparison = null;
+        _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
+        _statusMessage = "Base Data/Config folder selected. Run an analysis.";
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetRuntimeLogsPath(string path)
+    {
+        ThrowIfAnalysisBusy();
+        _runtimeLogsPath = ValidateDirectoryPath(path, "The runtime logs path");
+        _runtimeComparison = null;
+        _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
+        _statusMessage = "Runtime logs folder selected. Run a comparison.";
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task<bool> AnalyzeConflictsAsync()
+    {
+        ThrowIfForegroundKnowledgeOperationBusy();
+        if (!await _analysisGate.WaitAsync(0))
+        {
+            _statusMessage = "An analysis operation is already running.";
+            _analysisDiagnostics = new[]
+            {
+                new DiagnosticUiState(
+                    "analysis.busy",
+                    "warning",
+                    "An analysis operation is already running.")
+            };
+            OperationStateChanged?.Invoke(this, EventArgs.Empty);
+            return false;
+        }
+
+        SetAnalysisOperation(new AnalysisOperationUiState("conflict-analysis", true));
+        try
+        {
+            if (_session is null)
+            {
+                throw new InvalidOperationException("Load Local Knowledge before analysis.");
+            }
+
+            var baseDataPath = GetReadyDirectory(_baseDataPath, "Select a base Data/Config folder first.");
+            var result = await Task.Run(() => _query.AnalyzeConflicts(
+                new SevenDaysToDieBaseDataInput(baseDataPath)));
+            _conflictAnalysis = result;
+            _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
+            _statusMessage = "Conflict analysis completed.";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            var message = SanitizeAnalysisMessage(exception.Message);
+            _statusMessage = $"Conflict analysis failed. Existing result was kept. {message}";
+            _analysisDiagnostics = new[]
+            {
+                new DiagnosticUiState("analysis.conflict.failed", "error", message)
+            };
+            return false;
+        }
+        finally
+        {
+            SetAnalysisOperation(AnalysisOperationUiState.Idle);
+            _analysisGate.Release();
+        }
+    }
+
+    public async Task<bool> CompareRuntimeEvidenceAsync(string? toolVersion, string? gameVersion)
+    {
+        ThrowIfForegroundKnowledgeOperationBusy();
+        if (!await _analysisGate.WaitAsync(0))
+        {
+            _statusMessage = "An analysis operation is already running.";
+            _analysisDiagnostics = new[]
+            {
+                new DiagnosticUiState(
+                    "analysis.busy",
+                    "warning",
+                    "An analysis operation is already running.")
+            };
+            OperationStateChanged?.Invoke(this, EventArgs.Empty);
+            return false;
+        }
+
+        SetAnalysisOperation(new AnalysisOperationUiState("runtime-comparison", true));
+        try
+        {
+            if (_session is null)
+            {
+                throw new InvalidOperationException("Load Local Knowledge before comparison.");
+            }
+
+            var baseDataPath = GetReadyDirectory(_baseDataPath, "Select a base Data/Config folder first.");
+            var runtimeLogsPath = GetReadyDirectory(_runtimeLogsPath, "Select a runtime logs folder first.");
+            var runtime = new RuntimeOcdEvidenceInput(
+                _session.SnapshotId,
+                runtimeLogsPath,
+                NormalizeOptionalVersion(toolVersion),
+                NormalizeOptionalVersion(gameVersion),
+                DateTimeOffset.UtcNow);
+            var result = await Task.Run(() => _query.CompareRuntimeOcdEvidence(
+                new SevenDaysToDieBaseDataInput(baseDataPath),
+                runtime));
+            _runtimeComparison = result;
+            _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
+            _statusMessage = "Runtime evidence comparison completed.";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            var message = SanitizeAnalysisMessage(exception.Message);
+            _statusMessage = $"Runtime evidence comparison failed. Existing result was kept. {message}";
+            _analysisDiagnostics = new[]
+            {
+                new DiagnosticUiState("analysis.runtime.failed", "error", message)
+            };
+            return false;
+        }
+        finally
+        {
+            SetAnalysisOperation(AnalysisOperationUiState.Idle);
+            _analysisGate.Release();
+        }
+    }
+
     public void DiscoverSources(IReadOnlyList<string>? selectedRoots = null)
     {
+        ThrowIfAnalysisBusy();
         _sourceDiscovery = _query.DiscoverSources(selectedRoots);
         _selectedSourceCandidateId = null;
 
@@ -98,6 +256,7 @@ public sealed class DesktopSessionController
 
     public async Task DiscoverSourcesAsync(IReadOnlyList<string>? selectedRoots = null)
     {
+        ThrowIfAnalysisBusy();
         await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-discovery", null);
@@ -145,6 +304,7 @@ public sealed class DesktopSessionController
     public bool LoadSourceCandidate(string candidateId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(candidateId);
+        ThrowIfAnalysisBusy();
         try
         {
             var session = _query.LoadSourceCandidate(candidateId);
@@ -161,6 +321,7 @@ public sealed class DesktopSessionController
     public async Task<bool> LoadSourceCandidateAsync(string candidateId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(candidateId);
+        ThrowIfAnalysisBusy();
         await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-load", null);
@@ -179,6 +340,7 @@ public sealed class DesktopSessionController
     public async Task<bool> LoadSourceAsync(Mo2SourceInput source)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ThrowIfAnalysisBusy();
         await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-load", source.ProfileName);
@@ -208,6 +370,7 @@ public sealed class DesktopSessionController
     public void LoadSource(Mo2SourceInput source)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ThrowIfAnalysisBusy();
         _session = _query.Load(source);
         _candidates = _query.GetModCandidates();
         _profiles = _query.GetProfiles();
@@ -218,12 +381,14 @@ public sealed class DesktopSessionController
         _inspector = null;
         _sourceDiscovery = null;
         _selectedSourceCandidateId = null;
+        ClearAnalysis();
         _statusMessage = $"Loaded {_candidates.Count} MOD records. Confirm the page identity.";
         StartBackgroundProfilePreload();
     }
 
     public void SwitchProfile(string profileName)
     {
+        ThrowIfAnalysisBusy();
         var session = _query.SwitchProfile(profileName);
         _session = session;
         _candidates = _query.GetModCandidates();
@@ -234,6 +399,7 @@ public sealed class DesktopSessionController
         _localContext = null;
         _inspector = null;
         _selectedSourceCandidateId = null;
+        ClearAnalysis();
         _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
         StartBackgroundProfilePreload();
     }
@@ -241,6 +407,7 @@ public sealed class DesktopSessionController
     public async Task<bool> SwitchProfileAsync(string profileName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
+        ThrowIfAnalysisBusy();
         await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("profile-switch", profileName.Trim());
@@ -312,16 +479,6 @@ public sealed class DesktopSessionController
     public void OpenInspector(string modKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modKey);
-        if (_localContext?.Status != LocalContextStatus.Installed)
-        {
-            throw new InvalidOperationException("Inspector is available only for an installed MOD.");
-        }
-
-        if (!string.Equals(_localContext.LocalModKey, modKey, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("The requested MOD is not the confirmed local MOD.");
-        }
-
         _inspector = _query.GetInspector(modKey);
         _statusMessage = $"Inspector opened for {_inspector.DirectoryName}.";
     }
@@ -344,6 +501,13 @@ public sealed class DesktopSessionController
             new IdentityUiState(_candidateIdentity, _selectedLocalModKey),
             _localContext,
             _inspector,
+            DesktopStateMapper.MapAnalysis(
+                _conflictAnalysis,
+                _runtimeComparison,
+                _baseDataPath is not null && Directory.Exists(_baseDataPath),
+                _runtimeLogsPath is not null && Directory.Exists(_runtimeLogsPath),
+                _analysisOperation,
+                _analysisDiagnostics),
             new LayoutUiState(_contextVisible, _modListVisible),
             _statusMessage,
             _operation,
@@ -705,6 +869,7 @@ public sealed class DesktopSessionController
         _localContext = null;
         _inspector = null;
         _selectedSourceCandidateId = null;
+        ClearAnalysis();
         _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
         _startProfilePreloadAfterOperation = true;
     }
@@ -750,7 +915,84 @@ public sealed class DesktopSessionController
         _localContext = null;
         _inspector = null;
         _selectedSourceCandidateId = candidateId;
+        ClearAnalysis();
         _statusMessage = $"Loaded {_candidates.Count} MOD records. Confirm the page identity.";
         _startProfilePreloadAfterOperation = true;
+    }
+
+    private void ClearAnalysis()
+    {
+        _baseDataPath = null;
+        _runtimeLogsPath = null;
+        _conflictAnalysis = null;
+        _runtimeComparison = null;
+        _analysisOperation = AnalysisOperationUiState.Idle;
+        _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SetAnalysisOperation(AnalysisOperationUiState operation)
+    {
+        _analysisOperation = operation;
+        _statusMessage = operation.IsBusy
+            ? operation.Kind == "conflict-analysis"
+                ? "Analyzing static XML conflicts."
+                : "Comparing runtime evidence."
+            : _statusMessage;
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ThrowIfAnalysisBusy()
+    {
+        if (_analysisOperation.IsBusy)
+        {
+            throw new InvalidOperationException("Analysis is running. Wait until the analysis is complete.");
+        }
+    }
+
+    private void ThrowIfForegroundKnowledgeOperationBusy()
+    {
+        if (_operation.IsBusy && !_operation.IsBackground)
+        {
+            throw new InvalidOperationException("Local Knowledge is loading. Wait until the operation is complete.");
+        }
+    }
+
+    private static string ValidateDirectoryPath(string path, string label)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var fullPath = Path.GetFullPath(path.Trim());
+        if (!Directory.Exists(fullPath))
+        {
+            throw new DirectoryNotFoundException($"{label} was not found.");
+        }
+
+        return fullPath;
+    }
+
+    private static string GetReadyDirectory(string? path, string message)
+    {
+        if (path is null || !Directory.Exists(path))
+        {
+            throw new InvalidOperationException(message);
+        }
+
+        return path;
+    }
+
+    private static string? NormalizeOptionalVersion(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private string SanitizeAnalysisMessage(string message)
+    {
+        var sanitized = message;
+        foreach (var path in new[] { _baseDataPath, _runtimeLogsPath }.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            sanitized = sanitized.Replace(path!, "[selected folder]", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return sanitized;
     }
 }

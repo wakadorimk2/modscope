@@ -239,6 +239,55 @@ public partial class MainWindow : Window
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
+            case "analysis.selectBaseData":
+            {
+                var path = ChooseFolder("Select the 7 Days to Die base Data/Config folder");
+                if (path is not null)
+                {
+                    _controller.SetBaseDataPath(path);
+                }
+
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "analysis.selectRuntimeLogs":
+            {
+                var path = ChooseFolder("Select the RuntimeOCD logs folder");
+                if (path is not null)
+                {
+                    _controller.SetRuntimeLogsPath(path);
+                }
+
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "analysis.analyzeConflicts":
+            {
+                var analysisTask = _controller.AnalyzeConflictsAsync();
+                SendState(targetWebView: sourceWebView);
+                await analysisTask;
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "analysis.compareRuntimeEvidence":
+            {
+                var payload = BridgeProtocol.ReadPayload<CompareRuntimeEvidencePayload>(command.Payload);
+                var comparisonTask = _controller.CompareRuntimeEvidenceAsync(
+                    payload.ToolVersion,
+                    payload.GameVersion);
+                SendState(targetWebView: sourceWebView);
+                await comparisonTask;
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "analysis.useFixture":
+            {
+                var fixtureTask = _controller.UseAnalysisFixtureAsync();
+                SendState(targetWebView: sourceWebView);
+                await fixtureTask;
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
             case "knowledge.loadSource":
             {
                 var payload = BridgeProtocol.ReadPayload<LoadSourcePayload>(command.Payload);
@@ -471,9 +520,14 @@ public partial class MainWindow : Window
 
     private static string? ChooseMo2Root()
     {
+        return ChooseFolder("Select the MO2 instance or portable root");
+    }
+
+    private static string? ChooseFolder(string title)
+    {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "Select the MO2 instance or portable root"
+            Title = title
         };
 
         return dialog.ShowDialog() == true ? dialog.FolderName : null;

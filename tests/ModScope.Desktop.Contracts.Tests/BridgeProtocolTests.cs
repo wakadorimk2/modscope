@@ -271,4 +271,143 @@ public sealed class BridgeProtocolTests
         Assert.Null(KnowledgeOperationUiState.Idle.Completed);
         Assert.Null(KnowledgeOperationUiState.Idle.Total);
     }
+
+    [Theory]
+    [InlineData("analysis.selectBaseData")]
+    [InlineData("analysis.selectRuntimeLogs")]
+    [InlineData("analysis.analyzeConflicts")]
+    [InlineData("analysis.compareRuntimeEvidence")]
+    [InlineData("analysis.useFixture")]
+    public void ParsesAnalysisCommands(string command)
+    {
+        var envelope = BridgeProtocol.ParseCommand("""
+            {
+              "contractVersion": 1,
+              "requestId": "analysis-1",
+              "command": "COMMAND",
+              "payload": {}
+            }
+            """.Replace("COMMAND", command, StringComparison.Ordinal));
+
+        Assert.Equal(command, envelope.Command);
+    }
+
+    [Fact]
+    public void ParsesRuntimeComparisonVersionsInCamelCase()
+    {
+        var envelope = BridgeProtocol.ParseCommand("""
+            {
+              "contractVersion": 1,
+              "requestId": "runtime-1",
+              "command": "analysis.compareRuntimeEvidence",
+              "payload": { "toolVersion": "1.0", "gameVersion": "7DTD-test" }
+            }
+            """);
+        var payload = BridgeProtocol.ReadPayload<CompareRuntimeEvidencePayload>(envelope.Payload);
+
+        Assert.Equal("1.0", payload.ToolVersion);
+        Assert.Equal("7DTD-test", payload.GameVersion);
+    }
+
+    [Fact]
+    public void SerializesAnalysisStateWithoutPathsOrRuntimeRawResults()
+    {
+        var observation = new RuntimeEvidenceObservationUiState(
+            "First Mod",
+            "items.xml",
+            "/items/item[@name='A']/@value",
+            "set",
+            "Attribute Overrides",
+            "Different",
+            Array.Empty<DiagnosticUiState>());
+        var runtimeEvidence = new RuntimeEvidenceUiState(
+            "snapshot-1",
+            "synthetic-instance",
+            "default",
+            "RuntimeOCD",
+            null,
+            null,
+            DateTimeOffset.UnixEpoch,
+            new[] { observation },
+            Array.Empty<DiagnosticUiState>());
+        var runtimeComparison = new RuntimeEvidenceComparisonUiState(
+            "snapshot-1",
+            "synthetic-instance",
+            "default",
+            runtimeEvidence,
+            new[]
+            {
+                new RuntimeEvidenceComparisonItemUiState(
+                    "items.xml",
+                    "/items/item[@name='A']/@value",
+                    "different",
+                    "different",
+                    "different",
+                    new[] { observation },
+                    Array.Empty<DiagnosticUiState>())
+            },
+            Array.Empty<DiagnosticUiState>());
+        var state = new UiState(
+            new BrowserUiState("about:blank", "", false, false),
+            null,
+            new SourceDiscoveryUiState(Array.Empty<SourceCandidateUiState>(), null),
+            new KnowledgeUiState(
+                null,
+                Array.Empty<ModCandidateUiState>(),
+                Array.Empty<ProfileUiState>(),
+                KnowledgeOperationUiState.Idle),
+            new IdentityUiState("", null),
+            null,
+            null,
+            new AnalysisUiState(
+                new AnalysisInputUiState(true, true),
+                null,
+                runtimeComparison,
+                AnalysisOperationUiState.Idle,
+                Array.Empty<DiagnosticUiState>()),
+            new LayoutUiState(true, true),
+            "analysis",
+            Array.Empty<DiagnosticUiState>());
+
+        var message = BridgeProtocol.SerializeMessage("state", state);
+
+        Assert.Contains("\"analysis\"", message);
+        Assert.DoesNotContain("baseDataPath", message);
+        Assert.DoesNotContain("runtimeLogsPath", message);
+        Assert.DoesNotContain("rawResult", message);
+        Assert.DoesNotContain("runtime log body", message);
+        Assert.DoesNotContain("C:\\\\private", message);
+    }
+
+    [Fact]
+    public void SerializesXmlPatchOperationInspectorDto()
+    {
+        var source = new SourceReferenceUiState("modXml", "mods/First Mod/Config/changes.xml", 2, 4);
+        var raw = new RawXmlObservationUiState(
+            "/configs/set[1]",
+            "set",
+            Array.Empty<XmlAttributeObservationUiState>(),
+            "one",
+            source,
+            false);
+        var patch = new XmlPatchOperationUiState(
+            "/configs/set[1]",
+            "set",
+            "set",
+            raw,
+            new[] { new XmlXPathCandidateUiState("/items/item[@name='A']/@value", "/configs/set[1]", source) },
+            Array.Empty<XmlReferenceCandidateUiState>(),
+            Array.Empty<XmlReferenceCandidateUiState>(),
+            Array.Empty<XmlReferenceCandidateUiState>(),
+            Array.Empty<XmlReferenceCandidateUiState>(),
+            Array.Empty<DiagnosticUiState>(),
+            source);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(patch, BridgeProtocol.JsonOptions);
+
+        Assert.Contains("\"rawOperationName\":\"set\"", json);
+        Assert.Contains("\"normalizedKind\":\"set\"", json);
+        Assert.Contains("\"hasChildElements\":false", json);
+        Assert.Contains("\"xPathCandidates\"", json);
+    }
 }
