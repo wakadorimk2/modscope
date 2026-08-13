@@ -85,6 +85,191 @@ public sealed class LocalKnowledgeQueryTests
     }
 
     [Fact]
+    public void ProjectsPatchOperationsAndUnknownOperationDetailsInInspector()
+    {
+        var query = CreateQuery();
+        query.Load(CreateSource(FixtureRoot));
+        var alphaKey = query.GetModCandidates().Single(candidate => candidate.DirectoryName == "Alpha Mod").ModKey;
+
+        var inspector = query.GetInspector(alphaKey);
+        var operationsFile = Assert.Single(
+            inspector.XmlFiles,
+            file => file.RelativePath == "Config/operations.xml");
+
+        Assert.Equal(10, operationsFile.PatchOperations.Count);
+
+        var set = Assert.Single(
+            operationsFile.PatchOperations,
+            operation => operation.RawOperationName == "set");
+        Assert.Equal(QueryXmlPatchOperationKind.Set, set.NormalizedKind);
+        Assert.Contains(set.TargetXmlCandidates, candidate => candidate.NormalizedValue == "items.xml");
+        Assert.Contains(
+            set.XPathCandidates,
+            candidate => candidate.RawValue == "/items/item[@name='Alpha']/property[@name='Health']/@value");
+
+        var unknown = Assert.Single(
+            operationsFile.PatchOperations,
+            operation => operation.RawOperationName == "mystery");
+        Assert.Null(unknown.NormalizedKind);
+        Assert.Contains(
+            unknown.RawObservation.Attributes,
+            attribute => attribute.Name == "custom" && attribute.Value == "preserve");
+        Assert.Contains(
+            unknown.Diagnostics,
+            diagnostic => diagnostic.Code == "xml.patch.operation.unknown");
+    }
+
+    [Fact]
+    public void FindsForwardAndReverseReferencesWithOwnerContext()
+    {
+        var query = CreateQuery();
+        query.Load(CreateSource(FixtureRoot));
+
+        var operationKey = "mods/Alpha Mod/Config/operations.xml#configs/set";
+        var forward = query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.PatchOperation,
+            operationKey.Replace('/', '\\'),
+            KnowledgeQueryDirection.Forward));
+        var targetReference = Assert.Single(
+            forward,
+            reference => reference.To.Kind == KnowledgeQueryNodeKind.TargetXml
+                && reference.To.Value == "items.xml");
+
+        Assert.Equal(KnowledgeReferenceRelation.Targets, targetReference.Relation);
+        Assert.Equal(QueryEvidenceKind.Normalized, targetReference.Evidence.Kind);
+        Assert.Equal("Alpha Mod", targetReference.OwnerMod?.DirectoryName);
+        Assert.Equal("Alpha Display", targetReference.OwnerMod?.DisplayName);
+        Assert.Equal("1.2.3", targetReference.OwnerMod?.Version);
+        Assert.Equal(QueryProfileState.Listed, targetReference.OwnerMod?.ProfileState);
+        Assert.Equal(QueryEnabledState.Enabled, targetReference.OwnerMod?.EnabledState);
+        Assert.Equal(0, targetReference.OwnerMod?.Priority);
+        Assert.Equal("set", targetReference.Operation?.RawOperationName);
+        Assert.Equal(QueryXmlPatchOperationKind.Set, targetReference.Operation?.NormalizedKind);
+
+        var reverse = query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.TargetXml,
+            @"Config\items.xml",
+            KnowledgeQueryDirection.Reverse));
+        var reverseReference = Assert.Single(
+            reverse,
+            reference => reference.Operation?.RawOperationName == "set"
+                && reference.OwnerMod?.ModKey == "Alpha Mod"
+                && reference.Evidence.Kind == QueryEvidenceKind.Normalized);
+
+        Assert.Equal(KnowledgeQueryNodeKind.TargetXml, reverseReference.From.Kind);
+        Assert.Equal("items.xml", reverseReference.From.Value);
+        Assert.Equal(KnowledgeQueryNodeKind.PatchOperation, reverseReference.To.Kind);
+        Assert.Equal(KnowledgeReferenceRelation.Targets, reverseReference.Relation);
+        Assert.Equal(QueryEvidenceKind.Normalized, reverseReference.Evidence.Kind);
+
+        var inferredUnknown = Assert.Single(
+            query.FindReferences(new KnowledgeReferenceQuery(
+                KnowledgeQueryNodeKind.TargetXml,
+                "operations.xml",
+                KnowledgeQueryDirection.Reverse)),
+            reference => reference.OwnerMod?.ModKey == "Alpha Mod"
+                && reference.Operation?.RawOperationName == "mystery");
+        Assert.Equal(QueryEvidenceKind.Inference, inferredUnknown.Evidence.Kind);
+        Assert.Null(inferredUnknown.Operation?.NormalizedKind);
+        Assert.Contains(
+            inferredUnknown.Diagnostics,
+            diagnostic => diagnostic.Code == "xml.patch.operation.unknown");
+    }
+
+    [Fact]
+    public void SupportsAllKnowledgeNodeKindsWithNormalizedExactMatching()
+    {
+        var query = CreateQuery();
+        query.Load(CreateSource(FixtureRoot));
+        var operationKey = "mods/Alpha Mod/Config/operations.xml#configs/set";
+
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.Mod,
+            "Alpha Mod",
+            KnowledgeQueryDirection.Forward)));
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.File,
+            @"mods\Alpha Mod\Config\operations.xml",
+            KnowledgeQueryDirection.Forward)));
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.XmlFile,
+            "mods/Alpha Mod/Config/operations.xml",
+            KnowledgeQueryDirection.Forward)));
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.PatchOperation,
+            operationKey,
+            KnowledgeQueryDirection.Forward)));
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.TargetXml,
+            "items.xml",
+            KnowledgeQueryDirection.Reverse)));
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.XPath,
+            "/items/item[@name='Alpha']/property[@name='Health']/@value",
+            KnowledgeQueryDirection.Reverse)));
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.Entity,
+            "item",
+            KnowledgeQueryDirection.Reverse)));
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.Property,
+            "Health",
+            KnowledgeQueryDirection.Reverse)));
+        Assert.NotEmpty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.Attribute,
+            "value",
+            KnowledgeQueryDirection.Reverse)));
+
+        Assert.Empty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.TargetXml,
+            "ITEMS.XML",
+            KnowledgeQueryDirection.Reverse)));
+        Assert.Empty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.TargetXml,
+            "items",
+            KnowledgeQueryDirection.Reverse)));
+    }
+
+    [Fact]
+    public void AppliesReferenceQueryLimitsAndRequiresALoadedSnapshot()
+    {
+        var query = CreateQuery();
+        query.Load(CreateSource(FixtureRoot));
+
+        var all = query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.Entity,
+            "item",
+            KnowledgeQueryDirection.Reverse));
+        var limited = query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.Entity,
+            "item",
+            KnowledgeQueryDirection.Reverse,
+            1));
+
+        Assert.NotEmpty(all);
+        Assert.Single(limited);
+        Assert.Equal(all[0].From, limited[0].From);
+        Assert.Equal(all[0].To, limited[0].To);
+        Assert.Equal(all[0].Relation, limited[0].Relation);
+        Assert.Empty(query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.Entity,
+            "item",
+            KnowledgeQueryDirection.Reverse,
+            0)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => query.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.Entity,
+            "item",
+            KnowledgeQueryDirection.Reverse,
+            -1)));
+
+        var unloaded = LocalKnowledgeQueryService.CreateDefault();
+        Assert.Throws<InvalidOperationException>(() => unloaded.FindReferences(new KnowledgeReferenceQuery(
+            KnowledgeQueryNodeKind.TargetXml,
+            "items.xml",
+            KnowledgeQueryDirection.Reverse)));
+    }
+
+    [Fact]
     public void ListsOnlyExplicitInstanceProfilesAndSwitchesReadOnlySession()
     {
         var root = Directory.CreateTempSubdirectory("modscope-profiles-");
