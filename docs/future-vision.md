@@ -421,14 +421,19 @@ ModScopeは、次の状態を目指します。
 - frontendはQuery projectionだけを表示します。
 - frontendはMO2 source、LocalModSnapshot、filesystemへ直接アクセスしません。
 
-現在のUIは、Global Browser chromeを上段に置き、Browser ContentとContextを下段に分ける3面構成です。
+現在のUIは、固定したGlobal Browser chromeを上段に置き、ModList、Browser Content、Contextを下段に分ける3列構成です。
 
-- Toolbar WebView2はURL、navigation、resolved source内のProfile dropdown、Context toggleを表示します。
+- Toolbar WebView2はURL、navigation、MOD list toggle、Context toggleを表示します。
+- ModList WebView2はactive profileのMOD一覧とprofile selectorを表示します。
 - Browser WebView2は外部Web pageだけを表示します。
 - Context WebView2はLocal context、例外確認、Developer tools、Inspectorを表示します。
 
-ToolbarとContextは、同じSvelte bundleを別surfaceとして読み込みます。
-Desktop hostは両方へ同じstate、error、ready messageをbroadcastします。
+Toolbar、ModList、Contextは、同じSvelte bundleを別surfaceとして読み込みます。
+Desktop hostは各App WebViewへ同じstate、error、ready messageをbroadcastします。
+ModListの幅は約280pxです。
+MOD一覧だけをスクロール可能にします。
+ToolbarはBrowser操作とURLだけを1行で固定します。
+ModListとContextは独立して折りたためます。
 この構成は情報設計の検証用です。
 将来はContextをdrawerまたはoverlayへ折り畳みます。
 
@@ -448,10 +453,14 @@ v0.1では、次を保留します。
 - identity確認は通常工程ではなく、認識失敗時の例外導線です。
 - Developer toolsはfixtureと明示sourceを検証するために残しますが、初期状態では閉じます。
 - Browser navigation完了後のObserveはDesktop hostが実行します。
-- Profile dropdownは、MO2設定から解決したProfiles directoryにあるprofileだけをread-onlyで切り替えます。
+- Profile selectorは、MO2設定から解決したProfiles directoryにあるprofileだけをread-onlyで切り替えます。
 - Profile switch後はsession、candidates、profile nameを更新し、page observationは維持します。
-- Context上部は、current profileの件数とenabled MODのpriority上位8件を要約表示します。
-- 全MODは、必要なときだけdisplay name、directory name、MOD keyで検索します。
+- ModListはactive profileの全MODをpriority順で表示します。
+- profileに存在するがMOD directoryがないMODはunresolvedとして表示します。
+- MOD directoryに存在するがprofileに存在しないMODは、折りたたみ式の`Profile外`欄へ表示します。
+- 他profileはactive profile表示後にbackground preloadし、selectorへPending、Loading、Ready、Failedを表示します。
+- background preload中もprofile switchを許可し、選択profileを優先します。
+- 認識失敗時の検索drawerは、全候補をdisplay name、directory name、MOD keyで検索する補助導線として維持します。
 - `ModInfo.xml`の確認済みWebsiteだけを、内蔵Browserで開きます。
 - WebsiteがないMODは、URLを推測せずリンクなしで表示します。
 - 認識失敗時のlocal MOD選択も、同じ検索導線を使用します。
