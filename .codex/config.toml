@@ -1,0 +1,2 @@
+[plugins."waka-dev-workbench@personal".mcp_servers.blender]
+enabled = false
