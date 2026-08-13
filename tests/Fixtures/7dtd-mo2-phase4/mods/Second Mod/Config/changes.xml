@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configs>
+  <set xpath="/items/item[@name='A']/@value" targetXml="items.xml">two</set>
+  <set xpath="/items/item[@name='C']/@value" targetXml="items.xml">same</set>
+  <setattribute xpath="/items/item[@name='E']" name="group" targetXml="items.xml">beta</setattribute>
+  <set xpath="/items/item[@name='B']" targetXml="items.xml">changed</set>
+  <setattribute xpath="/items/item[@name='D']" name="value" targetXml="items.xml">restored</setattribute>
+  <append xpath="/items/item[@name='A']/@tags" targetXml="items.xml">,second</append>
+  <append xpath="/items/item[@name='Many']/@tags" targetXml="items.xml">,two</append>
+  <set xpath="/items/item[@name='Missing']" targetXml="missing.xml">missing base</set>
+  <set xpath="/items" targetXml="malformed.xml">malformed base</set>
+  <set xpath="/items" targetXml="base-dtd.xml">DTD base</set>
+</configs>

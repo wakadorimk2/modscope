@@ -130,7 +130,10 @@ internal static class XmlParsing
                         element.Name.LocalName,
                         elementAttributes,
                         string.IsNullOrWhiteSpace(element.Value) ? null : element.Value,
-                        elementSource));
+                        elementSource)
+                    {
+                        HasChildElements = element.Elements().Any()
+                    });
                 }
 
                 foreach (var attribute in element.Attributes())
@@ -238,11 +241,15 @@ internal static class XmlParsing
 
             var rawObservation = observations.FirstOrDefault(observation =>
                 observation.ElementPath.Equals(elementPath, StringComparison.Ordinal)
-                && observation.Source.RelativePath.Equals(source.RelativePath, StringComparison.Ordinal))
+                && observation.Source.RelativePath.Equals(source.RelativePath, StringComparison.Ordinal)
+                && observation.Source.LineNumber == elementSource.LineNumber
+                && observation.Source.ColumnNumber == elementSource.ColumnNumber)
                 ?? CreateRawObservation(element, elementPath, elementSource);
 
             var operationXpaths = xpathCandidates
-                .Where(candidate => candidate.ElementPath.Equals(elementPath, StringComparison.Ordinal))
+                .Where(candidate => candidate.ElementPath.Equals(elementPath, StringComparison.Ordinal)
+                    && candidate.Source.LineNumber == elementSource.LineNumber
+                    && candidate.Source.ColumnNumber == elementSource.ColumnNumber)
                 .ToList()
                 .AsReadOnly();
 
@@ -475,7 +482,10 @@ internal static class XmlParsing
                 .ToList()
                 .AsReadOnly(),
             string.IsNullOrWhiteSpace(element.Value) ? null : element.Value,
-            source);
+            source)
+        {
+            HasChildElements = element.Elements().Any()
+        };
     }
 
     public static IReadOnlyList<RawXmlObservation> CollectUnknownModInfoObservations(
@@ -526,7 +536,10 @@ internal static class XmlParsing
                     .ToList()
                     .AsReadOnly(),
                 string.IsNullOrWhiteSpace(element.Value) ? null : element.Value,
-                elementSource));
+                elementSource)
+            {
+                HasChildElements = element.Elements().Any()
+            });
         }
 
         return observations.AsReadOnly();

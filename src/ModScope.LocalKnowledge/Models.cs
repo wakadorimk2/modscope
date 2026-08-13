@@ -135,7 +135,8 @@ public enum SourceReferenceKind
     ProfileFile,
     InstanceFile,
     ModDirectory,
-    ModFile
+    ModFile,
+    GameDataFile
 }
 
 public enum XmlParseStatus
@@ -172,7 +173,10 @@ public sealed record RawXmlObservation(
     string ElementName,
     IReadOnlyList<XmlAttributeObservation> Attributes,
     string? InnerText,
-    SourceReference Source);
+    SourceReference Source)
+{
+    public bool HasChildElements { get; init; }
+}
 
 public sealed record XmlXPathCandidate(
     string RawValue,
@@ -214,7 +218,10 @@ public sealed record XmlPatchOperationObservation(
     IReadOnlyList<XmlReferenceCandidate> PropertyCandidates,
     IReadOnlyList<XmlReferenceCandidate> AttributeCandidates,
     IReadOnlyList<Diagnostic> Diagnostics,
-    SourceReference Source);
+    SourceReference Source)
+{
+    public bool HasChildElements => RawObservation.HasChildElements;
+}
 
 public sealed record ProfileModEntry(
     string RawLine,

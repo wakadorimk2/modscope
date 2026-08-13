@@ -802,9 +802,22 @@ Phase 3完了判定メモ（2026-08-13）：
 - GUI確認前後で、MO2の`modlist.txt`と対象MODの入力ファイルのSHA-256は一致しました。MO2 sourceは変更していません。
 - Phase 3の対象外は、agent transport、Compare UI、Site Adapter、Runtime evidence、MO2 writeです。これらを追加しません。
 
-### Phase 4：semantic conflict
+### Phase 4：semantic conflict（完了）
 
-semantic conflict、operation sequence、priority、effective resultを解析します。
+2026-08-13のPhase 4では、active profileのenabled MODを対象に、target XMLとXPathごとのsemantic conflict解析を追加しました。
+
+- `SevenDaysToDieBaseDataSource`が、明示された7DTD `Data/Config` directoryをread-onlyで読みます。
+- `SevenDaysToDieConflictAnalyzer`が、profile priorityの`0→N`順でoperation sequenceを作ります。
+- priorityの実ゲーム上の勝者方向は確定せず、`inference`とuncertaintyとして保持します。
+- 基準XMLの結果は相対path、SHA-256、`GameDataFile` source referenceで保持します。absolute pathは結果へ出しません。
+- `set`、`setattribute`、`remove`、`removeattribute`、属性値への単純な`append`をeffective subsetとして評価します。
+- child fragment、`prepend`、`insertBefore`、`insertAfter`、`csv`、unknown operation、標準XPathで評価できない式は`unknown`またはdiagnosticとして保持します。
+- 同じ値は`compatible`、異なる値は`conflict`、removeと変更は`conflict`、順序依存または未検証の組み合わせは`possible`とします。
+- base XMLの欠落、parse失敗、XPath no matchは`unknown`とします。
+- Query layerへ`AnalyzeConflicts`と`ConflictAnalysisReadModel`を追加しました。Desktop、Desktop Contracts、Web frontendは変更しません。
+- Runtime evidence、完全なXML patch engine、MO2 write、UI表示はPhase 4の対象外です。
+
+Phase 4の検証は、匿名synthetic fixtureで行います。solution test、build、`git diff --check`を受入証拠とします。
 
 ### Phase 5：runtime evidence
 

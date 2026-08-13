@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configs>
+  <set xpath="/items/item[@name='A']/@value" targetXml="items.xml">one</set>
+  <set xpath="/items/item[@name='C']/@value" targetXml="items.xml">same</set>
+  <setattribute xpath="/items/item[@name='E']" name="group" targetXml="items.xml">alpha</setattribute>
+  <append xpath="/items/item[@name='A']/@tags" targetXml="items.xml">,first</append>
+  <append xpath="/items/item[@name='Many']/@tags" targetXml="items.xml">,one</append>
+  <remove xpath="/items/item[@name='B']" targetXml="items.xml" />
+  <removeattribute xpath="/items/item[@name='D']" name="value" targetXml="items.xml" />
+  <append xpath="/items" targetXml="items.xml">
+    <item name="ChildFragment" />
+  </append>
+  <prepend xpath="/items" targetXml="items.xml" />
+  <mystery xpath="/items/item[@name='A']" targetXml="items.xml">unknown operation</mystery>
+  <set xpath="/items/[" targetXml="items.xml">invalid xpath</set>
+  <set xpath="/items/item[@name='Missing']/@value" targetXml="items.xml">no match</set>
+</configs>
