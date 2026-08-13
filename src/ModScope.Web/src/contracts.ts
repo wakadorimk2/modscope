@@ -50,6 +50,7 @@ export type ModCandidateUiState = {
   directoryName: string;
   displayName?: string | null;
   version?: string | null;
+  website?: string | null;
   profileState: string;
   enabledState: string;
   priority?: number | null;

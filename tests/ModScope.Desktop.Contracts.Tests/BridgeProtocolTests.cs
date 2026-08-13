@@ -90,6 +90,35 @@ public sealed class BridgeProtocolTests
     }
 
     [Fact]
+    public void SerializesModCandidateWebsiteInCamelCase()
+    {
+        var message = BridgeProtocol.SerializeMessage(
+            "state",
+            new KnowledgeUiState(
+                null,
+                new[]
+                {
+                    new ModCandidateUiState(
+                        "Alpha Mod",
+                        "Alpha Mod",
+                        "Alpha Display",
+                        "1.2.3",
+                        "https://example.test/alpha",
+                        "listed",
+                        "enabled",
+                        0,
+                        new SourceReferenceUiState("modDirectory", "mods/Alpha Mod"),
+                        null,
+                        Array.Empty<DiagnosticUiState>())
+                },
+                Array.Empty<ProfileUiState>(),
+                KnowledgeOperationUiState.Idle));
+
+        Assert.Contains("\"website\":\"https://example.test/alpha\"", message);
+        Assert.DoesNotContain("instanceRootPath", message);
+    }
+
+    [Fact]
     public void ParsesProfileSwitchAndContextVisibilityCommands()
     {
         var profileEnvelope = BridgeProtocol.ParseCommand(

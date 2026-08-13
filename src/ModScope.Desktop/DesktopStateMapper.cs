@@ -92,6 +92,7 @@ internal static class DesktopStateMapper
             value.DirectoryName,
             value.DisplayName,
             value.Version,
+            value.Website,
             EnumText(value.ProfileState),
             EnumText(value.EnabledState),
             value.Priority,
