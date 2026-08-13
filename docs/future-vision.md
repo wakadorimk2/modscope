@@ -301,6 +301,10 @@ Query APIは現在のsnapshotと一致するexplicit snapshotだけを受け付�
 Phase 5-Bでは、公開schema、license、anonymous sample log、tool versionとgame versionの取得方法を確認できた外部Runtime Adapterだけを追加します。
 RuntimeOCDのschemaが確認できない場合は、RuntimeOCD Adapterを追加しません。
 
+2026-08-13時点のGate確認では、手元のRuntimeOCD 0.15.2からtool versionだけを確認できました。
+version-specificなlog schema、parser配布条件、匿名sample log、game version取得方法は未確認です。
+この状態では、RuntimeOCD Adapterを作成せず、Phase 5-Aのstatic-only境界を維持します。
+
 ## 11. Read / writeの将来境界
 
 Read planeは、MO2 source、snapshot、Local Mod Knowledge、query、Inspector、analysisを扱います。

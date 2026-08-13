@@ -549,6 +549,19 @@ RuntimeOCD Adapterは、次の情報を公開仕様または提供者の許可�
 
 確認できない場合は、中立契約とsynthetic comparisonを維持します。RuntimeOCDのコードをコピーまたは再実装しません。
 
+#### 13.2.1 Gate確認結果（2026-08-13）
+
+手元に展開したRuntimeOCD 0.15.2の`ModInfo.xml`から、tool version `0.15.2`は確認できました。
+手元の配布物には、version-specificなlog schema、license、parser配布条件を示す資料はありませんでした。
+生成されたログは、カテゴリ別のtext fileと`Source`行を持ちますが、Target XMLを独立したfieldとして出力しません。
+公開説明はログの出力先と機能カテゴリを示しますが、version-specificなschemaとparser配布条件を示しません。[RuntimeOCD description](https://www.nexusmods.com/7daystodie/mods/6920?tab=description)
+匿名sample logと、game versionを信頼して取得する方法も確認できませんでした。
+
+したがって、Phase 5-BのGateは未達です。
+RuntimeOCD AdapterとParserは追加しません。
+Phase 5-Aの中立runtime evidence契約、synthetic comparison、static-onlyの制約を維持します。
+資料が揃うまで、RuntimeOCDの実ログを製品read modelへ取り込みません。
+
 ## 14. Read / write boundary
 
 ### Read plane
