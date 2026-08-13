@@ -19,7 +19,7 @@ body,
 
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
   background:
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 32rem),
     #0b1120;
@@ -47,16 +47,183 @@ button:disabled {
 }
 
 .toolbar-surface {
-  min-height: 100%;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
   padding: 10px 12px;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(11, 17, 32, 0.98));
 }
 
 .toolbar-row {
   display: flex;
+  flex: 0 0 46px;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   min-height: 46px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.mod-list-surface {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(11, 17, 32, 0.98));
+}
+
+.mod-list-header,
+.mod-list-title-row {
+  display: flex;
+  align-items: center;
+}
+
+.mod-list-header {
+  flex: 0 0 auto;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mod-list-title-row {
+  gap: 7px;
+  min-width: 0;
+  margin-top: 3px;
+}
+
+.mod-list-title-row h1 {
+  overflow: hidden;
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-list-profile-picker {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 5px;
+  margin-top: 12px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mod-list-profile-picker select {
+  height: 34px;
+  padding: 6px 8px;
+}
+
+.mod-list-operation-rail {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 8px 9px;
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  border-radius: 9px;
+  background: rgba(14, 116, 144, 0.14);
+}
+
+.sidebar-count-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 0 0 auto;
+  margin-top: 12px;
+}
+
+.sidebar-count-grid div {
+  padding: 7px 8px;
+}
+
+.sidebar-count-grid strong {
+  font-size: 14px;
+}
+
+.mod-list-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  margin-top: 13px;
+  padding-right: 3px;
+  overflow-y: auto;
+  scrollbar-color: rgba(100, 116, 139, 0.75) transparent;
+  scrollbar-width: thin;
+}
+
+.mod-list-section-label {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.mod-list-items {
+  display: grid;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.mod-list-item {
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.42);
+}
+
+.mod-list-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 2px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #e2e8f0;
+  text-align: left;
+}
+
+.mod-list-item-main:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.mod-list-item-main strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-list-item-main > span {
+  flex: 0 0 auto;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.profile-outside-section {
+  margin-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  padding-top: 10px;
+}
+
+.profile-outside-section summary {
+  cursor: pointer;
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mod-list-empty-state {
+  display: grid;
+  align-content: center;
+  flex: 1 1 auto;
+  gap: 7px;
+  color: #94a3b8;
+  text-align: center;
 }
 
 .operation-rail {
@@ -465,10 +632,6 @@ select:focus {
   min-height: 168px;
 }
 
-.profile-overview-panel {
-  border-color: rgba(125, 211, 252, 0.28);
-}
-
 .profile-count-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -579,10 +742,6 @@ select:focus {
   margin-left: auto;
   color: #7dd3fc;
   font-size: 10px;
-}
-
-.profile-overview-actions {
-  margin-top: 14px;
 }
 
 .source-discovery-panel {
@@ -973,13 +1132,8 @@ dd {
     flex-wrap: wrap;
   }
 
-  .toolbar-row {
-    flex-wrap: wrap;
-  }
-
   .toolbar-address {
-    order: 2;
-    flex-basis: 100%;
+    min-width: 80px;
   }
 
   .profile-picker {
