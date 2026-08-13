@@ -308,7 +308,7 @@ public sealed class LocalKnowledgeQueryTests
                 progress => progress.Phase == "scanning-mod-folders");
 
             Assert.Equal(
-                new[] { "Alternate", "Default" },
+                new[] { "Default", "Alternate" },
                 query.GetProfiles().Select(profile => profile.ProfileName));
 
             var switchProgress = new RecordingProgress();
@@ -319,9 +319,53 @@ public sealed class LocalKnowledgeQueryTests
                 switchProgress.Values,
                 progress => progress.Phase == "projecting-profile");
             Assert.Contains(query.GetModCandidates(), candidate => candidate.DirectoryName == "Beta Mod");
+            Assert.Equal("Alternate", query.GetProfiles().First().ProfileName);
             Assert.DoesNotContain(query.GetProfiles(), profile => profile.ProfileName == "OutsideCatalog");
             Assert.Throws<ArgumentException>(() => query.SwitchProfile("OutsideCatalog"));
             Assert.Equal("Beta Mod", query.GetModCandidates().Single(candidate => candidate.DirectoryName == "Beta Mod").DirectoryName);
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void WarmsBackgroundProfileWithoutReplacingActiveSnapshot()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-warm-profile-");
+        try
+        {
+            var profilesPath = Directory.CreateDirectory(Path.Combine(root.FullName, "profiles"));
+            var defaultProfile = CreateProfile(profilesPath.FullName, "Default", "+Alpha Mod");
+            CreateProfile(profilesPath.FullName, "Alternate", "+Beta Mod");
+            var modsPath = Directory.CreateDirectory(Path.Combine(root.FullName, "mods"));
+            var alphaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Alpha Mod"));
+            var betaModPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Beta Mod"));
+            File.WriteAllText(
+                Path.Combine(alphaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Alpha Mod\" /></xml>");
+            File.WriteAllText(
+                Path.Combine(betaModPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Beta Mod\" /></xml>");
+
+            var query = CreateQuery();
+            query.Load(new Mo2SourceInput(
+                "synthetic-instance",
+                "Default",
+                root.FullName,
+                defaultProfile,
+                modsPath.FullName));
+
+            query.WarmProfile("Alternate");
+
+            Assert.Equal(QueryProfileState.Listed, query.GetModCandidates().Single(candidate => candidate.DirectoryName == "Alpha Mod").ProfileState);
+            Assert.Equal(QueryProfileState.Unlisted, query.GetModCandidates().Single(candidate => candidate.DirectoryName == "Beta Mod").ProfileState);
+
+            var switched = query.SwitchProfile("Alternate");
+
+            Assert.Equal("Alternate", switched.ProfileName);
+            Assert.Equal(QueryProfileState.Listed, query.GetModCandidates().Single(candidate => candidate.DirectoryName == "Beta Mod").ProfileState);
         }
         finally
         {
@@ -361,7 +405,7 @@ public sealed class LocalKnowledgeQueryTests
             });
 
             Assert.Equal(
-                new[] { "Alternate", "Default" },
+                new[] { "Default", "Alternate" },
                 query.GetProfiles().Select(profile => profile.ProfileName));
 
             var switched = query.SwitchProfile("Alternate");
@@ -420,7 +464,7 @@ public sealed class LocalKnowledgeQueryTests
             query.LoadSourceCandidate("external-profile-candidate");
 
             Assert.Equal(
-                new[] { "Alternate", "Default" },
+                new[] { "Default", "Alternate" },
                 query.GetProfiles().Select(profile => profile.ProfileName));
 
             var switched = query.SwitchProfile("Alternate");
