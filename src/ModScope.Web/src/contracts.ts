@@ -50,6 +50,7 @@ export type ModCandidateUiState = {
   directoryName: string;
   displayName?: string | null;
   version?: string | null;
+  website?: string | null;
   profileState: string;
   enabledState: string;
   priority?: number | null;
@@ -60,11 +61,13 @@ export type ModCandidateUiState = {
 
 export type ProfileUiState = {
   name: string;
+  loadState: string;
 };
 
 export type KnowledgeOperationUiState = {
   kind: string;
   isBusy: boolean;
+  isBackground: boolean;
   targetProfileName?: string | null;
   phase: string;
   completed?: number | null;
@@ -183,6 +186,7 @@ export type InspectorUiState = {
 
 export type LayoutUiState = {
   contextVisible: boolean;
+  modListVisible: boolean;
 };
 
 export type UiState = {
@@ -223,6 +227,7 @@ export const initialState: UiState = {
     operation: {
       kind: 'idle',
       isBusy: false,
+      isBackground: false,
       targetProfileName: null,
       phase: 'idle',
       completed: null,
@@ -240,7 +245,8 @@ export const initialState: UiState = {
   localContext: null,
   inspector: null,
   layout: {
-    contextVisible: true
+    contextVisible: true,
+    modListVisible: true
   },
   statusMessage: 'Load a source and observe the current page.',
   diagnostics: []

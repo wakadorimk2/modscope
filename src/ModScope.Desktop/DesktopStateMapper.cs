@@ -18,7 +18,8 @@ internal static class DesktopStateMapper
         InspectorReadModel? inspector,
         LayoutUiState layout,
         string statusMessage,
-        KnowledgeOperationUiState operation)
+        KnowledgeOperationUiState operation,
+        IReadOnlyDictionary<string, string>? profileLoadStates = null)
     {
         return new UiState(
             browser,
@@ -29,7 +30,10 @@ internal static class DesktopStateMapper
             new KnowledgeUiState(
                 session is null ? null : KnowledgeSession(session),
                 candidates.Select(Candidate).ToList().AsReadOnly(),
-                profiles.Select(Profile).ToList().AsReadOnly(),
+                profiles
+                    .Select(profile => Profile(profile, profileLoadStates))
+                    .ToList()
+                    .AsReadOnly(),
                 operation),
             identity,
             localContext is null ? null : LocalContext(localContext),
@@ -92,6 +96,7 @@ internal static class DesktopStateMapper
             value.DirectoryName,
             value.DisplayName,
             value.Version,
+            value.Website,
             EnumText(value.ProfileState),
             EnumText(value.EnabledState),
             value.Priority,
@@ -100,9 +105,15 @@ internal static class DesktopStateMapper
             Diagnostics(value.Diagnostics));
     }
 
-    private static ProfileUiState Profile(ProfileSummaryReadModel value)
+    private static ProfileUiState Profile(
+        ProfileSummaryReadModel value,
+        IReadOnlyDictionary<string, string>? profileLoadStates)
     {
-        return new ProfileUiState(value.ProfileName);
+        var loadState = profileLoadStates is not null
+            && profileLoadStates.TryGetValue(value.ProfileName, out var state)
+            ? state
+            : "ready";
+        return new ProfileUiState(value.ProfileName, loadState);
     }
 
     private static LocalContextUiState LocalContext(LocalContextReadModel value)

@@ -228,6 +228,7 @@ public sealed record ModCandidateSummary(
     string DirectoryName,
     string? DisplayName,
     string? Version,
+    string? Website,
     QueryProfileState ProfileState,
     QueryEnabledState EnabledState,
     int? Priority,
