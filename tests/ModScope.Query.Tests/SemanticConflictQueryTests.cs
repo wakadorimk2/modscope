@@ -27,6 +27,7 @@ public sealed class SemanticConflictQueryTests
         var group = Assert.Single(result.Groups);
         Assert.Equal("items.xml", group.TargetXml);
         Assert.Equal(QuerySemanticConflictAssessment.Conflict, group.Assessment);
+        Assert.Equal(QuerySemanticConflictConfidence.High, group.Confidence);
         Assert.Equal(QueryEffectiveResultStatus.Computed, group.EffectiveStatus);
         Assert.Equal(2, group.OperationSequence.Count);
         var operation = group.OperationSequence[0];
@@ -35,6 +36,11 @@ public sealed class SemanticConflictQueryTests
         Assert.Equal(QueryXmlPatchOperationKind.Set, operation.NormalizedKind);
         Assert.Equal(QuerySourceReferenceKind.ModFile, operation.Source.Kind);
         Assert.Contains(operation.Evidence, evidence => evidence.Kind == QueryEvidenceKind.Source);
+
+        var possible = query.AnalyzeConflicts(
+            new SevenDaysToDieBaseDataInput(Path.Combine(root, "base", "Data", "Config")),
+            new ConflictAnalysisQuery(XPath: "/items/item[@name='A']/@tags"));
+        Assert.Equal(QuerySemanticConflictConfidence.Medium, Assert.Single(possible.Groups).Confidence);
 
         var baseFile = Assert.Single(result.BaseFiles, file => file.TargetXml == "items.xml");
         Assert.Equal(QuerySourceReferenceKind.GameDataFile, baseFile.Source.Kind);
@@ -61,6 +67,7 @@ public sealed class SemanticConflictQueryTests
             && group.XPath == "/items");
         Assert.Contains(childGroup.OperationSequence, operation => operation.HasChildElements);
         Assert.Equal(QuerySemanticConflictAssessment.Unknown, childGroup.Assessment);
+        Assert.Equal(QuerySemanticConflictConfidence.Unknown, childGroup.Confidence);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "xml.malformed");
 
         Assert.Throws<ArgumentOutOfRangeException>(() => query.AnalyzeConflicts(

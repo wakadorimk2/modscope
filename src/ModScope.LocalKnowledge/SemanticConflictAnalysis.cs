@@ -17,6 +17,13 @@ public enum SemanticConflictAssessment
     Unknown
 }
 
+public enum SemanticConflictConfidence
+{
+    High,
+    Medium,
+    Unknown
+}
+
 public enum EffectiveResultStatus
 {
     Computed,
@@ -69,6 +76,7 @@ public sealed record SemanticConflictGroup(
     string? TargetXml,
     string? XPath,
     SemanticConflictAssessment Assessment,
+    SemanticConflictConfidence Confidence,
     EffectiveResultStatus EffectiveStatus,
     IReadOnlyList<SemanticConflictOperation> OperationSequence,
     IReadOnlyList<EffectiveChange> EffectiveChanges,
@@ -277,6 +285,7 @@ public static class SevenDaysToDieConflictAnalyzer
                 group.Key.TargetXml,
                 group.Key.XPath,
                 assessment,
+                DetermineConfidence(assessment, effectiveStatus),
                 effectiveStatus,
                 groupItems.Select(item => item.Operation).ToList().AsReadOnly(),
                 effectiveChanges.AsReadOnly(),
@@ -1022,6 +1031,25 @@ public static class SevenDaysToDieConflictAnalyzer
         }
 
         return SemanticConflictAssessment.Compatible;
+    }
+
+    private static SemanticConflictConfidence DetermineConfidence(
+        SemanticConflictAssessment assessment,
+        EffectiveResultStatus effectiveStatus)
+    {
+        if (effectiveStatus != EffectiveResultStatus.Computed)
+        {
+            return SemanticConflictConfidence.Unknown;
+        }
+
+        return assessment switch
+        {
+            SemanticConflictAssessment.Compatible or SemanticConflictAssessment.Conflict =>
+                SemanticConflictConfidence.High,
+            SemanticConflictAssessment.Possible => SemanticConflictConfidence.Medium,
+            SemanticConflictAssessment.Unknown => SemanticConflictConfidence.Unknown,
+            _ => throw new ArgumentOutOfRangeException(nameof(assessment), assessment, null)
+        };
     }
 
     private static bool IsRemoval(OperationSimulation simulation)

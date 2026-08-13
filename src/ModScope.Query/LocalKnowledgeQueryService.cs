@@ -1032,6 +1032,7 @@ internal static class QueryProjection
             group.TargetXml,
             group.XPath,
             MapSemanticConflictAssessment(group.Assessment),
+            MapSemanticConflictConfidence(group.Confidence),
             MapEffectiveResultStatus(group.EffectiveStatus),
             group.OperationSequence.Select(SemanticConflictOperation).ToList().AsReadOnly(),
             group.EffectiveChanges.Select(EffectiveChange).ToList().AsReadOnly(),
@@ -1154,6 +1155,18 @@ internal static class QueryProjection
             SemanticConflictAssessment.Possible => QuerySemanticConflictAssessment.Possible,
             SemanticConflictAssessment.Unknown => QuerySemanticConflictAssessment.Unknown,
             _ => throw new ArgumentOutOfRangeException(nameof(assessment), assessment, null)
+        };
+    }
+
+    private static QuerySemanticConflictConfidence MapSemanticConflictConfidence(
+        SemanticConflictConfidence confidence)
+    {
+        return confidence switch
+        {
+            SemanticConflictConfidence.High => QuerySemanticConflictConfidence.High,
+            SemanticConflictConfidence.Medium => QuerySemanticConflictConfidence.Medium,
+            SemanticConflictConfidence.Unknown => QuerySemanticConflictConfidence.Unknown,
+            _ => throw new ArgumentOutOfRangeException(nameof(confidence), confidence, null)
         };
     }
 
