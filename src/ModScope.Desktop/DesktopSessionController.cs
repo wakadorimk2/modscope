@@ -21,8 +21,14 @@ public sealed class DesktopSessionController
     private string? _selectedLocalModKey;
     private string _statusMessage = "Load a source and observe the current page.";
     private bool _contextVisible = true;
+    private bool _modListVisible = true;
     private KnowledgeOperationUiState _operation = KnowledgeOperationUiState.Idle;
     private long _operationToken;
+    private readonly Dictionary<string, string> _profileLoadStates =
+        new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _profilePreloadCancellation;
+    private Task? _profilePreloadTask;
+    private bool _startProfilePreloadAfterOperation;
 
     internal event EventHandler? OperationStateChanged;
 
@@ -92,6 +98,7 @@ public sealed class DesktopSessionController
 
     public async Task DiscoverSourcesAsync(IReadOnlyList<string>? selectedRoots = null)
     {
+        await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-discovery", null);
         var progress = CreateProgressReporter(operationToken);
@@ -154,6 +161,7 @@ public sealed class DesktopSessionController
     public async Task<bool> LoadSourceCandidateAsync(string candidateId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(candidateId);
+        await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-load", null);
         var progress = CreateProgressReporter(operationToken);
@@ -171,6 +179,7 @@ public sealed class DesktopSessionController
     public async Task<bool> LoadSourceAsync(Mo2SourceInput source)
     {
         ArgumentNullException.ThrowIfNull(source);
+        await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-load", source.ProfileName);
         var progress = CreateProgressReporter(operationToken);
@@ -202,6 +211,7 @@ public sealed class DesktopSessionController
         _session = _query.Load(source);
         _candidates = _query.GetModCandidates();
         _profiles = _query.GetProfiles();
+        InitializeProfileLoadStates(source.ProfileName);
         _candidateIdentity = string.Empty;
         _selectedLocalModKey = null;
         _localContext = null;
@@ -209,6 +219,7 @@ public sealed class DesktopSessionController
         _sourceDiscovery = null;
         _selectedSourceCandidateId = null;
         _statusMessage = $"Loaded {_candidates.Count} MOD records. Confirm the page identity.";
+        StartBackgroundProfilePreload();
     }
 
     public void SwitchProfile(string profileName)
@@ -217,17 +228,20 @@ public sealed class DesktopSessionController
         _session = session;
         _candidates = _query.GetModCandidates();
         _profiles = _query.GetProfiles();
+        InitializeProfileLoadStates(session.ProfileName);
         _candidateIdentity = string.Empty;
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
         _selectedSourceCandidateId = null;
         _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
+        StartBackgroundProfilePreload();
     }
 
     public async Task<bool> SwitchProfileAsync(string profileName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
+        await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("profile-switch", profileName.Trim());
         var progress = CreateProgressReporter(operationToken);
@@ -255,6 +269,11 @@ public sealed class DesktopSessionController
     public void SetContextVisible(bool visible)
     {
         _contextVisible = visible;
+    }
+
+    public void SetModListVisible(bool visible)
+    {
+        _modListVisible = visible;
     }
 
     public void SetObservation(PageObservation observation)
@@ -325,9 +344,10 @@ public sealed class DesktopSessionController
             new IdentityUiState(_candidateIdentity, _selectedLocalModKey),
             _localContext,
             _inspector,
-            new LayoutUiState(_contextVisible),
+            new LayoutUiState(_contextVisible, _modListVisible),
             _statusMessage,
-            _operation);
+            _operation,
+            _profileLoadStates);
     }
 
     private async Task<bool> LoadSourceCandidateCoreAsync(
@@ -355,6 +375,7 @@ public sealed class DesktopSessionController
         _operation = new KnowledgeOperationUiState(
             kind,
             true,
+            false,
             targetProfileName,
             InitialPhase(kind),
             null,
@@ -362,6 +383,25 @@ public sealed class DesktopSessionController
         _statusMessage = targetProfileName is null
             ? "Loading local MO2 knowledge."
             : $"Loading profile {targetProfileName}.";
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+        return operationToken;
+    }
+
+    private long BeginBackgroundOperation(
+        string kind,
+        string? targetProfileName,
+        int total)
+    {
+        var operationToken = Interlocked.Increment(ref _operationToken);
+        _operation = new KnowledgeOperationUiState(
+            kind,
+            true,
+            true,
+            targetProfileName,
+            "preloading-profile",
+            0,
+            total);
+        _statusMessage = "Preparing other profiles in the background.";
         OperationStateChanged?.Invoke(this, EventArgs.Empty);
         return operationToken;
     }
@@ -416,6 +456,27 @@ public sealed class DesktopSessionController
         OperationStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    private void SetBackgroundProgress(
+        long operationToken,
+        int completed,
+        int total,
+        string? targetProfileName = null)
+    {
+        if (operationToken != _operationToken || !_operation.IsBusy)
+        {
+            return;
+        }
+
+        _operation = _operation with
+        {
+            Phase = "preloading-profile",
+            TargetProfileName = targetProfileName ?? _operation.TargetProfileName,
+            Completed = Math.Clamp(completed, 0, total),
+            Total = total
+        };
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     private IProgress<LocalKnowledgeProgress> CreateProgressReporter(long operationToken)
     {
         var uiProgress = new Progress<LocalKnowledgeProgress>(progress =>
@@ -432,6 +493,137 @@ public sealed class DesktopSessionController
 
         _operation = KnowledgeOperationUiState.Idle;
         OperationStateChanged?.Invoke(this, EventArgs.Empty);
+
+        if (_startProfilePreloadAfterOperation)
+        {
+            _startProfilePreloadAfterOperation = false;
+            StartBackgroundProfilePreload();
+        }
+    }
+
+    private void InitializeProfileLoadStates(string activeProfileName)
+    {
+        _profileLoadStates.Clear();
+        foreach (var profile in _profiles)
+        {
+            _profileLoadStates[profile.ProfileName] = string.Equals(
+                profile.ProfileName,
+                activeProfileName,
+                StringComparison.OrdinalIgnoreCase)
+                ? "ready"
+                : "pending";
+        }
+    }
+
+    private void SetProfileLoadState(string profileName, string loadState)
+    {
+        _profileLoadStates[profileName] = loadState;
+        OperationStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void StartBackgroundProfilePreload()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        var activeProfileName = _session.ProfileName;
+        var pendingProfiles = _profiles
+            .Where(profile => !string.Equals(
+                profile.ProfileName,
+                activeProfileName,
+                StringComparison.OrdinalIgnoreCase))
+            .Where(profile => !_profileLoadStates.TryGetValue(profile.ProfileName, out var state)
+                || !string.Equals(state, "ready", StringComparison.OrdinalIgnoreCase))
+            .Select(profile => profile.ProfileName)
+            .ToList();
+        if (pendingProfiles.Count == 0)
+        {
+            return;
+        }
+
+        _profilePreloadCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _profilePreloadCancellation = cancellation;
+        var operationToken = BeginBackgroundOperation(
+            "profile-preload",
+            pendingProfiles[0],
+            pendingProfiles.Count);
+        _profilePreloadTask = Task.Run(async () =>
+        {
+            try
+            {
+                for (var index = 0; index < pendingProfiles.Count; index++)
+                {
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    var profileName = pendingProfiles[index];
+                    SetProfileLoadState(profileName, "loading");
+                    SetBackgroundProgress(operationToken, index, pendingProfiles.Count, profileName);
+
+                    try
+                    {
+                        await Task.Run(
+                            () => _query.WarmProfile(profileName, cancellation.Token),
+                            cancellation.Token);
+                        SetProfileLoadState(profileName, "ready");
+                        SetBackgroundProgress(operationToken, index + 1, pendingProfiles.Count, profileName);
+                    }
+                    catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+                    {
+                        SetProfileLoadState(profileName, "pending");
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        SetProfileLoadState(profileName, "failed");
+                        _statusMessage = $"Profile preload failed for {profileName}. {exception.Message}";
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+            }
+            finally
+            {
+                EndOperation(operationToken);
+                if (ReferenceEquals(_profilePreloadCancellation, cancellation))
+                {
+                    _profilePreloadCancellation = null;
+                    _profilePreloadTask = null;
+                }
+                cancellation.Dispose();
+            }
+        }, cancellation.Token);
+    }
+
+    private async Task StopBackgroundProfilePreloadAsync()
+    {
+        var cancellation = _profilePreloadCancellation;
+        var preloadTask = _profilePreloadTask;
+        if (cancellation is null || preloadTask is null)
+        {
+            return;
+        }
+
+        cancellation.Cancel();
+        try
+        {
+            await preloadTask;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        _profilePreloadCancellation = null;
+        _profilePreloadTask = null;
+        foreach (var profile in _profileLoadStates.Keys.ToList())
+        {
+            if (string.Equals(_profileLoadStates[profile], "loading", StringComparison.OrdinalIgnoreCase))
+            {
+                _profileLoadStates[profile] = "pending";
+            }
+        }
     }
 
     private static string InitialPhase(string kind)
@@ -507,12 +699,14 @@ public sealed class DesktopSessionController
         _session = session;
         _candidates = _query.GetModCandidates();
         _profiles = _query.GetProfiles();
+        InitializeProfileLoadStates(session.ProfileName);
         _candidateIdentity = string.Empty;
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
         _selectedSourceCandidateId = null;
         _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
+        _startProfilePreloadAfterOperation = true;
     }
 
     private void MarkCandidateLoadFailure(string candidateId, Exception exception)
@@ -550,11 +744,13 @@ public sealed class DesktopSessionController
         _session = session;
         _candidates = _query.GetModCandidates();
         _profiles = _query.GetProfiles();
+        InitializeProfileLoadStates(session.ProfileName);
         _candidateIdentity = string.Empty;
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
         _selectedSourceCandidateId = candidateId;
         _statusMessage = $"Loaded {_candidates.Count} MOD records. Confirm the page identity.";
+        _startProfilePreloadAfterOperation = true;
     }
 }

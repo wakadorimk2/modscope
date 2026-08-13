@@ -27,6 +27,11 @@ public interface ILocalKnowledgeQuery
         CancellationToken cancellationToken = default,
         IProgress<LocalKnowledgeProgress>? progress = null);
 
+    void WarmProfile(
+        string profileName,
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null);
+
     LocalContextReadModel ConfirmIdentity(IdentityConfirmation confirmation);
 
     InspectorReadModel GetInspector(string modKey);
@@ -44,6 +49,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
     private Mo2SourceInput? _source;
     private IReadOnlyList<Mo2ProfileDefinition> _profiles = Array.Empty<Mo2ProfileDefinition>();
     private IReadOnlyList<Mo2SourceCandidate> _sourceCandidates = Array.Empty<Mo2SourceCandidate>();
+    private readonly Dictionary<string, LocalModSnapshot> _profileSnapshots =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public LocalKnowledgeQueryService(IMo2SnapshotReader snapshotReader)
         : this(
@@ -127,7 +134,9 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
 
         _source = source;
         _snapshot = snapshot;
-        _profiles = profiles;
+        _profiles = OrderProfiles(profiles, snapshot.ProfileName);
+        _profileSnapshots.Clear();
+        _profileSnapshots[snapshot.ProfileName] = snapshot;
         return ToSession(snapshot);
     }
 
@@ -176,12 +185,46 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             ProfileName = profile.Name,
             ProfilePath = profile.ProfilePath
         };
-        var snapshot = _snapshotReader.Read(ToDefinition(nextSource), cancellationToken, progress);
+        var snapshot = _profileSnapshots.TryGetValue(profile.Name, out var cachedSnapshot)
+            ? cachedSnapshot
+            : _snapshotReader.Read(ToDefinition(nextSource), cancellationToken, progress);
 
         _source = nextSource;
         _snapshot = snapshot;
+        _profiles = OrderProfiles(_profiles, snapshot.ProfileName);
         TryWritePreference(nextSource);
         return ToSession(snapshot);
+    }
+
+    public void WarmProfile(
+        string profileName,
+        CancellationToken cancellationToken = default,
+        IProgress<LocalKnowledgeProgress>? progress = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
+        var source = _source ?? throw new InvalidOperationException(
+            "Load an explicit MO2 source before warming profiles.");
+        var profile = _profiles.FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, profileName.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (profile is null)
+        {
+            throw new ArgumentException(
+                $"The profile '{profileName}' is not available in the explicit instance.",
+                nameof(profileName));
+        }
+
+        if (_profileSnapshots.ContainsKey(profile.Name))
+        {
+            return;
+        }
+
+        var nextSource = source with
+        {
+            ProfileName = profile.Name,
+            ProfilePath = profile.ProfilePath
+        };
+        var snapshot = _snapshotReader.Read(ToDefinition(nextSource), cancellationToken, progress);
+        _profileSnapshots[profile.Name] = snapshot;
     }
 
     public LocalContextReadModel ConfirmIdentity(IdentityConfirmation confirmation)
@@ -385,6 +428,18 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
         {
             ProfilesPath = source.ProfilesPath
         };
+    }
+
+    private static IReadOnlyList<Mo2ProfileDefinition> OrderProfiles(
+        IReadOnlyList<Mo2ProfileDefinition> profiles,
+        string activeProfileName)
+    {
+        return profiles
+            .OrderBy(profile =>
+                string.Equals(profile.Name, activeProfileName, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList()
+            .AsReadOnly();
     }
 
     private static SourceDiscoveryReadModel ToSourceDiscovery(
@@ -658,6 +713,7 @@ internal static class QueryProjection
             record.DirectoryName,
             record.ModInfo?.DisplayName ?? record.ModInfo?.Name,
             record.ModInfo?.Version,
+            record.ModInfo?.Website,
             ProfileState(record.ProfileState),
             EnabledState(record.EnabledState),
             record.Priority,

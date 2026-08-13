@@ -181,7 +181,9 @@ Local Mod Knowledgeは、ModScopeのcore assetです。GUIだけの内部デー�
 
 ### 7.1 v0.1の入力境界
 
-解決した、7DTD + MO2の1 instanceと1 profileを読み取ります。
+解決した、7DTD + MO2の1 instanceを読み取ります。
+active profileを先に読み取ります。
+Profiles directoryからread-onlyのprofile catalogを取得し、active表示後に他profileをbackground preloadします。
 
 - profileの`modlist.txt`
 - `mods/`内のMOD directory
@@ -190,7 +192,7 @@ Local Mod Knowledgeは、ModScopeのcore assetです。GUIだけの内部デー�
 - `Config/**/*.xml`
 - XML patch operationのraw情報と、確認できるnormalized情報
 
-MO2のdownloads、virtual filesystem、他profileは、v0.1の必須入力にしません。
+MO2のdownloadsとvirtual filesystemは、v0.1の必須入力にしません。
 
 MO2 sourceは、既知の場所と実行中MO2からread-onlyで候補化します。
 全ドライブの再帰探索は行いません。探索範囲と待ち時間を予測可能にするためです。
@@ -556,7 +558,7 @@ Write planeは、将来必要性が確認できた場合だけ追加します。
 
 ### 15.1 含めるもの
 
-- 7DTD + MO2の1 instanceと1 profile
+- 7DTD + MO2の1 instance、active profile、read-only profile catalog
 - read-onlyのMO2 snapshot
 - modlist、enabled状態、priority、MOD directory、ファイル一覧
 - ModInfo.xmlのmetadata
@@ -579,7 +581,7 @@ Write planeは、将来必要性が確認できた場合だけ追加します。
 - 完全なsemantic conflict判定
 - RuntimeOCD連携
 - MO2へのwrite
-- 常時表示の高密度Mod一覧
+- MO2管理操作を持つ高密度Mod Manager UI
 - 特定AI製品への専用統合
 - agent Web backendの固定
 - Browser engineの自作
@@ -813,7 +815,8 @@ Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡
 
 ### v0.1
 
-- 解決した7DTD + MO2の1 instanceと1 profileをread-onlyで読み取れる
+- 解決した7DTD + MO2の1 instanceとactive profileをread-onlyで読み取れる
+- Profiles directoryのread-only profile catalogを取得し、他profileをbackground preloadできる
 - modlistからenabled状態とpriorityを取得できる
 - MODのfile list、ModInfo metadata、軽量なXML referenceを取得できる
 - raw情報、normalized value、source reference、diagnosticを保持できる
@@ -857,24 +860,32 @@ Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡
 
 ### 24.2 Three WebView2 surfaces
 
-Desktopは3つのWebView2を、Global Browser chrome + Content / Contextとして配置します。
+Desktopは4つのWebView2を、Global Browser chrome + MOD list + Content / Contextとして配置します。
 
-- Toolbar WebView2：全幅のURL、navigation、profile、Context toggle
+- Toolbar WebView2：全幅のURL、navigation、MOD list toggle、Context toggle
+- ModList WebView2：active profileのMOD一覧、profile selector、profile preload state
 - Browser WebView2：ユーザーが閲覧する外部Web page
 - Context WebView2：Local context、例外確認、Developer tools、Inspector
 
-ToolbarとContextは、同じfrontend bundleをsurface query付きで読み込みます。
+Toolbar、ModList、Contextは、同じfrontend bundleをsurface query付きで読み込みます。
 Toolbarは`?surface=toolbar`を使用します。
+ModListは`?surface=mod-list`を使用します。
 Contextは`?surface=context`を使用します。
 
 任意サイトをfrontendのiframeへ移しません。
 Browser WebView2へWPF panelを重ねません。
 WPFはwindow、WebView2 host、native bridgeに限定します。
 
-BrowserとContextの初期比率は`3*:2*`です。
+下段は、左からModList `280px`、Browser `3*`、Context `2*`です。
+Toolbarは全列にまたがり、固定1行で表示します。
+ModListを閉じるとBrowser columnが広がります。
+ModListの見出しにprofile load stateとscanning progressを表示します。
+MOD一覧だけをスクロール可能にします。
 Context columnは、ToolbarのContext buttonまたはCtrl/Cmd+Iで非表示にできます。
 非表示中もContext WebView2のstateとInspector stateを破棄しません。
-2面構成から3面構成への変更は、Global Browser chromeの視線移動を検証する暫定surfaceです。
+ModList columnはToolbarのMOD list buttonまたは`layout.setModListVisible`で非表示にできます。
+active profileを先に表示し、他profileはbackground preloadします。
+profile selectorはpending、loading、ready、failedを表示します。
 将来はContextをdrawerまたはoverlayへ折り畳める構造へ進めます。
 
 ### 24.3 Bridge contract
@@ -901,9 +912,10 @@ frontendからhostへ送るcommandは次です。
 - identity.confirm
 - inspector.open
 - layout.setContextVisible
+- layout.setModListVisible
 
 hostからfrontendへ送るmessageは、state、error、readyです。
-ToolbarとContextの両方へ同じmessageをbroadcastします。
+Toolbar、ModList、Contextの各App WebViewへ同じmessageをbroadcastします。
 stateはUI stateの完全なsnapshotです。
 
 Hostは次を検証します。
@@ -943,18 +955,23 @@ cache missではouter MOD単位のscanを最大2並列で実行します。
 `ModInfo.xml`と`Config/**/*.xml`は、scan時に取得したbyte bufferからhashとXML observationを生成します。
 
 初回読み込みとProfile switchはDesktop UI threadの外で実行します。
-bridge stateはoperation kind、busy state、target profile nameを保持します。
+active profileのsnapshotを先にactive sessionへ適用します。
+他profileのsnapshotはstatic catalogを再利用して1件ずつbackground preloadします。
+background preloadはactive sessionとMOD一覧を置き換えません。
+profile switchはbackground preloadをキャンセルし、選択profileの読み込みを優先します。
+bridge stateはoperation kind、busy state、background flag、target profile nameを保持します。
 読み込み中は現在のsession、candidate、page observationを保持します。
 成功後だけProfile stateとlocal contextを更新します。
 失敗時は既存stateを保持し、statusまたはsource cardへ要約を表示します。
-Profile dropdownとsource操作はbusy中だけ無効にします。
+foreground operation中だけsource操作を無効にします。
+background preload中もprofile switchを許可します。
 
 ### 24.3.1 Operation progress rail
 
 初回ロード、source load、Profile switchは、派生UI stateとしてoperation progressを公開します。
 Progress stateはsnapshot ID、manifest、normalized data、LocalKnowledgeIndexへ含めません。
 
-`KnowledgeOperationUiState`はoperation kind、busy state、対象Profile、phase、completed、totalを持ちます。
+`KnowledgeOperationUiState`はoperation kind、busy state、background flag、対象Profile、phase、completed、totalを持ちます。
 実数を安全に取得できないphaseではcompletedとtotalをnullにします。
 
 outer MOD folderの並列scanだけは、folder数をtotalとして決定的な進捗を報告します。
@@ -964,7 +981,7 @@ index構築とProfile projectionは不定形phaseとして表示します。
 
 Desktop hostはoperation tokenでstale callbackを破棄します。
 progress通知は最大20回/秒へ間引きます。
-Web UIは150msを超えたoperationだけ、画面上端のprogress railを表示します。
+Web UIは150msを超えたoperationだけ、ModListのprofile見出しへprogress railを表示します。
 短時間のcache hitでは、progress railを表示しません。
 
 progress railは現在のBrowser pageとLocal contextを隠しません。
@@ -1008,6 +1025,18 @@ ready候補が1件なら自動読込します。
 ready候補が複数件ならsource cardで選択します。
 candidateがない場合は再探索とnative folder pickerを表示します。
 unsupported candidateとload failureはsource cardへ要約表示します。
-通常画面のProfile dropdownは、解決済みsource内のread-only profile switchだけを実行します。
+ModListのProfile selectorは、解決済みsource内のread-only profile switchだけを実行します。
 page identity自動認識とoverlap判定は追加しません。
 既存のQuery modelとread-only境界を維持し、profile catalogとlayout stateを明示的なread modelへ追加します。
+
+Profile-first Browser UI整理では、左のModListにactive profileの全MODをpriority順で表示します。
+profileに存在するがMOD directoryがないMODはunresolvedとして表示します。
+MOD directoryに存在するがprofileに存在しないMODは、折りたたみ式の`Profile外`欄へ分離します。
+enabled、disabled、unresolved、priority不明の状態を同じ一覧で表示します。
+profile selectorはModListへ移し、profile名とPending、Loading、Ready、Failedを表示します。
+active profileを先に表示し、他profileはactive表示後にbackground preloadします。
+全候補を常設一覧から削減するため、認識失敗時の検索drawerは補助導線として維持します。
+検索対象はdisplay name、directory name、MOD keyです。
+`ModInfo.xml`から得たabsolute http / https Websiteだけを、既存の`browser.navigate`で開きます。
+WebsiteがないMODのURLは推測しません。
+認識失敗時のlocal MOD選択も、同じ検索結果から行います。

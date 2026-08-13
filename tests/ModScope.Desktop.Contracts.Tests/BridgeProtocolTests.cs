@@ -90,7 +90,36 @@ public sealed class BridgeProtocolTests
     }
 
     [Fact]
-    public void ParsesProfileSwitchAndContextVisibilityCommands()
+    public void SerializesModCandidateWebsiteInCamelCase()
+    {
+        var message = BridgeProtocol.SerializeMessage(
+            "state",
+            new KnowledgeUiState(
+                null,
+                new[]
+                {
+                    new ModCandidateUiState(
+                        "Alpha Mod",
+                        "Alpha Mod",
+                        "Alpha Display",
+                        "1.2.3",
+                        "https://example.test/alpha",
+                        "listed",
+                        "enabled",
+                        0,
+                        new SourceReferenceUiState("modDirectory", "mods/Alpha Mod"),
+                        null,
+                        Array.Empty<DiagnosticUiState>())
+                },
+                Array.Empty<ProfileUiState>(),
+                KnowledgeOperationUiState.Idle));
+
+        Assert.Contains("\"website\":\"https://example.test/alpha\"", message);
+        Assert.DoesNotContain("instanceRootPath", message);
+    }
+
+    [Fact]
+    public void ParsesProfileSwitchAndLayoutVisibilityCommands()
     {
         var profileEnvelope = BridgeProtocol.ParseCommand(
             """
@@ -114,8 +143,20 @@ public sealed class BridgeProtocolTests
             """);
         var layoutPayload = BridgeProtocol.ReadPayload<SetContextVisiblePayload>(layoutEnvelope.Payload);
 
+        var modListEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "mod-list-layout-1",
+              "command": "layout.setModListVisible",
+              "payload": { "visible": false }
+            }
+            """);
+        var modListPayload = BridgeProtocol.ReadPayload<SetModListVisiblePayload>(modListEnvelope.Payload);
+
         Assert.Equal("Alternate", profilePayload.ProfileName);
         Assert.False(layoutPayload.Visible);
+        Assert.False(modListPayload.Visible);
     }
 
     [Fact]
@@ -186,14 +227,40 @@ public sealed class BridgeProtocolTests
                 new KnowledgeOperationUiState(
                     "profile-switch",
                     true,
+                    false,
                     "Alternate",
                     "scanning-mod-folders",
                     3,
                     89)));
 
         Assert.Contains(
-            "\"operation\":{\"kind\":\"profile-switch\",\"isBusy\":true,\"targetProfileName\":\"Alternate\",\"phase\":\"scanning-mod-folders\",\"completed\":3,\"total\":89}",
+            "\"operation\":{\"kind\":\"profile-switch\",\"isBusy\":true,\"isBackground\":false,\"targetProfileName\":\"Alternate\",\"phase\":\"scanning-mod-folders\",\"completed\":3,\"total\":89}",
             message);
+    }
+
+    [Fact]
+    public void SerializesProfileLayoutAndBackgroundOperationInCamelCase()
+    {
+        var profile = System.Text.Json.JsonSerializer.Serialize(
+            new ProfileUiState("default", "pending"),
+            BridgeProtocol.JsonOptions);
+        var layout = System.Text.Json.JsonSerializer.Serialize(
+            new LayoutUiState(true, false),
+            BridgeProtocol.JsonOptions);
+        var operation = System.Text.Json.JsonSerializer.Serialize(
+            new KnowledgeOperationUiState(
+                "profile-preload",
+                true,
+                true,
+                "alternate",
+                "preloading-profile",
+                1,
+                2),
+            BridgeProtocol.JsonOptions);
+
+        Assert.Equal("{\"name\":\"default\",\"loadState\":\"pending\"}", profile);
+        Assert.Equal("{\"contextVisible\":true,\"modListVisible\":false}", layout);
+        Assert.Contains("\"isBackground\":true", operation);
     }
 
     [Fact]
