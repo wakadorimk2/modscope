@@ -12,6 +12,7 @@ public partial class MainWindow : Window
     private const string AppHostName = "appassets.modscope";
     private readonly DesktopSessionController _controller = new();
     private bool _toolbarReady;
+    private bool _modListReady;
     private bool _contextReady;
     private bool _sourceDiscoveryStarted;
 
@@ -28,6 +29,7 @@ public partial class MainWindow : Window
         {
             await Browser.EnsureCoreWebView2Async();
             await ToolbarShell.EnsureCoreWebView2Async();
+            await ModListWebView.EnsureCoreWebView2Async();
             await ContextWebView.EnsureCoreWebView2Async();
 
             Browser.NavigationCompleted += Browser_NavigationCompleted;
@@ -35,6 +37,9 @@ public partial class MainWindow : Window
             ToolbarShell.NavigationStarting += AppShell_NavigationStarting;
             ToolbarShell.NavigationCompleted += AppShell_NavigationCompleted;
             ToolbarShell.CoreWebView2.WebMessageReceived += AppShell_WebMessageReceived;
+            ModListWebView.NavigationStarting += AppShell_NavigationStarting;
+            ModListWebView.NavigationCompleted += AppShell_NavigationCompleted;
+            ModListWebView.CoreWebView2.WebMessageReceived += AppShell_WebMessageReceived;
             ContextWebView.NavigationStarting += AppShell_NavigationStarting;
             ContextWebView.NavigationCompleted += AppShell_NavigationCompleted;
             ContextWebView.CoreWebView2.WebMessageReceived += AppShell_WebMessageReceived;
@@ -47,6 +52,7 @@ public partial class MainWindow : Window
             }
 
             ConfigureFrontend(ToolbarShell, webAssetsPath, "toolbar");
+            ConfigureFrontend(ModListWebView, webAssetsPath, "mod-list");
             ConfigureFrontend(ContextWebView, webAssetsPath, "context");
 
             if (!_sourceDiscoveryStarted)
@@ -66,7 +72,9 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             _controller.SetStatus("WebView2 initialization failed.");
-            if (ToolbarShell.CoreWebView2 is not null || ContextWebView.CoreWebView2 is not null)
+            if (ToolbarShell.CoreWebView2 is not null
+                || ModListWebView.CoreWebView2 is not null
+                || ContextWebView.CoreWebView2 is not null)
             {
                 SendError("browser.initialization.failed", exception.Message);
             }
@@ -119,6 +127,10 @@ public partial class MainWindow : Window
         {
             _contextReady = true;
         }
+        else if (ReferenceEquals(webView, ModListWebView))
+        {
+            _modListReady = true;
+        }
 
         SendMessageTo(webView, "ready", new { });
         SendState();
@@ -165,6 +177,11 @@ public partial class MainWindow : Window
         if (ReferenceEquals(sender, ContextWebView.CoreWebView2))
         {
             return ContextWebView;
+        }
+
+        if (ReferenceEquals(sender, ModListWebView.CoreWebView2))
+        {
+            return ModListWebView;
         }
 
         return null;
@@ -307,6 +324,25 @@ public partial class MainWindow : Window
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
+            case "layout.setModListVisible":
+            {
+                if (!command.Payload.TryGetProperty("visible", out var visible)
+                    || visible.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                {
+                    throw new BridgeProtocolException("The MOD list visibility must be a boolean.");
+                }
+
+                var payload = BridgeProtocol.ReadPayload<SetModListVisiblePayload>(command.Payload);
+                _controller.SetModListVisible(payload.Visible);
+                ModListColumn.Width = payload.Visible
+                    ? new GridLength(280)
+                    : new GridLength(0);
+                ModListShell.Visibility = payload.Visible
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
             case "inspector.open":
             {
                 var payload = BridgeProtocol.ReadPayload<InspectorOpenPayload>(command.Payload);
@@ -407,7 +443,8 @@ public partial class MainWindow : Window
         Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
     {
         if (Browser.CoreWebView2 is null
-            || ((!_toolbarReady && !_contextReady) && targetWebView?.CoreWebView2 is null))
+            || ((!_toolbarReady && !_modListReady && !_contextReady)
+                && targetWebView?.CoreWebView2 is null))
         {
             return;
         }
@@ -449,7 +486,10 @@ public partial class MainWindow : Window
         Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
     {
         _controller.SetStatus(message);
-        if (targetWebView?.CoreWebView2 is null && !_toolbarReady && !_contextReady)
+        if (targetWebView?.CoreWebView2 is null
+            && !_toolbarReady
+            && !_modListReady
+            && !_contextReady)
         {
             return;
         }
@@ -484,6 +524,14 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(targetWebView, ContextWebView))
             {
                 ContextWebView.CoreWebView2.PostWebMessageAsJson(message);
+            }
+        }
+
+        if (_modListReady && ModListWebView.CoreWebView2 is not null)
+        {
+            if (!ReferenceEquals(targetWebView, ModListWebView))
+            {
+                ModListWebView.CoreWebView2.PostWebMessageAsJson(message);
             }
         }
     }

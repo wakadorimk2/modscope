@@ -36,7 +36,8 @@ public static class BridgeProtocol
         "knowledge.switchProfile",
         "identity.confirm",
         "inspector.open",
-        "layout.setContextVisible"
+        "layout.setContextVisible",
+        "layout.setModListVisible"
     };
 
     public static JsonSerializerOptions JsonOptions { get; } = new()
@@ -193,6 +194,8 @@ public sealed record SwitchProfilePayload(string ProfileName);
 
 public sealed record SetContextVisiblePayload(bool Visible);
 
+public sealed record SetModListVisiblePayload(bool Visible);
+
 public sealed record BridgeErrorPayload(string Code, string Message);
 
 public sealed record BrowserUiState(
@@ -249,7 +252,7 @@ public sealed record ModCandidateUiState(
     EvidenceReferenceUiState? PriorityEvidence,
     IReadOnlyList<DiagnosticUiState> Diagnostics);
 
-public sealed record ProfileUiState(string Name);
+public sealed record ProfileUiState(string Name, string LoadState);
 
 public sealed record KnowledgeUiState(
     KnowledgeSessionUiState? Session,
@@ -260,6 +263,7 @@ public sealed record KnowledgeUiState(
 public sealed record KnowledgeOperationUiState(
     string Kind,
     bool IsBusy,
+    bool IsBackground,
     string? TargetProfileName,
     string Phase,
     int? Completed,
@@ -267,6 +271,7 @@ public sealed record KnowledgeOperationUiState(
 {
     public static KnowledgeOperationUiState Idle { get; } = new(
         "idle",
+        false,
         false,
         null,
         "idle",
@@ -366,7 +371,7 @@ public sealed record InspectorUiState(
     IReadOnlyList<DiagnosticUiState> Diagnostics,
     SourceReferenceUiState Source);
 
-public sealed record LayoutUiState(bool ContextVisible);
+public sealed record LayoutUiState(bool ContextVisible, bool ModListVisible);
 
 public sealed record UiState(
     BrowserUiState Browser,
