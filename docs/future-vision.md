@@ -303,7 +303,7 @@ Phase 5-Bでは、Runtime comparisonだけを対象にしたLocal-only RuntimeOC
 DL、導入、初回セットアップ、UI、Desktop、MO2 write、RuntimeOCD本体の再配布は対象外です。
 ModScopeはRuntimeOCDのバイナリまたはソースを同梱しません。公開ソースは挙動確認の根拠だけに使います。
 
-RuntimeOCD 0.15.2の手元ログでは、カテゴリdirectory、説明行、直後の`Source`行を確認しました。
+RuntimeOCD 0.15.2の手元ログでは、カテゴリdirectory、複数行になる説明block、説明blockの最後の`Source`行を確認しました。
 Adapterはこの限定的なrecord形を独立実装します。正式schema互換性は主張しません。
 
 `ToolVersion`は`0.15.2`だけを通常対応とします。欠落または別versionはdiagnosticを保持し、comparison statusを`Unknown`にします。

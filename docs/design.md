@@ -558,11 +558,11 @@ RuntimeOCD Adapterは、Local-only Gateで追加します。ModScopeは、Runtim
 #### 13.2.1 Local-only Adapterの契約
 
 手元に展開したRuntimeOCD 0.15.2の`ModInfo.xml`から、tool version `0.15.2`は確認できました。
-手元の0.15.2ログでは、カテゴリ別directory、説明行、直後の`Source`行を確認しました。Target XMLは独立fieldとして出力されません。
+手元の0.15.2ログでは、カテゴリ別directory、複数行になる説明block、説明blockの最後の`Source`行を確認しました。Target XMLは独立fieldとして出力されません。
 
 `RuntimeOcdImportRequest`は、explicit `SnapshotId`、explicit log directory、tool version、game version、capture timeを受け取ります。log directoryはread-onlyで読み取ります。絶対pathはdocument、diagnostic、read modelへ保存しません。
 
-`RuntimeOcdAdapter`は、説明行と直後の`Source`行を1 observationとして解析します。カテゴリは`R`、`EO`、`SC`、`AO`、`FP`を保持します。未知カテゴリ、未知operation、壊れたrecord、duplicate observationは破棄しません。
+`RuntimeOcdAdapter`は、説明blockとその直後の`Source`行を1 observationとして解析します。カテゴリは`R`、`EO`、`SC`、`AO`、`FP`を保持します。未知カテゴリ、未知operation、壊れたrecord、duplicate observationは破棄しません。
 
 `ToolVersion`は`0.15.2`だけを通常対応とします。欠落または別versionはdiagnosticを保持し、comparison statusを`Unknown`にします。`GameVersion`はexplicit valueを優先し、欠落時はdiagnosticだけを追加します。推測fallbackは使いません。
 

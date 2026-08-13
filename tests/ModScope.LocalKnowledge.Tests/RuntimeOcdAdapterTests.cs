@@ -70,7 +70,8 @@ public sealed class RuntimeOcdAdapterTests
                     "another broken description",
                     "Source <set xpath=\"/unknown\" ...",
                     "another broken description",
-                    "Source <set xpath=\"/unknown\" ..."
+                    "Source <set xpath=\"/unknown\" ...",
+                    "trailing broken description"
                 });
 
             var document = new RuntimeOcdAdapter().Import(
@@ -85,6 +86,7 @@ public sealed class RuntimeOcdAdapterTests
 
             Assert.Equal(4, document.Observations.Count);
             Assert.Contains(document.Observations, observation => observation.RawResult.StartsWith("Source <explode", StringComparison.Ordinal));
+            Assert.Contains(document.Observations, observation => observation.RawResult.Contains("another broken description", StringComparison.Ordinal));
             Assert.Contains(document.Diagnostics, diagnostic => diagnostic.Code == "runtime.ocd.tool-version.unsupported");
             Assert.Contains(document.Diagnostics, diagnostic => diagnostic.Code == "runtime.ocd.game-version.missing");
             Assert.Contains(document.Observations.SelectMany(observation => observation.Diagnostics), diagnostic => diagnostic.Code == "runtime.ocd.operation.unknown");

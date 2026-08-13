@@ -232,29 +232,44 @@ public sealed class RuntimeOcdAdapter
                 continue;
             }
 
-            if (index + 1 < lines.Count && IsSourceLine(lines[index + 1]))
+            var descriptionLines = new List<string> { line };
+            var sourceIndex = index + 1;
+            while (sourceIndex < lines.Count && !IsSourceLine(lines[sourceIndex]))
             {
+                if (!string.IsNullOrWhiteSpace(lines[sourceIndex]))
+                {
+                    descriptionLines.Add(lines[sourceIndex]);
+                }
+
+                sourceIndex++;
+            }
+
+            var description = string.Join(Environment.NewLine, descriptionLines);
+            if (sourceIndex < lines.Count)
+            {
+                var sourceLine = lines[sourceIndex];
+                var pairedSource = new SourceReference(SourceReferenceKind.RuntimeLog, relativePath, sourceIndex + 1);
                 var paired = CreateObservation(
-                    ExtractModKey(line),
-                    line,
-                    lines[index + 1],
-                    source,
+                    ExtractModKey(description),
+                    description,
+                    sourceLine,
+                    pairedSource,
                     category,
                     staticAnalysis);
                 observations.Add(paired);
-                index++;
+                index = sourceIndex;
                 continue;
             }
 
             observations.Add(CreateObservation(
-                ExtractModKey(line),
-                line,
+                ExtractModKey(description),
+                description,
                 null,
                 source,
                 category,
                 staticAnalysis,
                 "runtime.ocd.record.malformed",
-                "The RuntimeOCD description line is not followed by an immediate Source line."));
+                "The RuntimeOCD description block has no following Source line."));
         }
     }
 
@@ -415,16 +430,22 @@ public sealed class RuntimeOcdAdapter
 
     private static string? ExtractModKey(string description)
     {
-        var addedMatch = AddedModPattern.Match(description);
-        if (addedMatch.Success)
+        foreach (var line in description.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            return TrimModKey(addedMatch.Groups["mod"].Value);
+            var addedMatch = AddedModPattern.Match(line);
+            if (addedMatch.Success)
+            {
+                return TrimModKey(addedMatch.Groups["mod"].Value);
+            }
+
+            var changedMatch = ChangedByModPattern.Match(line);
+            if (changedMatch.Success)
+            {
+                return TrimModKey(changedMatch.Groups["mod"].Value);
+            }
         }
 
-        var changedMatch = ChangedByModPattern.Match(description);
-        return changedMatch.Success
-            ? TrimModKey(changedMatch.Groups["mod"].Value)
-            : null;
+        return null;
     }
 
     private static string? TrimModKey(string value)
