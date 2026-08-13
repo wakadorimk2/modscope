@@ -770,7 +770,7 @@ MO2 source discovery、profile切り替え、page observation、MOD identity con
 Core、Resourceなどの配布単位とMO2 record単位のgroupingは未確定です。
 Phase 2ではMO2 recordを独立したraw sourceとして保持し、package groupingは後続課題とします。
 
-### Phase 3：QueryとInspector core
+### Phase 3：QueryとInspector core（完了）
 
 neutral read modelを安定させます。既存のLocalKnowledgeIndexを、C# Query APIからread-onlyで検索できます。
 Site Adapterは、具体的な必要性が確認されるまで追加しません。
@@ -791,9 +791,20 @@ Desktop bridge、Web UI、agent transportは変更しません。
 Site Adapterを先に追加する代替案は、具体的なサイト要件が未確認のため採用しません。
 semantic conflictとeffective resultはPhase 4の対象として残します。
 
+Phase 3完了判定メモ（2026-08-13）：
+
+- 自動検証では、solution全体の57テスト、solution build、frontendのcheckとbuildが成功しました。buildは警告0件、エラー0件でした。
+- Query testsをPhase 3のQuery semanticsに対する再現可能な受入証拠とします。9種類のQuery node、forward / reverse query、path区切り、`Config/`接頭辞、limit、未ロードsnapshotを検証しました。
+- Query resultはowner MOD、profile state、enabled state、priority、operation、evidence、diagnosticを返します。
+- Inspector read modelはModInfo、file list、XML reference、unknown operation、inference、unresolved owner、diagnosticを保持します。未知の情報を破棄しません。
+- 実MO2のread-only GUI確認では、native pickerでportable sourceを選択し、profile projection、`NotebookServer`のactive profile、verified Websiteのpage observation、Local MOD identity、installed、enabled、priority、version、Inspectorを確認しました。
+- 自動検証と実MO2 GUI確認は別の証拠として扱います。実MO2のabsolute pathは文書へ保存しません。
+- GUI確認前後で、MO2の`modlist.txt`と対象MODの入力ファイルのSHA-256は一致しました。MO2 sourceは変更していません。
+- Phase 3の対象外は、agent transport、Compare UI、Site Adapter、Runtime evidence、MO2 writeです。これらを追加しません。
+
 ### Phase 4：semantic conflict
 
-patch semantics、priority、operation sequence、effective resultを解析します。
+semantic conflict、operation sequence、priority、effective resultを解析します。
 
 ### Phase 5：runtime evidence
 
@@ -836,7 +847,7 @@ Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡
 
 ### v0.1以降
 
-- target XML、XPath、entity、property、attributeからMODへreverse queryできる
+- Phase 3で達成済み：target XML、XPath、entity、property、attributeからMODへreverse queryできる
 - semantic conflictとeffective resultをevidence付きで説明できる
 - Runtime evidenceをstatic evidenceと区別して比較できる
 - Site Adapterを追加してもgeneric page observationを壊さない
