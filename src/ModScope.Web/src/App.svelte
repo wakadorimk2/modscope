@@ -29,6 +29,8 @@
   let bridge: Bridge | undefined;
   let operationRailTimer: number | undefined;
   let operationRailVisible = false;
+  let runtimeToolVersion = '';
+  let runtimeGameVersion = '';
   let source = {
     instanceName: 'explicit-instance',
     profileName: 'default',
@@ -66,7 +68,22 @@
   $: unresolvedProfileCandidates = profileCandidates.filter((candidate) => candidate.profileState === 'unresolved');
   $: unknownProfileCount = profileCandidates.length - enabledProfileCandidates.length - disabledProfileCandidates.length;
   $: modSearchResults = searchCandidates(state.knowledge.candidates, modSearchQuery);
-  $: operationBlocksInteraction = state.knowledge.operation.isBusy && !state.knowledge.operation.isBackground;
+  $: analysisBusy = state.analysis.operation.isBusy;
+  $: analysisGroups = state.analysis.conflict?.groups ?? [];
+  $: candidateAnalysisGroups = state.analysis.conflict && state.localContext?.localModKey
+    ? state.analysis.conflict.groups.filter((group) => group.operations.some(
+      (operation) => operation.modKey === state.localContext?.localModKey))
+    : [];
+  $: inspectorConflictGroups = state.inspector && state.analysis.conflict
+    ? state.analysis.conflict.groups.filter((group) => group.operations.some(
+      (operation) => operation.modKey === state.inspector?.modKey))
+    : [];
+  $: inspectorRuntimeItems = state.inspector && state.analysis.runtimeComparison
+    ? state.analysis.runtimeComparison.items.filter((item) => item.observations.some(
+      (observation) => observation.modKey === state.inspector?.modKey))
+    : [];
+  $: operationBlocksInteraction = analysisBusy
+    || (state.knowledge.operation.isBusy && !state.knowledge.operation.isBackground);
 
   type DiagnosticGroup = {
     diagnostic: DiagnosticUiState;
@@ -211,9 +228,20 @@
 
   function openInspector() {
     if (state.localContext?.localModKey) {
-      inspectorOpen = true;
-      send('inspector.open', { modKey: state.localContext.localModKey });
+      openInspectorForMod(state.localContext.localModKey);
     }
+  }
+
+  function openInspectorForMod(modKey: string) {
+    inspectorOpen = true;
+    send('inspector.open', { modKey });
+  }
+
+  function compareRuntimeEvidence() {
+    send('analysis.compareRuntimeEvidence', {
+      toolVersion: runtimeToolVersion.trim() || null,
+      gameVersion: runtimeGameVersion.trim() || null
+    });
   }
 
   function openModSearch(mode: 'browse' | 'recognition' = 'browse') {
@@ -303,6 +331,48 @@
 
   function statusClass(status: string | undefined): string {
     return 'status-' + (status ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
+  }
+
+  function analysisLabel(value: string | null | undefined): string {
+    const normalized = (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+    switch (normalized) {
+      case 'match':
+        return 'Match';
+      case 'different':
+      case 'conflict':
+        return 'Different';
+      case 'possible':
+        return 'Possible';
+      case 'notassessed':
+        return 'Not assessed';
+      case 'inferred':
+      case 'inferredmatch':
+      case 'inferreddifferent':
+        return 'Inferred';
+      case 'runtimeonly':
+      case 'staticonly':
+        return 'Not assessed';
+      case 'unknown':
+      case '':
+        return 'Unknown';
+      default:
+        return formatLabel(value);
+    }
+  }
+
+  function analysisStatusClass(value: string | null | undefined): string {
+    return 'analysis-status-' + (value ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
+  }
+
+  function analysisOperationLabel(): string {
+    switch (state.analysis.operation.kind) {
+      case 'conflict-analysis':
+        return 'Analyzing static XML conflicts';
+      case 'runtime-comparison':
+        return 'Comparing runtime evidence';
+      default:
+        return 'Analysis idle';
+    }
   }
 
   function operationLabel(): string {
@@ -743,6 +813,249 @@
       {/if}
     </section>
 
+    <section class="panel analysis-panel" aria-labelledby="analysis-title">
+      <div class="summary-header">
+        <div>
+          <span class="eyebrow">ANALYSIS</span>
+          <h2 id="analysis-title">Compare &amp; Diagnose</h2>
+          <p class="summary-meta">Static evidence and runtime evidence stay separate.</p>
+        </div>
+        <span class="status-chip {analysisStatusClass(state.analysis.operation.kind)}">
+          {analysisOperationLabel()}
+        </span>
+      </div>
+
+      <div class="analysis-input-status" aria-label="Analysis input status">
+        <span class="status-chip {state.analysis.inputs.baseDataReady ? 'status-ready' : 'status-unknown'}">
+          Base Data/Config · {state.analysis.inputs.baseDataReady ? 'Ready' : 'Not selected'}
+        </span>
+        <span class="status-chip {state.analysis.inputs.runtimeLogsReady ? 'status-ready' : 'status-unknown'}">
+          Runtime logs · {state.analysis.inputs.runtimeLogsReady ? 'Ready' : 'Not selected'}
+        </span>
+        {#if analysisBusy}<span class="subtle" role="status">{analysisOperationLabel()}…</span>{/if}
+      </div>
+
+      {#if state.analysis.diagnostics.length > 0}
+        <div class="diagnostic-list">
+          {#each state.analysis.diagnostics as diagnostic}
+            <p class={diagnosticClass(diagnostic.severity)}>
+              <strong>{diagnostic.code}</strong> {diagnostic.message}
+            </p>
+          {/each}
+        </div>
+      {/if}
+
+      <details class="analysis-section" open>
+        <summary>
+          <span>Compare</span>
+          <span class="subtle">Confirmed candidate MOD only</span>
+        </summary>
+
+        {#if !state.analysis.conflict}
+          <p class="notice">未確認。静的解析を実行してください。</p>
+        {:else if !state.localContext?.localModKey}
+          <p class="notice">確認済みcandidate MODがありません。Compareは未確認です。</p>
+        {:else if candidateAnalysisGroups.length === 0}
+          <p class="notice">確認済みcandidate MODに関係する評価がありません。競合なしとは判定していません。</p>
+        {:else}
+          <div class="analysis-card-list">
+            {#each candidateAnalysisGroups as group}
+              <article class="analysis-card">
+                <div class="analysis-card-heading">
+                  <div>
+                    <strong>{group.targetXml || 'Target XML unknown'}</strong>
+                    <code>{group.xPath || 'XPath unknown'}</code>
+                  </div>
+                  <div class="analysis-badges">
+                    <span class="status-chip {analysisStatusClass(group.assessment)}">{analysisLabel(group.assessment)}</span>
+                    <span class="status-chip {analysisStatusClass(group.confidence)}">Confidence · {analysisLabel(group.confidence)}</span>
+                  </div>
+                </div>
+                <p class="analysis-meta">Effective status · {analysisLabel(group.effectiveStatus)}</p>
+
+                <div class="evidence-card static-evidence-card">
+                  <span class="eyebrow">STATIC EVIDENCE</span>
+                  <ol class="operation-sequence">
+                    {#each group.operations as operation, operationIndex}
+                      <li>
+                        <div class="operation-heading">
+                          <strong>{operationIndex + 1}. {operation.modKey}</strong>
+                          <span>Priority {operation.priority ?? 'Unknown'}</span>
+                        </div>
+                        <div class="analysis-meta">
+                          {operation.xmlFileRelativePath} · {operation.elementPath} · {operation.rawOperationName}
+                          {#if operation.normalizedKind} · {operation.normalizedKind}{/if}
+                        </div>
+                        {#if operation.targetXml || operation.xPath}
+                          <div class="analysis-code-pair">
+                            <span>Target XML</span><code>{operation.targetXml || 'Unknown'}</code>
+                            <span>XPath</span><code>{operation.xPath || 'Unknown'}</code>
+                          </div>
+                        {/if}
+                        {#if operation.attributeName || operation.value}
+                          <div class="analysis-meta">
+                            Attribute {operation.attributeName || 'Unknown'} · Value {operation.value || 'Unknown'}
+                          </div>
+                        {/if}
+                        <p class="provenance-line">Source · {operation.source.kind} · {operation.source.relativePath}</p>
+                      </li>
+                    {/each}
+                  </ol>
+                </div>
+
+                {#if group.effectiveChanges.length > 0}
+                  <details class="evidence-detail">
+                    <summary>Effective changes · {group.effectiveChanges.length}</summary>
+                    {#each group.effectiveChanges as change}
+                      <p class="analysis-meta">
+                        {change.matchPath} · {change.attributeName || 'element'} ·
+                        {change.beforeValue || 'Unknown'} → {change.afterValue || 'Unknown'}
+                      </p>
+                    {/each}
+                  </details>
+                {/if}
+
+                {#if group.uncertainties.length > 0}
+                  <div class="notice-list">
+                    {#each group.uncertainties as uncertainty}<p class="notice">Uncertainty · {uncertainty}</p>{/each}
+                  </div>
+                {/if}
+                {#if group.diagnostics.length > 0}
+                  <div class="diagnostic-list">
+                    {#each groupDiagnostics(group.diagnostics) as groupDiagnostic}
+                      <p class={diagnosticClass(groupDiagnostic.diagnostic.severity)}>
+                        <strong>{groupDiagnostic.diagnostic.code}</strong> {groupDiagnostic.diagnostic.message}
+                        {#if groupDiagnostic.diagnostic.source}<span class="diagnostic-source">{groupDiagnostic.diagnostic.source.relativePath}</span>{/if}
+                      </p>
+                    {/each}
+                  </div>
+                {/if}
+              </article>
+            {/each}
+          </div>
+        {/if}
+      </details>
+
+      <details class="analysis-section" open>
+        <summary>
+          <span>Diagnosis</span>
+          <span class="subtle">Active profile · {state.knowledge.session?.profileName || 'Unknown'}</span>
+        </summary>
+
+        {#if !state.analysis.conflict}
+          <p class="notice">未確認。active profile全体のDiagnosisは解析後に表示します。</p>
+        {:else if analysisGroups.length === 0}
+          <p class="notice">解析結果の評価groupがありません。評価は未確認です。</p>
+        {:else}
+          <div class="diagnosis-list">
+            {#each analysisGroups as group}
+              <article class="diagnosis-row">
+                <div>
+                  <strong>{group.targetXml || 'Target XML unknown'}</strong>
+                  <code>{group.xPath || 'XPath unknown'}</code>
+                </div>
+                <div class="analysis-badges">
+                  <span class="status-chip {analysisStatusClass(group.assessment)}">{analysisLabel(group.assessment)}</span>
+                  <span class="status-chip {analysisStatusClass(group.confidence)}">{analysisLabel(group.confidence)}</span>
+                </div>
+                <p class="analysis-meta">
+                  {group.operations.length} operations ·
+                  {#each group.operations as operation, operationIndex}
+                    {#if operationIndex > 0} / {/if}{operation.modKey} ({operation.priority ?? 'Unknown'})
+                  {/each}
+                </p>
+              </article>
+            {/each}
+          </div>
+        {/if}
+      </details>
+
+      <details class="analysis-section">
+        <summary>
+          <span>Static evidence</span>
+          <span class="subtle">Base files · {state.analysis.conflict?.baseFiles.length ?? 0}</span>
+        </summary>
+        {#if state.analysis.conflict}
+          {#each state.analysis.conflict.baseFiles as file}
+            <article class="evidence-row">
+              <div>
+                <strong>{file.targetXml}</strong>
+                <p class="analysis-meta">{sizeLabel(file.size)} · SHA-256 {file.sha256}</p>
+              </div>
+              <span class="status-chip {statusClass(file.parseStatus || 'unknown')}">{formatLabel(file.parseStatus)}</span>
+              <p class="provenance-line">Source · {file.source.kind} · {file.source.relativePath}</p>
+            </article>
+          {/each}
+          {#if state.analysis.conflict.diagnostics.length > 0}
+            <div class="diagnostic-list">
+              {#each state.analysis.conflict.diagnostics as diagnostic}
+                <p class={diagnosticClass(diagnostic.severity)}><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+              {/each}
+            </div>
+          {/if}
+        {:else}
+          <p class="notice">未確認。静的解析を実行してください。</p>
+        {/if}
+      </details>
+
+      <details class="analysis-section" open>
+        <summary>
+          <span>Runtime evidence</span>
+          <span class="subtle">RuntimeOCD comparison</span>
+        </summary>
+        {#if !state.analysis.runtimeComparison}
+          <p class="notice">未確認。runtime logを選択して比較を実行してください。</p>
+        {:else}
+          {@const runtimeEvidence = state.analysis.runtimeComparison.runtimeEvidence}
+          <div class="evidence-card runtime-evidence-card">
+            <span class="eyebrow">RUNTIME EVIDENCE</span>
+            <div class="summary-grid">
+              <div><span>Tool</span><strong>{runtimeEvidence.toolName}</strong></div>
+              <div><span>Tool version</span><strong>{runtimeEvidence.toolVersion || 'Unknown'}</strong></div>
+              <div><span>Game version</span><strong>{runtimeEvidence.gameVersion || 'Unknown'}</strong></div>
+              <div><span>Captured</span><strong>{runtimeEvidence.capturedAtUtc}</strong></div>
+            </div>
+            {#each state.analysis.runtimeComparison.items as item}
+              <article class="runtime-comparison-row">
+                <div class="analysis-card-heading">
+                  <div>
+                    <strong>{item.targetXml || 'Target XML unknown'}</strong>
+                    <code>{item.xPath || 'XPath unknown'}</code>
+                  </div>
+                  <div class="analysis-badges">
+                    <span class="status-chip {analysisStatusClass(item.status)}">{analysisLabel(item.status)}</span>
+                    <span class="status-chip {analysisStatusClass(item.staticAssessment)}">Static · {analysisLabel(item.staticAssessment)}</span>
+                    <span class="status-chip {analysisStatusClass(item.runtimeAssessment)}">Runtime · {analysisLabel(item.runtimeAssessment)}</span>
+                  </div>
+                </div>
+                {#each item.observations as observation}
+                  <p class="analysis-meta">
+                    {observation.modKey || 'MOD unknown'} · {observation.observedOperation || 'Operation unknown'} ·
+                    {observation.observedCategory || 'Category unknown'} · {analysisLabel(observation.normalizedAssessment)}
+                  </p>
+                {/each}
+                {#if item.diagnostics.length > 0}
+                  {#each item.diagnostics as diagnostic}
+                    <p class={diagnosticClass(diagnostic.severity)}><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+                  {/each}
+                {/if}
+              </article>
+            {/each}
+            {#if runtimeEvidence.diagnostics.length > 0}
+              <div class="diagnostic-list">
+                {#each runtimeEvidence.diagnostics as diagnostic}
+                  <p class={diagnosticClass(diagnostic.severity)}>
+                    <strong>{diagnostic.code}</strong> {diagnostic.message}
+                    {#if diagnostic.source}<span class="diagnostic-source">{diagnostic.source.relativePath}</span>{/if}
+                  </p>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </details>
+    </section>
+
     {#if state.diagnostics.length > 0}
       {@const diagnosticGroups = groupDiagnostics(state.diagnostics)}
       <section class="panel diagnostics-panel">
@@ -794,6 +1107,43 @@
         <button class="secondary-button" disabled={operationBlocksInteraction} onclick={() => send('knowledge.useFixture')}>Use fixture</button>
         <button class="primary-button" disabled={operationBlocksInteraction} onclick={loadSource}>Load source</button>
         <button class="secondary-button" onclick={() => send('browser.observe')}>Observe now</button>
+      </div>
+
+      <div class="analysis-developer-tools">
+        <div class="analysis-tool-header">
+          <div>
+            <span class="eyebrow">PHASE6 ANALYSIS</span>
+            <strong>Static and runtime evidence inputs</strong>
+          </div>
+          <div class="analysis-badges">
+            <span class="status-chip {state.analysis.inputs.baseDataReady ? 'status-ready' : 'status-unknown'}">
+              Base {state.analysis.inputs.baseDataReady ? 'ready' : 'missing'}
+            </span>
+            <span class="status-chip {state.analysis.inputs.runtimeLogsReady ? 'status-ready' : 'status-unknown'}">
+              Logs {state.analysis.inputs.runtimeLogsReady ? 'ready' : 'missing'}
+            </span>
+          </div>
+        </div>
+        <div class="developer-actions">
+          <button class="secondary-button" disabled={operationBlocksInteraction} onclick={() => send('analysis.selectBaseData')}>Select base Data/Config</button>
+          <button class="secondary-button" disabled={operationBlocksInteraction} onclick={() => send('analysis.selectRuntimeLogs')}>Select runtime logs</button>
+          <button
+            class="primary-button"
+            disabled={operationBlocksInteraction || !state.analysis.inputs.baseDataReady}
+            onclick={() => send('analysis.analyzeConflicts')}
+          >Analyze conflicts</button>
+          <button
+            class="primary-button"
+            disabled={operationBlocksInteraction || !state.analysis.inputs.baseDataReady || !state.analysis.inputs.runtimeLogsReady}
+            onclick={compareRuntimeEvidence}
+          >Compare runtime</button>
+          <button class="secondary-button" disabled={operationBlocksInteraction} onclick={() => send('analysis.useFixture')}>Use Phase6 fixture</button>
+        </div>
+        <div class="source-grid analysis-version-grid">
+          <label>Tool version<input bind:value={runtimeToolVersion} placeholder="Unknown" disabled={analysisBusy} /></label>
+          <label>Game version<input bind:value={runtimeGameVersion} placeholder="Unknown" disabled={analysisBusy} /></label>
+        </div>
+        <p class="subtle developer-status">Paths stay in the Desktop session. Runtime log bodies and raw results stay out of Web state.</p>
       </div>
 
       <details class="source-details">
@@ -899,6 +1249,13 @@
                     Use for recognition
                   </button>
                 {/if}
+                <button
+                  type="button"
+                  class="secondary-button mod-recognition-button"
+                  onclick={() => openInspectorForMod(candidate.modKey)}
+                >
+                  Inspect evidence
+                </button>
               </article>
             {/each}
           </div>
@@ -929,6 +1286,29 @@
             </div>
           {/if}
 
+          {#if inspectorConflictGroups.length > 0}
+            <div class="drawer-section">
+              <span class="eyebrow">RELATED STATIC EVIDENCE</span>
+              {#each inspectorConflictGroups as group}
+                <p class="analysis-meta">
+                  {group.targetXml || 'Target XML unknown'} · {group.xPath || 'XPath unknown'} ·
+                  {analysisLabel(group.assessment)} · {analysisLabel(group.confidence)}
+                </p>
+              {/each}
+            </div>
+          {/if}
+
+          {#if inspectorRuntimeItems.length > 0}
+            <div class="drawer-section">
+              <span class="eyebrow">RELATED RUNTIME COMPARISON</span>
+              {#each inspectorRuntimeItems as item}
+                <p class="analysis-meta">
+                  {item.targetXml || 'Target XML unknown'} · {item.xPath || 'XPath unknown'} · {analysisLabel(item.status)}
+                </p>
+              {/each}
+            </div>
+          {/if}
+
           <div class="drawer-section">
             <span class="eyebrow">FILES · {state.inspector.files.length}</span>
             <ul class="compact-list">
@@ -944,9 +1324,45 @@
               <details class="xml-item">
                 <summary><code>{xml.relativePath}</code><span>{formatLabel(xml.parseStatus)}</span></summary>
                 <p>{xml.rootElementName || 'Unknown root'} · {xml.elementCount} elements · {xml.attributeCount} attributes</p>
-                {#each xml.xpathCandidates as xpath}
+                {#each xml.xPathCandidates as xpath}
                   <code class="block-code">{xpath.rawValue}</code>
                 {/each}
+                {#if xml.patchOperations.length > 0}
+                  <details class="patch-operation-list">
+                    <summary>Patch operations · {xml.patchOperations.length}</summary>
+                    {#each xml.patchOperations as patch}
+                      <details class="patch-operation-item">
+                        <summary>
+                          <span>{patch.rawOperationName}</span>
+                          <span class="subtle">{patch.normalizedKind || 'Unknown'} · {patch.elementPath}</span>
+                        </summary>
+                        <p class="analysis-meta">Source · {patch.source.kind} · {patch.source.relativePath}</p>
+                        {#if patch.xPathCandidates.length > 0}
+                          <div class="analysis-code-pair">
+                            <span>XPath</span>
+                            {#each patch.xPathCandidates as xpath}<code>{xpath.rawValue}</code>{/each}
+                          </div>
+                        {/if}
+                        {#if patch.targetXmlCandidates.length > 0}
+                          <p class="analysis-meta">Target XML · {patch.targetXmlCandidates.map((candidate) => candidate.normalizedValue || candidate.rawValue).join(', ')}</p>
+                        {/if}
+                        <details class="raw-detail">
+                          <summary>Raw XML observation</summary>
+                          <code class="block-code">{patch.rawObservation.elementPath} · &lt;{patch.rawObservation.elementName}&gt;</code>
+                          {#each patch.rawObservation.attributes as attribute}
+                            <p class="analysis-meta">Attribute · {attribute.name} = {attribute.value}</p>
+                          {/each}
+                          {#if patch.rawObservation.innerText}<pre>{patch.rawObservation.innerText}</pre>{/if}
+                        </details>
+                        {#if patch.diagnostics.length > 0}
+                          {#each patch.diagnostics as diagnostic}
+                            <p class={diagnosticClass(diagnostic.severity)}><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+                          {/each}
+                        {/if}
+                      </details>
+                    {/each}
+                  </details>
+                {/if}
                 {#each xml.diagnostics as diagnostic}
                   <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
                 {/each}

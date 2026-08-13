@@ -1,0 +1,6 @@
+First Mod added a property
+       Source <set xpath="/items/item[@name='A']/@value" />
+items.xml value MODIFIED by Second Mod
+       Source <set xpath="/items/item[@name='A']/@value" />
+First Mod added a property
+       Source <set xpath="/items/item[@name='C']/@value" />

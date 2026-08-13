@@ -16,6 +16,7 @@ internal static class DesktopStateMapper
         IdentityUiState identity,
         LocalContextReadModel? localContext,
         InspectorReadModel? inspector,
+        AnalysisUiState analysis,
         LayoutUiState layout,
         string statusMessage,
         KnowledgeOperationUiState operation,
@@ -38,9 +39,26 @@ internal static class DesktopStateMapper
             identity,
             localContext is null ? null : LocalContext(localContext),
             inspector is null ? null : Inspector(inspector),
+            analysis,
             layout,
             statusMessage,
             session is null ? Array.Empty<DiagnosticUiState>() : Diagnostics(session.Diagnostics));
+    }
+
+    public static AnalysisUiState MapAnalysis(
+        ConflictAnalysisReadModel? conflict,
+        RuntimeEvidenceComparisonReadModel? runtimeComparison,
+        bool baseDataReady,
+        bool runtimeLogsReady,
+        AnalysisOperationUiState operation,
+        IReadOnlyList<DiagnosticUiState> diagnostics)
+    {
+        return new AnalysisUiState(
+            new AnalysisInputUiState(baseDataReady, runtimeLogsReady),
+            conflict is null ? null : ConflictAnalysis(conflict),
+            runtimeComparison is null ? null : RuntimeEvidenceComparison(runtimeComparison),
+            operation,
+            diagnostics);
     }
 
     private static SourceDiscoveryUiState SourceDiscovery(
@@ -185,6 +203,7 @@ internal static class DesktopStateMapper
             value.AttributeCount,
             value.XPathCandidates.Select(XPath).ToList().AsReadOnly(),
             value.RawObservations.Select(RawObservation).ToList().AsReadOnly(),
+            value.PatchOperations.Select(PatchOperation).ToList().AsReadOnly(),
             Diagnostics(value.Diagnostics),
             Source(value.Source));
     }
@@ -207,7 +226,160 @@ internal static class DesktopStateMapper
                 .ToList()
                 .AsReadOnly(),
             value.InnerText,
+            Source(value.Source),
+            value.HasChildElements);
+    }
+
+    private static XmlReferenceCandidateUiState ReferenceCandidate(
+        XmlReferenceCandidateReadModel value)
+    {
+        return new XmlReferenceCandidateUiState(
+            value.RawValue,
+            value.NormalizedValue,
+            value.ElementPath,
+            EnumText(value.EvidenceKind),
             Source(value.Source));
+    }
+
+    private static XmlPatchOperationUiState PatchOperation(XmlPatchOperationReadModel value)
+    {
+        return new XmlPatchOperationUiState(
+            value.ElementPath,
+            value.RawOperationName,
+            value.NormalizedKind is null ? null : EnumText(value.NormalizedKind.Value),
+            RawObservation(value.RawObservation),
+            value.XPathCandidates.Select(XPath).ToList().AsReadOnly(),
+            value.TargetXmlCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
+            value.EntityCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
+            value.PropertyCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
+            value.AttributeCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
+            Diagnostics(value.Diagnostics),
+            Source(value.Source));
+    }
+
+    private static BaseDataFileUiState BaseDataFile(BaseDataFileReadModel value)
+    {
+        return new BaseDataFileUiState(
+            value.TargetXml,
+            value.Size,
+            value.Sha256,
+            value.ParseStatus is null ? null : EnumText(value.ParseStatus.Value),
+            Source(value.Source),
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static SemanticConflictOperationUiState SemanticConflictOperation(
+        SemanticConflictOperationReadModel value)
+    {
+        return new SemanticConflictOperationUiState(
+            value.OperationKey,
+            value.ModKey,
+            value.Priority,
+            value.XmlFileRelativePath,
+            value.ElementPath,
+            value.RawOperationName,
+            value.NormalizedKind is null ? null : EnumText(value.NormalizedKind.Value),
+            value.TargetXml,
+            value.XPath,
+            value.AttributeName,
+            value.Value,
+            Source(value.Source),
+            value.Evidence.Select(Evidence).ToList().AsReadOnly(),
+            Diagnostics(value.Diagnostics),
+            value.HasChildElements);
+    }
+
+    private static EffectiveChangeUiState EffectiveChange(EffectiveChangeReadModel value)
+    {
+        return new EffectiveChangeUiState(
+            value.MatchPath,
+            value.AttributeName,
+            value.BeforeValue,
+            value.AfterValue,
+            value.ExistedBefore,
+            value.ExistsAfter,
+            Source(value.Source));
+    }
+
+    private static SemanticConflictGroupUiState SemanticConflictGroup(
+        SemanticConflictGroupReadModel value)
+    {
+        return new SemanticConflictGroupUiState(
+            value.TargetXml,
+            value.XPath,
+            EnumText(value.Assessment),
+            EnumText(value.Confidence),
+            EnumText(value.EffectiveStatus),
+            value.Operations.Select(SemanticConflictOperation).ToList().AsReadOnly(),
+            value.EffectiveChanges.Select(EffectiveChange).ToList().AsReadOnly(),
+            value.Evidence.Select(Evidence).ToList().AsReadOnly(),
+            value.Uncertainties,
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static ConflictAnalysisUiState ConflictAnalysis(ConflictAnalysisReadModel value)
+    {
+        return new ConflictAnalysisUiState(
+            value.SnapshotId,
+            value.InstanceName,
+            value.ProfileName,
+            value.BaseDataFiles.Select(BaseDataFile).ToList().AsReadOnly(),
+            value.OperationGroups.Select(SemanticConflictGroup).ToList().AsReadOnly(),
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static RuntimeEvidenceObservationUiState RuntimeEvidenceObservation(
+        RuntimeEvidenceObservationReadModel value)
+    {
+        return new RuntimeEvidenceObservationUiState(
+            value.ModKey,
+            value.TargetXml,
+            value.XPath,
+            value.ObservedOperation,
+            value.ObservedCategory,
+            value.NormalizedAssessment is null
+                ? null
+                : EnumText(value.NormalizedAssessment.Value),
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static RuntimeEvidenceUiState RuntimeEvidence(RuntimeEvidenceReadModel value)
+    {
+        return new RuntimeEvidenceUiState(
+            value.SnapshotId,
+            value.InstanceName,
+            value.ProfileName,
+            value.EvidenceSource,
+            value.ToolVersion,
+            value.GameVersion,
+            value.CaptureTimeUtc,
+            value.Results.Select(RuntimeEvidenceObservation).ToList().AsReadOnly(),
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static RuntimeEvidenceComparisonItemUiState RuntimeEvidenceComparisonItem(
+        RuntimeEvidenceComparisonItemReadModel value)
+    {
+        return new RuntimeEvidenceComparisonItemUiState(
+            value.TargetXml,
+            value.XPath,
+            EnumText(value.Status),
+            value.StaticAssessment is null ? null : EnumText(value.StaticAssessment.Value),
+            value.RuntimeAssessment is null ? null : EnumText(value.RuntimeAssessment.Value),
+            value.Observations.Select(RuntimeEvidenceObservation).ToList().AsReadOnly(),
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static RuntimeEvidenceComparisonUiState RuntimeEvidenceComparison(
+        RuntimeEvidenceComparisonReadModel value)
+    {
+        return new RuntimeEvidenceComparisonUiState(
+            value.SnapshotId,
+            value.InstanceName,
+            value.ProfileName,
+            RuntimeEvidence(value.RuntimeEvidence),
+            value.Results.Select(RuntimeEvidenceComparisonItem).ToList().AsReadOnly(),
+            Diagnostics(value.Diagnostics));
     }
 
     private static EvidenceReferenceUiState Evidence(EvidenceReferenceReadModel value)

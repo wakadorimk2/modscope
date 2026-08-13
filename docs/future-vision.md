@@ -406,6 +406,15 @@ Phase 5-Bでは、Runtime comparisonだけを対象にしたLocal-only RuntimeOC
 
 Browser page、Local context、Inspector、Compare、Diagnosisを拡張します。高密度Mod Manager UIは作りません。
 
+Phase6では、Browse-firstのContext WebViewへCompareとDiagnosisを追加しました。
+Desktop bridgeはbase Data/Config picker、RuntimeOCD logs picker、static conflict analysis、runtime evidence comparison、Phase6 fixtureを提供します。
+pathはDesktop sessionだけに保持し、Web stateにはabsolute path、runtime log本文、raw resultを送信しません。
+static evidenceとruntime evidenceを別表示し、target XML、XPath、priority、operation sequence、provenance、uncertainty、diagnosticを段階表示します。
+Compareは確認済みcandidate MODに絞り、Diagnosisはactive profile全体を表示します。
+analysis未実行時は未確認と表示し、空resultから競合なしと推測しません。
+Inspectorはreadable MOD全体を対象にし、patch operation detailを折りたたみ表示します。
+MO2はread-onlyのまま維持します。
+
 ### Phase 7：Controlled write
 
 必要性が確認できた場合に、dry-runと明示承認付きのMO2操作を追加します。

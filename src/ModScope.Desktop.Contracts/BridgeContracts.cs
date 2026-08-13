@@ -36,6 +36,11 @@ public static class BridgeProtocol
         "knowledge.switchProfile",
         "identity.confirm",
         "inspector.open",
+        "analysis.selectBaseData",
+        "analysis.selectRuntimeLogs",
+        "analysis.analyzeConflicts",
+        "analysis.compareRuntimeEvidence",
+        "analysis.useFixture",
         "layout.setContextVisible",
         "layout.setModListVisible"
     };
@@ -190,6 +195,10 @@ public sealed record ConfirmIdentityPayload(
 
 public sealed record InspectorOpenPayload(string ModKey);
 
+public sealed record CompareRuntimeEvidencePayload(
+    string? ToolVersion = null,
+    string? GameVersion = null);
+
 public sealed record SwitchProfilePayload(string ProfileName);
 
 public sealed record SetContextVisiblePayload(bool Visible);
@@ -340,11 +349,32 @@ public sealed record RawXmlObservationUiState(
     string ElementName,
     IReadOnlyList<XmlAttributeObservationUiState> Attributes,
     string? InnerText,
-    SourceReferenceUiState Source);
+    SourceReferenceUiState Source,
+    bool HasChildElements = false);
 
 public sealed record XmlXPathCandidateUiState(
     string RawValue,
     string ElementPath,
+    SourceReferenceUiState Source);
+
+public sealed record XmlReferenceCandidateUiState(
+    string RawValue,
+    string? NormalizedValue,
+    string ElementPath,
+    string EvidenceKind,
+    SourceReferenceUiState Source);
+
+public sealed record XmlPatchOperationUiState(
+    string ElementPath,
+    string RawOperationName,
+    string? NormalizedKind,
+    RawXmlObservationUiState RawObservation,
+    IReadOnlyList<XmlXPathCandidateUiState> XPathCandidates,
+    IReadOnlyList<XmlReferenceCandidateUiState> TargetXmlCandidates,
+    IReadOnlyList<XmlReferenceCandidateUiState> EntityCandidates,
+    IReadOnlyList<XmlReferenceCandidateUiState> PropertyCandidates,
+    IReadOnlyList<XmlReferenceCandidateUiState> AttributeCandidates,
+    IReadOnlyList<DiagnosticUiState> Diagnostics,
     SourceReferenceUiState Source);
 
 public sealed record XmlFileUiState(
@@ -356,6 +386,7 @@ public sealed record XmlFileUiState(
     int AttributeCount,
     IReadOnlyList<XmlXPathCandidateUiState> XPathCandidates,
     IReadOnlyList<RawXmlObservationUiState> RawObservations,
+    IReadOnlyList<XmlPatchOperationUiState> PatchOperations,
     IReadOnlyList<DiagnosticUiState> Diagnostics,
     SourceReferenceUiState Source);
 
@@ -371,6 +402,111 @@ public sealed record InspectorUiState(
     IReadOnlyList<DiagnosticUiState> Diagnostics,
     SourceReferenceUiState Source);
 
+public sealed record BaseDataFileUiState(
+    string TargetXml,
+    long Size,
+    string Sha256,
+    string? ParseStatus,
+    SourceReferenceUiState Source,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record SemanticConflictOperationUiState(
+    string OperationKey,
+    string ModKey,
+    int? Priority,
+    string XmlFileRelativePath,
+    string ElementPath,
+    string RawOperationName,
+    string? NormalizedKind,
+    string? TargetXml,
+    string? XPath,
+    string? AttributeName,
+    string? Value,
+    SourceReferenceUiState Source,
+    IReadOnlyList<EvidenceReferenceUiState> Evidence,
+    IReadOnlyList<DiagnosticUiState> Diagnostics,
+    bool HasChildElements);
+
+public sealed record EffectiveChangeUiState(
+    string MatchPath,
+    string? AttributeName,
+    string? BeforeValue,
+    string? AfterValue,
+    bool ExistedBefore,
+    bool ExistsAfter,
+    SourceReferenceUiState Source);
+
+public sealed record SemanticConflictGroupUiState(
+    string? TargetXml,
+    string? XPath,
+    string Assessment,
+    string Confidence,
+    string EffectiveStatus,
+    IReadOnlyList<SemanticConflictOperationUiState> Operations,
+    IReadOnlyList<EffectiveChangeUiState> EffectiveChanges,
+    IReadOnlyList<EvidenceReferenceUiState> Evidence,
+    IReadOnlyList<string> Uncertainties,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record ConflictAnalysisUiState(
+    string SnapshotId,
+    string InstanceName,
+    string ProfileName,
+    IReadOnlyList<BaseDataFileUiState> BaseFiles,
+    IReadOnlyList<SemanticConflictGroupUiState> Groups,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record RuntimeEvidenceObservationUiState(
+    string? ModKey,
+    string? TargetXml,
+    string? XPath,
+    string? ObservedOperation,
+    string? ObservedCategory,
+    string? NormalizedAssessment,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record RuntimeEvidenceUiState(
+    string SnapshotId,
+    string InstanceName,
+    string ProfileName,
+    string ToolName,
+    string? ToolVersion,
+    string? GameVersion,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<RuntimeEvidenceObservationUiState> Observations,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record RuntimeEvidenceComparisonItemUiState(
+    string? TargetXml,
+    string? XPath,
+    string Status,
+    string? StaticAssessment,
+    string? RuntimeAssessment,
+    IReadOnlyList<RuntimeEvidenceObservationUiState> Observations,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record RuntimeEvidenceComparisonUiState(
+    string SnapshotId,
+    string InstanceName,
+    string ProfileName,
+    RuntimeEvidenceUiState RuntimeEvidence,
+    IReadOnlyList<RuntimeEvidenceComparisonItemUiState> Items,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record AnalysisInputUiState(bool BaseDataReady, bool RuntimeLogsReady);
+
+public sealed record AnalysisOperationUiState(string Kind, bool IsBusy)
+{
+    public static AnalysisOperationUiState Idle { get; } = new("idle", false);
+}
+
+public sealed record AnalysisUiState(
+    AnalysisInputUiState Inputs,
+    ConflictAnalysisUiState? Conflict,
+    RuntimeEvidenceComparisonUiState? RuntimeComparison,
+    AnalysisOperationUiState Operation,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
 public sealed record LayoutUiState(bool ContextVisible, bool ModListVisible);
 
 public sealed record UiState(
@@ -381,6 +517,7 @@ public sealed record UiState(
     IdentityUiState Identity,
     LocalContextUiState? LocalContext,
     InspectorUiState? Inspector,
+    AnalysisUiState Analysis,
     LayoutUiState Layout,
     string StatusMessage,
     IReadOnlyList<DiagnosticUiState> Diagnostics);

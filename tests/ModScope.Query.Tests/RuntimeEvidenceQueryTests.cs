@@ -167,6 +167,39 @@ public sealed class RuntimeEvidenceQueryTests
                 DateTimeOffset.UtcNow)));
     }
 
+    [Fact]
+    public void ComparesPhase6FixtureRuntimeLogsWithSafeProjection()
+    {
+        var root = FixtureRoot;
+        var query = LocalKnowledgeQueryService.CreateDefault();
+        var session = query.Load(new Mo2SourceInput(
+            "synthetic-instance",
+            "default",
+            root,
+            Path.Combine(root, "profile"),
+            Path.Combine(root, "mods")));
+
+        var result = query.CompareRuntimeOcdEvidence(
+            new SevenDaysToDieBaseDataInput(Path.Combine(root, "base", "Data", "Config")),
+            new RuntimeOcdEvidenceInput(
+                session.SnapshotId,
+                Path.Combine(root, "runtime-logs"),
+                "0.15.2",
+                "7DTD-synthetic",
+                new DateTimeOffset(2026, 8, 14, 0, 0, 0, TimeSpan.Zero)));
+
+        Assert.Equal("RuntimeOCD", result.RuntimeEvidence.ToolName);
+        Assert.NotEmpty(result.RuntimeEvidence.Observations);
+        Assert.Contains(result.RuntimeEvidence.Observations, observation => observation.ModKey == "First Mod");
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, item => item.Status == QueryRuntimeEvidenceComparisonStatus.Unknown);
+
+        var serialized = JsonSerializer.Serialize(result);
+        Assert.DoesNotContain(Path.GetFullPath(root), serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Source <set", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("First Mod added", serialized, StringComparison.Ordinal);
+    }
+
     private static RuntimeEvidenceInput CreateInput(string snapshotId)
     {
         return new RuntimeEvidenceInput(

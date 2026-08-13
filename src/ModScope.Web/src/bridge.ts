@@ -1,4 +1,10 @@
-import { initialState, type HostMessage, type ModCandidateUiState, type UiState } from './contracts';
+import {
+  initialState,
+  type DiagnosticUiState,
+  type HostMessage,
+  type ModCandidateUiState,
+  type UiState
+} from './contracts';
 
 type WebViewPort = {
   postMessage(message: unknown): void;
@@ -103,8 +109,128 @@ function mockCandidatesForProfile(profileName: string): ModCandidateUiState[] {
   ];
 }
 
+function mockAnalysisForFixture(): UiState['analysis'] {
+  const source = (kind: string, relativePath: string, lineNumber?: number) => ({
+    kind,
+    relativePath,
+    lineNumber: lineNumber ?? null,
+    columnNumber: null
+  });
+  const emptyDiagnostics: DiagnosticUiState[] = [];
+  const operation = (
+    operationKey: string,
+    modKey: string,
+    priority: number,
+    value: string,
+    lineNumber: number
+  ) => ({
+    operationKey,
+    modKey,
+    priority,
+    xmlFileRelativePath: 'Config/changes.xml',
+    elementPath: `/configs/set[${priority + 1}]`,
+    rawOperationName: 'set',
+    normalizedKind: 'set',
+    targetXml: 'items.xml',
+    xPath: "/items/item[@name='A']/@value",
+    attributeName: null,
+    value,
+    source: source('modXml', `mods/${modKey}/Config/changes.xml`, lineNumber),
+    evidence: [{ kind: 'staticXml', source: source('modXml', `mods/${modKey}/Config/changes.xml`, lineNumber) }],
+    diagnostics: emptyDiagnostics,
+    hasChildElements: false
+  });
+  const staticGroup = {
+    targetXml: 'items.xml',
+    xPath: "/items/item[@name='A']/@value",
+    assessment: 'different',
+    confidence: 'high',
+    effectiveStatus: 'different',
+    operations: [
+      operation('alpha-a-value', 'Alpha Mod', 0, 'one', 2),
+      operation('beta-a-value', 'Beta Mod', 1, 'two', 2)
+    ],
+    effectiveChanges: [{
+      matchPath: "/items/item[@name='A']",
+      attributeName: 'value',
+      beforeValue: 'base',
+      afterValue: 'two',
+      existedBefore: true,
+      existsAfter: true,
+      source: source('baseData', 'base/Data/Config/items.xml', 3)
+    }],
+    evidence: [{ kind: 'baseData', source: source('baseData', 'base/Data/Config/items.xml', 3) }],
+    uncertainties: ['Runtime evidence is separate from static XML evidence.'],
+    diagnostics: emptyDiagnostics
+  };
+  const runtimeObservation = (modKey: string, assessment: string, lineNumber: number) => ({
+    modKey,
+    targetXml: 'items.xml',
+    xPath: "/items/item[@name='A']/@value",
+    observedOperation: 'set',
+    observedCategory: 'Attribute Overrides',
+    normalizedAssessment: assessment,
+    diagnostics: emptyDiagnostics
+  });
+
+  return {
+    inputs: { baseDataReady: true, runtimeLogsReady: true },
+    conflict: {
+      snapshotId: 'mock:snapshot',
+      instanceName: 'synthetic-instance',
+      profileName: 'default',
+      baseFiles: [{
+        targetXml: 'items.xml',
+        size: 256,
+        sha256: 'synthetic-sha256',
+        parseStatus: 'succeeded',
+        source: source('baseData', 'base/Data/Config/items.xml'),
+        diagnostics: emptyDiagnostics
+      }],
+      groups: [staticGroup],
+      diagnostics: emptyDiagnostics
+    },
+    runtimeComparison: {
+      snapshotId: 'mock:snapshot',
+      instanceName: 'synthetic-instance',
+      profileName: 'default',
+      runtimeEvidence: {
+        snapshotId: 'mock:snapshot',
+        instanceName: 'synthetic-instance',
+        profileName: 'default',
+        toolName: 'RuntimeOCD',
+        toolVersion: null,
+        gameVersion: null,
+        capturedAtUtc: new Date().toISOString(),
+        observations: [
+          runtimeObservation('Alpha Mod', 'different', 2),
+          runtimeObservation('Beta Mod', 'different', 4)
+        ],
+        diagnostics: [{
+          code: 'runtime.ocd.version.unknown',
+          severity: 'info',
+          message: 'Tool version is unknown.',
+          source: source('runtimeLog', 'ConflictDetector_(AO)_Attribute_Overrides/phase6-synthetic.txt')
+        }]
+      },
+      items: [{
+        targetXml: 'items.xml',
+        xPath: "/items/item[@name='A']/@value",
+        status: 'different',
+        staticAssessment: 'different',
+        runtimeAssessment: 'different',
+        observations: [runtimeObservation('Alpha Mod', 'different', 2)],
+        diagnostics: emptyDiagnostics
+      }],
+      diagnostics: emptyDiagnostics
+    },
+    operation: { kind: 'idle', isBusy: false },
+    diagnostics: []
+  };
+}
+
 function mockStateForCommand(state: UiState, command: string, payload: unknown): UiState {
-  const next = cloneState(state);
+  let next = cloneState(state);
   if (command === 'browser.navigate' && typeof payload === 'object' && payload !== null) {
     const url = (payload as { url?: unknown }).url;
     if (typeof url === 'string' && url.length > 0) {
@@ -148,7 +274,84 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
         total: null
       }
     };
+    next.analysis = initialState.analysis;
     next.statusMessage = 'Mock Local Knowledge loaded.';
+  } else if (command === 'analysis.selectBaseData') {
+    next.analysis = {
+      ...next.analysis,
+      inputs: { ...next.analysis.inputs, baseDataReady: true },
+      conflict: null,
+      runtimeComparison: null,
+      diagnostics: []
+    };
+    next.statusMessage = 'Mock base Data/Config folder selected.';
+  } else if (command === 'analysis.selectRuntimeLogs') {
+    next.analysis = {
+      ...next.analysis,
+      inputs: { ...next.analysis.inputs, runtimeLogsReady: true },
+      runtimeComparison: null,
+      diagnostics: []
+    };
+    next.statusMessage = 'Mock runtime logs folder selected.';
+  } else if (command === 'analysis.analyzeConflicts') {
+    if (next.analysis.inputs.baseDataReady) {
+      next.analysis = {
+        ...next.analysis,
+        conflict: mockAnalysisForFixture().conflict,
+        operation: { kind: 'idle', isBusy: false },
+        diagnostics: []
+      };
+      next.statusMessage = 'Mock conflict analysis completed.';
+    } else {
+      next.statusMessage = 'Select a base Data/Config folder first.';
+    }
+  } else if (command === 'analysis.compareRuntimeEvidence') {
+    if (next.analysis.inputs.baseDataReady && next.analysis.inputs.runtimeLogsReady) {
+      const analysis = mockAnalysisForFixture();
+      const versions = typeof payload === 'object' && payload !== null
+        ? payload as { toolVersion?: unknown; gameVersion?: unknown }
+        : {};
+      next.analysis = {
+        ...next.analysis,
+        runtimeComparison: {
+          ...analysis.runtimeComparison!,
+          runtimeEvidence: {
+            ...analysis.runtimeComparison!.runtimeEvidence,
+            toolVersion: typeof versions.toolVersion === 'string' && versions.toolVersion.length > 0
+              ? versions.toolVersion
+              : null,
+            gameVersion: typeof versions.gameVersion === 'string' && versions.gameVersion.length > 0
+              ? versions.gameVersion
+              : null
+          }
+        },
+        operation: { kind: 'idle', isBusy: false },
+        diagnostics: []
+      };
+      next.statusMessage = 'Mock runtime evidence comparison completed.';
+    } else {
+      next.statusMessage = 'Select both analysis input folders first.';
+    }
+  } else if (command === 'analysis.useFixture') {
+    const fixtureState = mockStateForCommand(next, 'knowledge.useFixture', {});
+    next = fixtureState;
+    next.identity = { candidateIdentity: 'Alpha Mod', selectedLocalModKey: 'Alpha Mod' };
+    next.localContext = {
+      candidateIdentity: 'Alpha Mod',
+      status: 'installed',
+      instanceName: 'synthetic-instance',
+      profileName: 'default',
+      localModKey: 'Alpha Mod',
+      directoryName: 'Alpha Mod',
+      enabledState: 'enabled',
+      priority: 0,
+      knownVersion: '1.2.3',
+      evidence: [{ kind: 'profileModlist', source: { kind: 'profileFile', relativePath: 'profile/modlist.txt' } }],
+      uncertainties: [],
+      diagnostics: []
+    };
+    next.analysis = mockAnalysisForFixture();
+    next.statusMessage = 'Mock Phase6 analysis fixture loaded.';
   } else if (command === 'knowledge.switchProfile' && typeof payload === 'object' && payload !== null) {
     const profileName = (payload as { profileName?: unknown }).profileName;
     if (typeof profileName === 'string' && profileName.length > 0 && next.knowledge.session) {
@@ -164,6 +367,7 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
       next.identity = { candidateIdentity: '', selectedLocalModKey: null };
       next.localContext = null;
       next.inspector = null;
+      next.analysis = initialState.analysis;
       next.statusMessage = 'Mock profile switched.';
     }
   } else if (command === 'layout.setContextVisible' && typeof payload === 'object' && payload !== null) {
