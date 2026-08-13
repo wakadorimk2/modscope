@@ -350,9 +350,19 @@ Query semanticsはsynthetic fixtureで再現可能に検証します。
 実MO2のread-only統合確認は、source load、profile projection、page observation、Local context、Inspectorを対象にしました。
 Site Adapter、agent transport、Compare UI、Runtime evidence、MO2 writeはPhase 3外として保留します。
 
-### Phase 4：Semantic conflict
+### Phase 4：Semantic conflict（完了）
 
-patch semantics、priority、operation sequence、effective resultを解析します。
+Phase 4では、active profileのenabled MODを、target XMLとXPathごとに解析します。
+priority sequenceは`0→N`で表示し、実ゲーム上の勝者方向は未検証のinferenceとして扱います。
+
+`Data/Config` directoryは入力で明示します。基準XMLはread-onlyで読み、結果には相対path、SHA-256、`GameDataFile` source referenceだけを残します。
+
+effective subsetは`set`、`setattribute`、`remove`、`removeattribute`、属性値への単純な`append`です。
+child fragment、`prepend`、`insertBefore`、`insertAfter`、`csv`、unknown operation、未評価XPathはunknownとして保持します。
+base XMLの欠落、parse失敗、XPath no matchもunknownです。
+
+Query layerの`AnalyzeConflicts`は、target XML、XPath、limitでread modelを絞れます。
+Desktop、Web、Runtime evidence、MO2 write、完全なXML patch engineはPhase 4に含めません。
 
 ### Phase 5：Runtime evidence
 
