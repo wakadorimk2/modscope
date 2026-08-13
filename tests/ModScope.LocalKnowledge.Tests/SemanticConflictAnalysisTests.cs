@@ -16,6 +16,7 @@ public sealed class SemanticConflictAnalysisTests
         var group = FindGroup(analysis, "/items/item[@name='A']/@value");
 
         Assert.Equal(SemanticConflictAssessment.Conflict, group.Assessment);
+        Assert.Equal(SemanticConflictConfidence.High, group.Confidence);
         Assert.Equal(EffectiveResultStatus.Computed, group.EffectiveStatus);
         Assert.Equal(new[] { "First Mod", "Second Mod" }, group.OperationSequence.Select(operation => operation.ModKey));
         Assert.Equal(new int?[] { 0, 1 }, group.OperationSequence.Select(operation => operation.Priority));
@@ -32,6 +33,7 @@ public sealed class SemanticConflictAnalysisTests
 
         var sameValue = FindGroup(analysis, "/items/item[@name='C']/@value");
         Assert.Equal(SemanticConflictAssessment.Compatible, sameValue.Assessment);
+        Assert.Equal(SemanticConflictConfidence.High, sameValue.Confidence);
 
         var removeMutation = FindGroup(analysis, "/items/item[@name='B']");
         Assert.Equal(SemanticConflictAssessment.Conflict, removeMutation.Assessment);
@@ -56,6 +58,7 @@ public sealed class SemanticConflictAnalysisTests
         Assert.Equal(EffectiveResultStatus.Computed, append.EffectiveStatus);
         Assert.Equal("seed,first,second", append.EffectiveChanges[^1].AfterValue);
         Assert.Equal(SemanticConflictAssessment.Possible, append.Assessment);
+        Assert.Equal(SemanticConflictConfidence.Medium, append.Confidence);
 
         var multiple = FindGroup(analysis, "/items/item[@name='Many']/@tags");
         Assert.Equal(4, multiple.EffectiveChanges.Count);
@@ -69,12 +72,14 @@ public sealed class SemanticConflictAnalysisTests
 
         var childFragment = FindGroup(analysis, "/items");
         Assert.Equal(SemanticConflictAssessment.Unknown, childFragment.Assessment);
+        Assert.Equal(SemanticConflictConfidence.Unknown, childFragment.Confidence);
         Assert.Equal(EffectiveResultStatus.Unknown, childFragment.EffectiveStatus);
         Assert.Contains(childFragment.OperationSequence, operation => operation.HasChildElements);
 
         var unknownOperation = FindGroup(analysis, "/items/item[@name='A']");
         Assert.Contains(unknownOperation.OperationSequence, operation => operation.NormalizedKind is null);
         Assert.Equal(SemanticConflictAssessment.Unknown, unknownOperation.Assessment);
+        Assert.Equal(SemanticConflictConfidence.Unknown, unknownOperation.Confidence);
 
         Assert.Contains(analysis.Diagnostics, diagnostic => diagnostic.Code == "xml.malformed");
         Assert.Contains(analysis.Diagnostics, diagnostic => diagnostic.Code == "xml.dtd.blocked");

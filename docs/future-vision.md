@@ -354,6 +354,7 @@ Site Adapter、agent transport、Compare UI、Runtime evidence、MO2 writeはPha
 
 Phase 4では、active profileのenabled MODを、target XMLとXPathごとに解析します。
 priority sequenceは`0→N`で表示し、実ゲーム上の勝者方向は未検証のinferenceとして扱います。
+confidenceは、計算済みの`Compatible` / `Conflict`を`High`、`Possible`を`Medium`、`Unknown`または未評価を`Unknown`として表します。
 
 `Data/Config` directoryは入力で明示します。基準XMLはread-onlyで読み、結果には相対path、SHA-256、`GameDataFile` source referenceだけを残します。
 

@@ -808,6 +808,7 @@ Phase 3完了判定メモ（2026-08-13）：
 
 - `SevenDaysToDieBaseDataSource`が、明示された7DTD `Data/Config` directoryをread-onlyで読みます。
 - `SevenDaysToDieConflictAnalyzer`が、profile priorityの`0→N`順でoperation sequenceを作ります。
+- semantic conflict groupの`confidence`は、計算済みの`Compatible` / `Conflict`を`High`、`Possible`を`Medium`、`Unknown`または未評価を`Unknown`として返します。
 - priorityの実ゲーム上の勝者方向は確定せず、`inference`とuncertaintyとして保持します。
 - 基準XMLの結果は相対path、SHA-256、`GameDataFile` source referenceで保持します。absolute pathは結果へ出しません。
 - `set`、`setattribute`、`remove`、`removeattribute`、属性値への単純な`append`をeffective subsetとして評価します。

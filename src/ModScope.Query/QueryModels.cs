@@ -112,6 +112,13 @@ public enum QuerySemanticConflictAssessment
     Unknown
 }
 
+public enum QuerySemanticConflictConfidence
+{
+    High,
+    Medium,
+    Unknown
+}
+
 public enum QueryEffectiveResultStatus
 {
     Computed,
@@ -363,6 +370,7 @@ public sealed record SemanticConflictGroupReadModel(
     string? TargetXml,
     string? XPath,
     QuerySemanticConflictAssessment Assessment,
+    QuerySemanticConflictConfidence Confidence,
     QueryEffectiveResultStatus EffectiveStatus,
     IReadOnlyList<SemanticConflictOperationReadModel> OperationSequence,
     IReadOnlyList<EffectiveChangeReadModel> EffectiveChanges,
