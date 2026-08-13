@@ -33,14 +33,12 @@ public sealed class RuntimeEvidenceQueryTests
         Assert.Equal(QuerySemanticConflictAssessment.Conflict, item.StaticAssessment);
         Assert.Equal(QuerySemanticConflictAssessment.Conflict, item.RuntimeAssessment);
         Assert.Equal("synthetic-runtime", result.RuntimeEvidence.ToolName);
-        Assert.Equal("raw-match", item.RuntimeObservations[0].RawResult);
-        Assert.Equal(QuerySourceReferenceKind.RuntimeLog, item.RuntimeObservations[0].RawLogReference.Kind);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "runtime.document.warning");
         Assert.Contains(item.Diagnostics, diagnostic => diagnostic.Code == "runtime.observation.warning");
-        Assert.DoesNotContain(
-            Path.GetFullPath(root),
-            JsonSerializer.Serialize(result),
-            StringComparison.Ordinal);
+        var serialized = JsonSerializer.Serialize(result);
+        Assert.DoesNotContain(Path.GetFullPath(root), serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("raw-match", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("runtime/runtime.log", serialized, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -71,6 +69,102 @@ public sealed class RuntimeEvidenceQueryTests
         Assert.Throws<InvalidOperationException>(() => unloaded.CompareRuntimeEvidence(
             baseData,
             CreateInput(session.SnapshotId)));
+    }
+
+    [Fact]
+    public void ComparesRuntimeOcdLogsWithCategoryFilterAndSafeProjection()
+    {
+        var root = FixtureRoot;
+        var query = LocalKnowledgeQueryService.CreateDefault();
+        var session = query.Load(new Mo2SourceInput(
+            "synthetic-instance",
+            "default",
+            root,
+            Path.Combine(root, "profile"),
+            Path.Combine(root, "mods")));
+        var logsRoot = Directory.CreateTempSubdirectory("modscope-runtime-ocd-query-");
+
+        try
+        {
+            var categoryDirectory = Directory.CreateDirectory(
+                Path.Combine(logsRoot.FullName, "ConflictDetector_(AO)_Attribute_Overrides"));
+            File.WriteAllText(
+                Path.Combine(categoryDirectory.FullName, "synthetic.txt"),
+                "Runtime Mod added a property\n       Source <set xpath=\"/items/item[@name='A']/@value\" ...");
+
+            var result = query.CompareRuntimeOcdEvidence(
+                new SevenDaysToDieBaseDataInput(Path.Combine(root, "base", "Data", "Config")),
+                new RuntimeOcdEvidenceInput(
+                    session.SnapshotId,
+                    logsRoot.FullName,
+                    "0.15.2",
+                    "2.5",
+                    new DateTimeOffset(2026, 8, 13, 12, 0, 0, TimeSpan.Zero)),
+                new RuntimeEvidenceComparisonQuery(
+                    ObservedCategory: "AO",
+                    Limit: 1));
+
+            var item = Assert.Single(result.Items);
+            Assert.Equal(QueryRuntimeEvidenceComparisonStatus.Unknown, item.Status);
+            var observation = Assert.Single(item.RuntimeObservations);
+            Assert.Equal("AO", observation.ObservedCategory);
+            Assert.Equal("set", observation.ObservedOperation);
+            Assert.Equal("Runtime Mod", observation.ModKey);
+
+            var serialized = JsonSerializer.Serialize(result);
+            Assert.DoesNotContain(logsRoot.FullName, serialized, StringComparison.Ordinal);
+            Assert.DoesNotContain("Source <set", serialized, StringComparison.Ordinal);
+            Assert.DoesNotContain("Runtime Mod added a property", serialized, StringComparison.Ordinal);
+
+            var empty = query.CompareRuntimeOcdEvidence(
+                new SevenDaysToDieBaseDataInput(Path.Combine(root, "base", "Data", "Config")),
+                new RuntimeOcdEvidenceInput(
+                    session.SnapshotId,
+                    logsRoot.FullName,
+                    "0.15.2",
+                    "2.5",
+                    new DateTimeOffset(2026, 8, 13, 12, 0, 0, TimeSpan.Zero)),
+                new RuntimeEvidenceComparisonQuery(Limit: 0));
+            Assert.Empty(empty.Items);
+        }
+        finally
+        {
+            logsRoot.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void RequiresLoadedMatchingSnapshotBeforeReadingRuntimeOcdLogs()
+    {
+        var root = FixtureRoot;
+        var baseData = new SevenDaysToDieBaseDataInput(Path.Combine(root, "base", "Data", "Config"));
+        var query = LocalKnowledgeQueryService.CreateDefault();
+        var session = query.Load(new Mo2SourceInput(
+            "synthetic-instance",
+            "default",
+            root,
+            Path.Combine(root, "profile"),
+            Path.Combine(root, "mods")));
+        var missingLogsPath = Path.Combine(root, "not-a-runtime-ocd-log-directory");
+
+        Assert.Throws<ArgumentException>(() => query.CompareRuntimeOcdEvidence(
+            baseData,
+            new RuntimeOcdEvidenceInput(
+                "different-snapshot",
+                missingLogsPath,
+                "0.15.2",
+                "2.5",
+                DateTimeOffset.UtcNow)));
+
+        var unloaded = LocalKnowledgeQueryService.CreateDefault();
+        Assert.Throws<InvalidOperationException>(() => unloaded.CompareRuntimeOcdEvidence(
+            baseData,
+            new RuntimeOcdEvidenceInput(
+                session.SnapshotId,
+                missingLogsPath,
+                "0.15.2",
+                "2.5",
+                DateTimeOffset.UtcNow)));
     }
 
     private static RuntimeEvidenceInput CreateInput(string snapshotId)

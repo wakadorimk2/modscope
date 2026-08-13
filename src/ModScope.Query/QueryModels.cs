@@ -131,6 +131,8 @@ public enum QueryRuntimeEvidenceComparisonStatus
 {
     Match,
     Different,
+    InferredMatch,
+    InferredDifferent,
     RuntimeOnly,
     StaticOnly,
     Unknown
@@ -338,7 +340,8 @@ public sealed record RuntimeEvidenceObservationInput(
     string RawResult,
     QuerySemanticConflictAssessment? NormalizedAssessment,
     SourceReferenceReadModel RawLogReference,
-    IReadOnlyList<DiagnosticReadModel>? Diagnostics = null)
+    IReadOnlyList<DiagnosticReadModel>? Diagnostics = null,
+    string? ObservedCategory = null)
 {
     public RuntimeEvidenceObservationInput(
         string? modKey,
@@ -348,7 +351,8 @@ public sealed record RuntimeEvidenceObservationInput(
         string rawResult,
         QuerySemanticConflictAssessment? normalizedAssessment,
         string rawLogRelativePath,
-        IReadOnlyList<DiagnosticReadModel>? diagnostics = null)
+        IReadOnlyList<DiagnosticReadModel>? diagnostics = null,
+        string? observedCategory = null)
         : this(
             modKey,
             targetXml,
@@ -357,7 +361,8 @@ public sealed record RuntimeEvidenceObservationInput(
             rawResult,
             normalizedAssessment,
             new SourceReferenceReadModel(QuerySourceReferenceKind.RuntimeLog, rawLogRelativePath),
-            diagnostics)
+            diagnostics,
+            observedCategory)
     {
     }
 }
@@ -379,11 +384,22 @@ public sealed record ConflictAnalysisQuery(
     string? XPath = null,
     int? Limit = null);
 
+public sealed record RuntimeOcdEvidenceInput(
+    string SnapshotId,
+    string RuntimeOcdLogsPath,
+    string? ToolVersion,
+    string? GameVersion,
+    DateTimeOffset CapturedAtUtc)
+{
+    public DateTimeOffset CaptureTimeUtc => CapturedAtUtc;
+}
+
 public sealed record RuntimeEvidenceComparisonQuery(
     string? TargetXml = null,
     string? XPath = null,
     QueryRuntimeEvidenceComparisonStatus? Status = null,
-    int? Limit = null);
+    int? Limit = null,
+    string? ObservedCategory = null);
 
 public sealed record BaseDataFileReadModel(
     string TargetXml,
@@ -459,14 +475,11 @@ public sealed record RuntimeEvidenceObservationReadModel(
     string? TargetXml,
     string? XPath,
     string? ObservedOperation,
-    string RawResult,
+    string? ObservedCategory,
     QuerySemanticConflictAssessment? NormalizedAssessment,
-    SourceReferenceReadModel RawLogReference,
     IReadOnlyList<DiagnosticReadModel> Diagnostics)
 {
     public string? ModIdentity => ModKey;
-
-    public string ObservedResult => RawResult;
 }
 
 public sealed record RuntimeEvidenceReadModel(

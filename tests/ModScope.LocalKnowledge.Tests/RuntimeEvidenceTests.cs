@@ -64,6 +64,57 @@ public sealed class RuntimeEvidenceTests
     }
 
     [Fact]
+    public void DistinguishesInferredMatchAndInferredDifferentResults()
+    {
+        var snapshot = ReadFixture();
+        var analysis = Analyze(snapshot);
+        var group = analysis.Groups.FirstOrDefault(candidate =>
+            candidate.TargetXml is not null
+            && candidate.XPath is not null
+            && candidate.Assessment != SemanticConflictAssessment.Unknown)
+            ?? throw new InvalidOperationException("The fixture must contain a known static conflict group.");
+        var source = new SourceReference(SourceReferenceKind.RuntimeLog, "runtime/runtime.log", 2);
+
+        RuntimeEvidenceComparison CompareWith(SemanticConflictAssessment assessment)
+        {
+            return RuntimeEvidenceComparison.Compare(
+                analysis,
+                new RuntimeEvidenceDocument(
+                    new RuntimeEvidenceBinding(snapshot.SnapshotId, snapshot.InstanceName, snapshot.ProfileName),
+                    "synthetic-runtime",
+                    "0.1",
+                    "2.5",
+                    DateTimeOffset.UtcNow,
+                    new[]
+                    {
+                        new RuntimeEvidenceObservation(
+                            "Synthetic Mod",
+                            group.TargetXml,
+                            group.XPath,
+                            "set",
+                            "inferred",
+                            assessment,
+                            source,
+                            new[]
+                            {
+                                new Diagnostic(
+                                    "runtime.targetxml.inferred",
+                                    DiagnosticSeverity.Info,
+                                    "Synthetic target XML inference.",
+                                    source)
+                            })
+                    },
+                    Array.Empty<Diagnostic>()));
+        }
+
+        Assert.Equal(RuntimeEvidenceComparisonStatus.InferredMatch, Find(CompareWith(group.Assessment), group).Status);
+        var differentAssessment = group.Assessment == SemanticConflictAssessment.Conflict
+            ? SemanticConflictAssessment.Compatible
+            : SemanticConflictAssessment.Conflict;
+        Assert.Equal(RuntimeEvidenceComparisonStatus.InferredDifferent, Find(CompareWith(differentAssessment), group).Status);
+    }
+
+    [Fact]
     public void KeepsDuplicateObservationsAndReportsMissingOrConflictingAssessments()
     {
         var snapshot = ReadFixture();

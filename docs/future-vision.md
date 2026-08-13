@@ -298,12 +298,29 @@ raw resultとruntime evidenceをstatic evidenceから分離します。
 assessmentが不足するruntime observationと、重複keyの食い違うassessmentは`Unknown`として保持します。
 Query APIは現在のsnapshotと一致するexplicit snapshotだけを受け付けます。
 
-Phase 5-Bでは、公開schema、license、anonymous sample log、tool versionとgame versionの取得方法を確認できた外部Runtime Adapterだけを追加します。
-RuntimeOCDのschemaが確認できない場合は、RuntimeOCD Adapterを追加しません。
+Phase 5-Bでは、Runtime comparisonだけを対象にしたLocal-only RuntimeOCD Adapterを追加します。
 
-2026-08-13時点のGate確認では、手元のRuntimeOCD 0.15.2からtool versionだけを確認できました。
-version-specificなlog schema、parser配布条件、匿名sample log、game version取得方法は未確認です。
-この状態では、RuntimeOCD Adapterを作成せず、Phase 5-Aのstatic-only境界を維持します。
+DL、導入、初回セットアップ、UI、Desktop、MO2 write、RuntimeOCD本体の再配布は対象外です。
+ModScopeはRuntimeOCDのバイナリまたはソースを同梱しません。公開ソースは挙動確認の根拠だけに使います。
+
+RuntimeOCD 0.15.2の手元ログでは、カテゴリdirectory、説明行、直後の`Source`行を確認しました。
+Adapterはこの限定的なrecord形を独立実装します。正式schema互換性は主張しません。
+
+`ToolVersion`は`0.15.2`だけを通常対応とします。欠落または別versionはdiagnosticを保持し、comparison statusを`Unknown`にします。
+`GameVersion`はexplicit valueだけを使います。欠落時はdiagnosticを保持し、推測しません。
+
+カテゴリ`R`、`EO`、`SC`、`AO`、`FP`はoperationと分けて保持します。
+カテゴリから`NormalizedAssessment`へ自動変換しません。assessment不足は`Unknown`です。
+
+Target XMLがない場合は、正規化XPathに一致するstatic candidateが1件だけのときに限り推定します。
+候補が0件または複数件の場合は`Unknown`です。MOD identityだけでは推定しません。
+
+Query APIは、現在ロード中のsnapshotと一致するexplicit `SnapshotId`だけを受け付けます。
+raw resultとrelativeな`RuntimeLog` referenceはLocalKnowledgeだけに保持します。
+read modelへraw log本文、raw result、raw log reference、絶対pathを出しません。
+
+正式なversion-specific schema、anonymous sample log、game version取得方法は未確認として残します。
+この不足は、将来の正式RuntimeOCD distribution adapterを追加する前に解決する課題です。
 
 ## 11. Read / writeの将来境界
 
@@ -383,7 +400,7 @@ Desktop、Web、Runtime evidence、MO2 write、完全なXML patch engineはPhase
 ### Phase 5：Runtime evidence
 
 Phase 5-Aでは、中立runtime evidence契約を取り込み、static conflict resultとtarget XML + XPathで比較します。
-Phase 5-Bでは、公開schemaとlicenseを確認できた外部Runtime Adapterだけを追加します。
+Phase 5-Bでは、Runtime comparisonだけを対象にしたLocal-only RuntimeOCD Adapterを追加します。正式schema互換性、DL、導入、UI、MO2 write、RuntimeOCD本体の再配布は含めません。
 
 ### Phase 6：Workspace UIの拡張
 
