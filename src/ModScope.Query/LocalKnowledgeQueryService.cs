@@ -43,6 +43,12 @@ public interface ILocalKnowledgeQuery
         SevenDaysToDieBaseDataInput baseData,
         ConflictAnalysisQuery? query = null,
         CancellationToken cancellationToken = default);
+
+    RuntimeEvidenceComparisonReadModel CompareRuntimeEvidence(
+        SevenDaysToDieBaseDataInput baseData,
+        RuntimeEvidenceInput runtimeEvidence,
+        RuntimeEvidenceComparisonQuery? query = null,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
@@ -481,6 +487,204 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
         {
             Groups = filteredGroups.ToList().AsReadOnly()
         });
+    }
+
+    public RuntimeEvidenceComparisonReadModel CompareRuntimeEvidence(
+        SevenDaysToDieBaseDataInput baseData,
+        RuntimeEvidenceInput runtimeEvidence,
+        RuntimeEvidenceComparisonQuery? query = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(baseData);
+        ArgumentNullException.ThrowIfNull(runtimeEvidence);
+        query ??= new RuntimeEvidenceComparisonQuery();
+
+        if (query.Limit is < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                query.Limit,
+                "The runtime evidence comparison limit cannot be negative.");
+        }
+
+        var snapshot = RequireSnapshot();
+        if (query.TargetXml is not null && string.IsNullOrWhiteSpace(query.TargetXml))
+        {
+            throw new ArgumentException(
+                "The runtime evidence comparison target XML filter cannot be empty.",
+                nameof(query));
+        }
+
+        if (query.XPath is not null && string.IsNullOrWhiteSpace(query.XPath))
+        {
+            throw new ArgumentException(
+                "The runtime evidence comparison XPath filter cannot be empty.",
+                nameof(query));
+        }
+
+        var document = ToRuntimeEvidence(runtimeEvidence, snapshot);
+        RuntimeEvidenceComparison comparison;
+        if (query.Limit == 0)
+        {
+            comparison = RuntimeEvidenceComparison.Compare(
+                new SemanticConflictAnalysis(
+                    snapshot.SnapshotId,
+                    snapshot.InstanceName,
+                    snapshot.ProfileName,
+                    Array.Empty<BaseDataFileObservation>(),
+                    Array.Empty<SemanticConflictGroup>(),
+                    Array.Empty<Diagnostic>()),
+                document) with
+            {
+                Items = Array.Empty<RuntimeEvidenceComparisonItem>()
+            };
+        }
+        else
+        {
+            var analysis = SevenDaysToDieConflictAnalyzer.Analyze(
+                snapshot,
+                new SevenDaysToDieBaseDataSource(baseData.DataConfigPath),
+                cancellationToken);
+            comparison = RuntimeEvidenceComparison.Compare(analysis, document);
+        }
+
+        var targetFilter = query.TargetXml is null
+            ? null
+            : NormalizeConflictTarget(query.TargetXml);
+        var xpathFilter = query.XPath?.Trim();
+        var filteredItems = comparison.Items
+            .Where(item => targetFilter is null
+                || string.Equals(item.TargetXml, targetFilter, StringComparison.Ordinal))
+            .Where(item => xpathFilter is null
+                || string.Equals(item.XPath, xpathFilter, StringComparison.Ordinal));
+
+        if (query.Status is QueryRuntimeEvidenceComparisonStatus status)
+        {
+            filteredItems = filteredItems.Where(item =>
+                QueryProjection.MapRuntimeEvidenceComparisonStatus(item.Status) == status);
+        }
+
+        if (query.Limit is int limit)
+        {
+            filteredItems = filteredItems.Take(limit);
+        }
+
+        return QueryProjection.RuntimeEvidenceComparison(comparison with
+        {
+            Items = filteredItems.ToList().AsReadOnly()
+        });
+    }
+
+    private static RuntimeEvidenceDocument ToRuntimeEvidence(
+        RuntimeEvidenceInput input,
+        LocalModSnapshot snapshot)
+    {
+        if (string.IsNullOrWhiteSpace(input.SnapshotId))
+        {
+            throw new ArgumentException(
+                "Runtime evidence must include an explicit snapshot ID.",
+                nameof(input));
+        }
+
+        if (!string.Equals(input.SnapshotId, snapshot.SnapshotId, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Runtime evidence must reference the currently loaded snapshot.",
+                nameof(input));
+        }
+
+        ArgumentNullException.ThrowIfNull(input.Observations);
+        var observations = input.Observations
+            .Select(observation => new RuntimeEvidenceObservation(
+                observation.ModKey,
+                observation.TargetXml,
+                observation.XPath,
+                observation.ObservedOperation,
+                observation.RawResult,
+                observation.NormalizedAssessment is null
+                    ? null
+                    : ToLocalSemanticConflictAssessment(observation.NormalizedAssessment.Value),
+                ToLocalSourceReference(observation.RawLogReference),
+                (observation.Diagnostics ?? Array.Empty<DiagnosticReadModel>())
+                    .Select(ToLocalDiagnostic)
+                    .ToList()
+                    .AsReadOnly()))
+            .ToList()
+            .AsReadOnly();
+
+        var diagnostics = (input.Diagnostics ?? Array.Empty<DiagnosticReadModel>())
+            .Select(ToLocalDiagnostic)
+            .ToList()
+            .AsReadOnly();
+
+        return new RuntimeEvidenceDocument(
+            new RuntimeEvidenceBinding(
+                snapshot.SnapshotId,
+                snapshot.InstanceName,
+                snapshot.ProfileName),
+            input.ToolName,
+            input.ToolVersion,
+            input.GameVersion,
+            input.CapturedAtUtc,
+            observations,
+            diagnostics);
+    }
+
+    private static Diagnostic ToLocalDiagnostic(DiagnosticReadModel diagnostic)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostic);
+        return new Diagnostic(
+            diagnostic.Code,
+            diagnostic.Severity switch
+            {
+                QueryDiagnosticSeverity.Info => DiagnosticSeverity.Info,
+                QueryDiagnosticSeverity.Warning => DiagnosticSeverity.Warning,
+                QueryDiagnosticSeverity.Error => DiagnosticSeverity.Error,
+                _ => throw new ArgumentOutOfRangeException(nameof(diagnostic), diagnostic.Severity, null)
+            },
+            diagnostic.Message,
+            diagnostic.Source is null ? null : ToLocalSourceReference(diagnostic.Source),
+            diagnostic.RawValue);
+    }
+
+    private static SourceReference ToLocalSourceReference(SourceReferenceReadModel source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (string.IsNullOrWhiteSpace(source.RelativePath)
+            || Path.IsPathRooted(source.RelativePath))
+        {
+            throw new ArgumentException(
+                "Runtime evidence source references must use a non-empty relative path.",
+                nameof(source));
+        }
+
+        return new SourceReference(
+            source.Kind switch
+            {
+                QuerySourceReferenceKind.ProfileFile => SourceReferenceKind.ProfileFile,
+                QuerySourceReferenceKind.InstanceFile => SourceReferenceKind.InstanceFile,
+                QuerySourceReferenceKind.ModDirectory => SourceReferenceKind.ModDirectory,
+                QuerySourceReferenceKind.ModFile => SourceReferenceKind.ModFile,
+                QuerySourceReferenceKind.GameDataFile => SourceReferenceKind.GameDataFile,
+                QuerySourceReferenceKind.RuntimeLog => SourceReferenceKind.RuntimeLog,
+                _ => throw new ArgumentOutOfRangeException(nameof(source), source.Kind, null)
+            },
+            source.RelativePath,
+            source.LineNumber,
+            source.ColumnNumber);
+    }
+
+    private static SemanticConflictAssessment ToLocalSemanticConflictAssessment(
+        QuerySemanticConflictAssessment assessment)
+    {
+        return assessment switch
+        {
+            QuerySemanticConflictAssessment.Compatible => SemanticConflictAssessment.Compatible,
+            QuerySemanticConflictAssessment.Conflict => SemanticConflictAssessment.Conflict,
+            QuerySemanticConflictAssessment.Possible => SemanticConflictAssessment.Possible,
+            QuerySemanticConflictAssessment.Unknown => SemanticConflictAssessment.Unknown,
+            _ => throw new ArgumentOutOfRangeException(nameof(assessment), assessment, null)
+        };
     }
 
     private LocalModSnapshot RequireSnapshot()
@@ -1053,6 +1257,75 @@ internal static class QueryProjection
             Diagnostics(analysis.Diagnostics));
     }
 
+    public static RuntimeEvidenceObservationReadModel RuntimeEvidenceObservation(
+        ModScope.LocalKnowledge.RuntimeEvidenceObservation observation)
+    {
+        return new RuntimeEvidenceObservationReadModel(
+            observation.ModKey,
+            observation.TargetXml,
+            observation.XPath,
+            observation.ObservedOperation,
+            observation.RawResult,
+            observation.NormalizedAssessment is null
+                ? null
+                : MapSemanticConflictAssessment(observation.NormalizedAssessment.Value),
+            Source(observation.RawLogReference),
+            Diagnostics(observation.Diagnostics));
+    }
+
+    public static RuntimeEvidenceReadModel RuntimeEvidence(
+        ModScope.LocalKnowledge.RuntimeEvidenceDocument runtimeEvidence)
+    {
+        return new RuntimeEvidenceReadModel(
+            runtimeEvidence.SnapshotId,
+            runtimeEvidence.InstanceName,
+            runtimeEvidence.ProfileName,
+            runtimeEvidence.ToolName,
+            runtimeEvidence.ToolVersion,
+            runtimeEvidence.GameVersion,
+            runtimeEvidence.CapturedAtUtc,
+            runtimeEvidence.Observations
+                .Select(RuntimeEvidenceObservation)
+                .ToList()
+                .AsReadOnly(),
+            Diagnostics(runtimeEvidence.Diagnostics));
+    }
+
+    public static RuntimeEvidenceComparisonItemReadModel RuntimeEvidenceComparisonItem(
+        ModScope.LocalKnowledge.RuntimeEvidenceComparisonItem item)
+    {
+        return new RuntimeEvidenceComparisonItemReadModel(
+            item.TargetXml,
+            item.XPath,
+            MapRuntimeEvidenceComparisonStatus(item.Status),
+            item.StaticAssessment is null
+                ? null
+                : MapSemanticConflictAssessment(item.StaticAssessment.Value),
+            item.RuntimeAssessment is null
+                ? null
+                : MapSemanticConflictAssessment(item.RuntimeAssessment.Value),
+            item.RuntimeObservations
+                .Select(RuntimeEvidenceObservation)
+                .ToList()
+                .AsReadOnly(),
+            Diagnostics(item.Diagnostics));
+    }
+
+    public static RuntimeEvidenceComparisonReadModel RuntimeEvidenceComparison(
+        ModScope.LocalKnowledge.RuntimeEvidenceComparison comparison)
+    {
+        return new RuntimeEvidenceComparisonReadModel(
+            comparison.SnapshotId,
+            comparison.InstanceName,
+            comparison.ProfileName,
+            RuntimeEvidence(comparison.RuntimeEvidence),
+            comparison.Items
+                .Select(RuntimeEvidenceComparisonItem)
+                .ToList()
+                .AsReadOnly(),
+            Diagnostics(comparison.Diagnostics));
+    }
+
     public static IReadOnlyList<DiagnosticReadModel> Diagnostics(IEnumerable<Diagnostic> diagnostics)
     {
         return diagnostics.Select(Diagnostic).ToList().AsReadOnly();
@@ -1084,6 +1357,7 @@ internal static class QueryProjection
                 SourceReferenceKind.ModDirectory => QuerySourceReferenceKind.ModDirectory,
                 SourceReferenceKind.ModFile => QuerySourceReferenceKind.ModFile,
                 SourceReferenceKind.GameDataFile => QuerySourceReferenceKind.GameDataFile,
+                SourceReferenceKind.RuntimeLog => QuerySourceReferenceKind.RuntimeLog,
                 _ => throw new ArgumentOutOfRangeException(nameof(source), source.Kind, null)
             },
             source.RelativePath,
@@ -1178,6 +1452,20 @@ internal static class QueryProjection
             EffectiveResultStatus.Computed => QueryEffectiveResultStatus.Computed,
             EffectiveResultStatus.Unknown => QueryEffectiveResultStatus.Unknown,
             EffectiveResultStatus.NotAssessed => QueryEffectiveResultStatus.NotAssessed,
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
+        };
+    }
+
+    public static QueryRuntimeEvidenceComparisonStatus MapRuntimeEvidenceComparisonStatus(
+        RuntimeEvidenceComparisonStatus status)
+    {
+        return status switch
+        {
+            RuntimeEvidenceComparisonStatus.Match => QueryRuntimeEvidenceComparisonStatus.Match,
+            RuntimeEvidenceComparisonStatus.Different => QueryRuntimeEvidenceComparisonStatus.Different,
+            RuntimeEvidenceComparisonStatus.RuntimeOnly => QueryRuntimeEvidenceComparisonStatus.RuntimeOnly,
+            RuntimeEvidenceComparisonStatus.StaticOnly => QueryRuntimeEvidenceComparisonStatus.StaticOnly,
+            RuntimeEvidenceComparisonStatus.Unknown => QueryRuntimeEvidenceComparisonStatus.Unknown,
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
         };
     }

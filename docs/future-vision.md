@@ -290,6 +290,17 @@ Runtime Adapterは、license、公開仕様、input、output、ログ形式を�
 
 static evidenceとruntime evidenceを比較します。差異はinferenceまたはdiagnosticとして追跡します。
 
+Phase 5-Aでは、外部toolに依存しないruntime evidence契約を追加します。
+runtime evidenceは、tool、version、game version、capture time、explicit snapshot、MOD identity、target XML、XPath、observed operationまたはresult、raw log reference、diagnosticを保持します。
+raw resultとruntime evidenceをstatic evidenceから分離します。
+比較keyは正規化したtarget XML + XPathです。
+比較結果は`Match`、`Different`、`RuntimeOnly`、`StaticOnly`、`Unknown`です。
+assessmentが不足するruntime observationと、重複keyの食い違うassessmentは`Unknown`として保持します。
+Query APIは現在のsnapshotと一致するexplicit snapshotだけを受け付けます。
+
+Phase 5-Bでは、公開schema、license、anonymous sample log、tool versionとgame versionの取得方法を確認できた外部Runtime Adapterだけを追加します。
+RuntimeOCDのschemaが確認できない場合は、RuntimeOCD Adapterを追加しません。
+
 ## 11. Read / writeの将来境界
 
 Read planeは、MO2 source、snapshot、Local Mod Knowledge、query、Inspector、analysisを扱います。
@@ -367,7 +378,8 @@ Desktop、Web、Runtime evidence、MO2 write、完全なXML patch engineはPhase
 
 ### Phase 5：Runtime evidence
 
-外部runtime resultを取り込み、static resultと比較します。
+Phase 5-Aでは、中立runtime evidence契約を取り込み、static conflict resultとtarget XML + XPathで比較します。
+Phase 5-Bでは、公開schemaとlicenseを確認できた外部Runtime Adapterだけを追加します。
 
 ### Phase 6：Workspace UIの拡張
 
@@ -393,6 +405,7 @@ ModScopeは、次の状態を目指します。
 - unknownとinferenceをverified factと区別できる
 - file overlapとsemantic conflictを区別できる
 - static evidenceとruntime evidenceを比較できる
+- raw runtime result、relative raw log reference、explicit snapshot binding、comparison diagnosticを保持できる
 - GUIがquery layerの派生データだけを利用する
 - write planeがread planeから分離されている
 - 必要なときだけSite AdapterとGame Adapterを追加できる
