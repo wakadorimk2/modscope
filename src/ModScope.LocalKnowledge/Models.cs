@@ -136,7 +136,8 @@ public enum SourceReferenceKind
     InstanceFile,
     ModDirectory,
     ModFile,
-    GameDataFile
+    GameDataFile,
+    RuntimeLog
 }
 
 public enum XmlParseStatus

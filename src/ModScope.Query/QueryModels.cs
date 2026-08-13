@@ -54,7 +54,8 @@ public enum QuerySourceReferenceKind
     InstanceFile,
     ModDirectory,
     ModFile,
-    GameDataFile
+    GameDataFile,
+    RuntimeLog
 }
 
 public enum QueryXmlParseStatus
@@ -124,6 +125,15 @@ public enum QueryEffectiveResultStatus
     Computed,
     Unknown,
     NotAssessed
+}
+
+public enum QueryRuntimeEvidenceComparisonStatus
+{
+    Match,
+    Different,
+    RuntimeOnly,
+    StaticOnly,
+    Unknown
 }
 
 public sealed record KnowledgeReferenceQuery(
@@ -320,9 +330,59 @@ public sealed record SevenDaysToDieBaseDataInput(string DataConfigPath)
     public string DataConfigDirectory => DataConfigPath;
 }
 
+public sealed record RuntimeEvidenceObservationInput(
+    string? ModKey,
+    string? TargetXml,
+    string? XPath,
+    string? ObservedOperation,
+    string RawResult,
+    QuerySemanticConflictAssessment? NormalizedAssessment,
+    SourceReferenceReadModel RawLogReference,
+    IReadOnlyList<DiagnosticReadModel>? Diagnostics = null)
+{
+    public RuntimeEvidenceObservationInput(
+        string? modKey,
+        string? targetXml,
+        string? xpath,
+        string? observedOperation,
+        string rawResult,
+        QuerySemanticConflictAssessment? normalizedAssessment,
+        string rawLogRelativePath,
+        IReadOnlyList<DiagnosticReadModel>? diagnostics = null)
+        : this(
+            modKey,
+            targetXml,
+            xpath,
+            observedOperation,
+            rawResult,
+            normalizedAssessment,
+            new SourceReferenceReadModel(QuerySourceReferenceKind.RuntimeLog, rawLogRelativePath),
+            diagnostics)
+    {
+    }
+}
+
+public sealed record RuntimeEvidenceInput(
+    string SnapshotId,
+    string ToolName,
+    string? ToolVersion,
+    string? GameVersion,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<RuntimeEvidenceObservationInput> Observations,
+    IReadOnlyList<DiagnosticReadModel>? Diagnostics = null)
+{
+    public DateTimeOffset CaptureTimeUtc => CapturedAtUtc;
+}
+
 public sealed record ConflictAnalysisQuery(
     string? TargetXml = null,
     string? XPath = null,
+    int? Limit = null);
+
+public sealed record RuntimeEvidenceComparisonQuery(
+    string? TargetXml = null,
+    string? XPath = null,
+    QueryRuntimeEvidenceComparisonStatus? Status = null,
     int? Limit = null);
 
 public sealed record BaseDataFileReadModel(
@@ -392,6 +452,62 @@ public sealed record ConflictAnalysisReadModel(
     public IReadOnlyList<BaseDataFileReadModel> BaseDataFiles => BaseFiles;
 
     public IReadOnlyList<SemanticConflictGroupReadModel> OperationGroups => Groups;
+}
+
+public sealed record RuntimeEvidenceObservationReadModel(
+    string? ModKey,
+    string? TargetXml,
+    string? XPath,
+    string? ObservedOperation,
+    string RawResult,
+    QuerySemanticConflictAssessment? NormalizedAssessment,
+    SourceReferenceReadModel RawLogReference,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public string? ModIdentity => ModKey;
+
+    public string ObservedResult => RawResult;
+}
+
+public sealed record RuntimeEvidenceReadModel(
+    string SnapshotId,
+    string InstanceName,
+    string ProfileName,
+    string ToolName,
+    string? ToolVersion,
+    string? GameVersion,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<RuntimeEvidenceObservationReadModel> Observations,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public string EvidenceSource => ToolName;
+
+    public DateTimeOffset CaptureTimeUtc => CapturedAtUtc;
+
+    public IReadOnlyList<RuntimeEvidenceObservationReadModel> Results => Observations;
+}
+
+public sealed record RuntimeEvidenceComparisonItemReadModel(
+    string? TargetXml,
+    string? XPath,
+    QueryRuntimeEvidenceComparisonStatus Status,
+    QuerySemanticConflictAssessment? StaticAssessment,
+    QuerySemanticConflictAssessment? RuntimeAssessment,
+    IReadOnlyList<RuntimeEvidenceObservationReadModel> RuntimeObservations,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public IReadOnlyList<RuntimeEvidenceObservationReadModel> Observations => RuntimeObservations;
+}
+
+public sealed record RuntimeEvidenceComparisonReadModel(
+    string SnapshotId,
+    string InstanceName,
+    string ProfileName,
+    RuntimeEvidenceReadModel RuntimeEvidence,
+    IReadOnlyList<RuntimeEvidenceComparisonItemReadModel> Items,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public IReadOnlyList<RuntimeEvidenceComparisonItemReadModel> Results => Items;
 }
 
 public sealed record XmlXPathCandidateReadModel(

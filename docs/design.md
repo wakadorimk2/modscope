@@ -524,6 +524,31 @@ Runtime Adapterは、ライセンス、公開仕様、入力形式、出力形�
 
 static evidenceとruntime evidenceは混ぜません。比較結果はinferenceまたはdiagnosticとして扱います。
 
+### 13.1 Phase 5-A：中立runtime evidence契約
+
+2026-08-13のPhase 5-Aでは、外部runtime toolに依存しない契約と比較処理を追加します。
+
+- `RuntimeEvidenceDocument`は、tool name、tool version、game version、capture time、explicit `SnapshotId`、profile、observations、diagnosticsを保持します。
+- `RuntimeEvidenceObservation`は、MOD identity、target XML、XPath、observed operation、raw result、raw log referenceを保持します。
+- raw resultは必ず保持します。normalized assessmentは、Adapterが根拠付きで変換できる場合だけ保持します。
+- raw log referenceは相対pathの`RuntimeLog` source referenceで保持します。raw log本文とabsolute pathはread modelへ出しません。
+- 比較keyは正規化したtarget XMLとXPathです。MOD identityだけでstatic groupへ結び付けません。
+- 比較結果は`Match`、`Different`、`RuntimeOnly`、`StaticOnly`、`Unknown`です。
+- normalized assessmentが不足する場合、または同じkeyのassessmentが食い違う場合は`Unknown`とdiagnosticを返します。
+- Query APIは、現在のsnapshotと一致するexplicit `SnapshotId`のruntime evidenceだけを受け付けます。
+- Phase 5-AはUI、MO2 write、永続storage、汎用runtime log parserを含めません。
+
+### 13.2 Phase 5-B：外部Runtime Adapterの条件
+
+RuntimeOCD Adapterは、次の情報を公開仕様または提供者の許可付き資料で確認できた場合だけ追加します。
+
+- version-specificなlog schema
+- licenseとparser配布条件
+- anonymous sample log
+- tool versionとgame versionの取得方法
+
+確認できない場合は、中立契約とsynthetic comparisonを維持します。RuntimeOCDのコードをコピーまたは再実装しません。
+
 ## 14. Read / write boundary
 
 ### Read plane
@@ -822,7 +847,9 @@ Phase 4の検証は、匿名synthetic fixtureで行います。solution test、b
 
 ### Phase 5：runtime evidence
 
-Runtime Adapterからruntime evidenceを取り込み、static evidenceと比較します。
+Phase 5-Aでは、中立runtime evidence契約を取り込み、Phase 4のstatic conflict groupとtarget XML + XPathで比較します。
+raw result、source reference、diagnosticを保持します。
+Phase 5-Bでは、公開schema、license、sample log、version情報を確認できた外部Runtime Adapterだけを追加します。
 
 ### Phase 6：Workspace UIの拡張
 
