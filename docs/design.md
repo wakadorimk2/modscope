@@ -540,27 +540,47 @@ static evidenceとruntime evidenceは混ぜません。比較結果はinference�
 
 ### 13.2 Phase 5-B：外部Runtime Adapterの条件
 
-RuntimeOCD Adapterは、次の情報を公開仕様または提供者の許可付き資料で確認できた場合だけ追加します。
+Phase 5-Bは、Runtime comparisonだけを扱います。DL、導入、初回セットアップ、UI、Desktop、MO2 write、RuntimeOCD本体の再配布は含めません。
+
+RuntimeOCD Adapterは、Local-only Gateで追加します。ModScopeは、RuntimeOCDのバイナリまたはソースを同梱しません。公開ソースは挙動確認の根拠だけに使います。GPLv3のコードはコピーしません。
+
+確認した公開資料は、[RuntimeOCD公式説明](https://community.thefunpimps.com/threads/runtimeocd.41946/)、[公開ソース](https://github.com/Aevum11/7DTD-RuntimeOCD)、[GPLv3 license](https://github.com/Aevum11/7DTD-RuntimeOCD/blob/main/COPYING)、[0.15.2変更履歴](https://github.com/7BytesToDie/mods/blob/main/RuntimeOCD/changelog.md)です。
+
+次のGate資料は未確認のままです。
 
 - version-specificなlog schema
 - licenseとparser配布条件
 - anonymous sample log
 - tool versionとgame versionの取得方法
 
-確認できない場合は、中立契約とsynthetic comparisonを維持します。RuntimeOCDのコードをコピーまたは再実装しません。
+この不足は、正式なRuntimeOCD schema互換性を主張しない理由として記録します。Local-only Adapterは、独立実装した限定parserとして扱います。
 
-#### 13.2.1 Gate確認結果（2026-08-13）
+#### 13.2.1 Local-only Adapterの契約
 
 手元に展開したRuntimeOCD 0.15.2の`ModInfo.xml`から、tool version `0.15.2`は確認できました。
-手元の配布物には、version-specificなlog schema、license、parser配布条件を示す資料はありませんでした。
-生成されたログは、カテゴリ別のtext fileと`Source`行を持ちますが、Target XMLを独立したfieldとして出力しません。
-公開説明はログの出力先と機能カテゴリを示しますが、version-specificなschemaとparser配布条件を示しません。[RuntimeOCD description](https://www.nexusmods.com/7daystodie/mods/6920?tab=description)
-匿名sample logと、game versionを信頼して取得する方法も確認できませんでした。
+手元の0.15.2ログでは、カテゴリ別directory、説明行、直後の`Source`行を確認しました。Target XMLは独立fieldとして出力されません。
 
-したがって、Phase 5-BのGateは未達です。
-RuntimeOCD AdapterとParserは追加しません。
-Phase 5-Aの中立runtime evidence契約、synthetic comparison、static-onlyの制約を維持します。
-資料が揃うまで、RuntimeOCDの実ログを製品read modelへ取り込みません。
+`RuntimeOcdImportRequest`は、explicit `SnapshotId`、explicit log directory、tool version、game version、capture timeを受け取ります。log directoryはread-onlyで読み取ります。絶対pathはdocument、diagnostic、read modelへ保存しません。
+
+`RuntimeOcdAdapter`は、説明行と直後の`Source`行を1 observationとして解析します。カテゴリは`R`、`EO`、`SC`、`AO`、`FP`を保持します。未知カテゴリ、未知operation、壊れたrecord、duplicate observationは破棄しません。
+
+`ToolVersion`は`0.15.2`だけを通常対応とします。欠落または別versionはdiagnosticを保持し、comparison statusを`Unknown`にします。`GameVersion`はexplicit valueを優先し、欠落時はdiagnosticだけを追加します。推測fallbackは使いません。
+
+RuntimeOCDカテゴリから`NormalizedAssessment`への自動変換は行いません。カテゴリは実害を直接意味しません。RuntimeOCDだけのassessment不足は`Unknown`として比較します。
+
+Target XMLがない場合は、正規化XPathに一致するstatic candidateが1件だけのときに限り推定します。推定時は`runtime.targetxml.inferred`を保持します。候補が0件または複数件の場合は`Unknown`です。MOD identityだけでは推定しません。
+
+`Match`、`Different`、`RuntimeOnly`、`StaticOnly`、`Unknown`に加え、推定targetを伴う一致または差異を`InferredMatch`、`InferredDifferent`で表します。assessmentが不足する場合は`Unknown`です。
+
+raw result、relativeな`RuntimeLog` reference、diagnosticはLocalKnowledgeに保持します。Query read modelは、category、operation、target、XPath、assessment、diagnosticだけを返します。raw log本文、raw result、raw log reference、絶対pathは返しません。
+
+Query APIは、現在ロード中のsnapshotと一致するexplicit `SnapshotId`だけを受け付けます。snapshot不一致を確認するまでlog pathへアクセスしません。既存のsynthetic `CompareRuntimeEvidence`は維持します。
+
+#### 13.2.2 Gate確認結果（2026-08-13）
+
+正式schema、anonymous sample log、game version取得方法は未確認です。したがって、RuntimeOCD 0.15.2の完全なschema互換性は未確定です。
+
+Local-only Adapterは、公開挙動と手元のsynthetic logで検証します。実ログはGitへ保存しません。RuntimeOCD本体の再実装と再配布は行いません。
 
 ## 14. Read / write boundary
 
@@ -862,7 +882,7 @@ Phase 4の検証は、匿名synthetic fixtureで行います。solution test、b
 
 Phase 5-Aでは、中立runtime evidence契約を取り込み、Phase 4のstatic conflict groupとtarget XML + XPathで比較します。
 raw result、source reference、diagnosticを保持します。
-Phase 5-Bでは、公開schema、license、sample log、version情報を確認できた外部Runtime Adapterだけを追加します。
+Phase 5-Bでは、Runtime comparisonだけを対象にしたLocal-only RuntimeOCD Adapterを追加します。正式schema互換性、DL、導入、UI、MO2 write、RuntimeOCD本体の再配布は含めません。
 
 ### Phase 6：Workspace UIの拡張
 

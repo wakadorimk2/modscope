@@ -35,7 +35,8 @@ public sealed record RuntimeEvidenceObservation(
     string RawResult,
     SemanticConflictAssessment? NormalizedAssessment,
     SourceReference RawLogReference,
-    IReadOnlyList<Diagnostic> Diagnostics)
+    IReadOnlyList<Diagnostic> Diagnostics,
+    string? ObservedCategory = null)
 {
     public string? ModIdentity => ModKey;
 
@@ -51,7 +52,8 @@ public sealed record RuntimeEvidenceObservation(
         string rawResult,
         SemanticConflictAssessment? normalizedAssessment,
         string rawLogRelativePath,
-        IReadOnlyList<Diagnostic>? diagnostics = null)
+        IReadOnlyList<Diagnostic>? diagnostics = null,
+        string? observedCategory = null)
         : this(
             modKey,
             targetXml,
@@ -60,7 +62,8 @@ public sealed record RuntimeEvidenceObservation(
             rawResult,
             normalizedAssessment,
             new SourceReference(SourceReferenceKind.RuntimeLog, rawLogRelativePath),
-            diagnostics ?? Array.Empty<Diagnostic>())
+            diagnostics ?? Array.Empty<Diagnostic>(),
+            observedCategory)
     {
     }
 }
@@ -69,6 +72,8 @@ public enum RuntimeEvidenceComparisonStatus
 {
     Match,
     Different,
+    InferredMatch,
+    InferredDifferent,
     RuntimeOnly,
     StaticOnly,
     Unknown
@@ -134,6 +139,7 @@ public sealed record RuntimeEvidenceComparison(
         var comparisonDiagnostics = runtimeEvidence.Diagnostics
             .Concat(staticAnalysis.Diagnostics)
             .ToList();
+        var blocksComparison = runtimeEvidence.Diagnostics.Any(IsBlockingComparisonDiagnostic);
         var items = new List<RuntimeEvidenceComparisonItem>(keys.Count);
 
         foreach (var key in keys)
@@ -156,6 +162,8 @@ public sealed record RuntimeEvidenceComparison(
                 observations.Count > 0,
                 staticAssessment,
                 runtimeAssessment,
+                blocksComparison,
+                observations,
                 itemDiagnostics);
 
             items.Add(new RuntimeEvidenceComparisonItem(
@@ -248,6 +256,8 @@ public sealed record RuntimeEvidenceComparison(
         bool hasRuntime,
         SemanticConflictAssessment? staticAssessment,
         SemanticConflictAssessment? runtimeAssessment,
+        bool blocksComparison,
+        IReadOnlyList<RuntimeEvidenceObservation> observations,
         ICollection<Diagnostic> diagnostics)
     {
         if (key.TargetXml is null || key.XPath is null)
@@ -256,6 +266,21 @@ public sealed record RuntimeEvidenceComparison(
                 "runtime.comparison.key.missing",
                 DiagnosticSeverity.Info,
                 "A target XML and XPath are required for runtime comparison."));
+            return RuntimeEvidenceComparisonStatus.Unknown;
+        }
+
+        if (blocksComparison)
+        {
+            return RuntimeEvidenceComparisonStatus.Unknown;
+        }
+
+        var hasInferredTarget = observations.Any(HasInferredTarget);
+        if (hasInferredTarget && observations.Any(observation => !HasInferredTarget(observation)))
+        {
+            diagnostics.Add(new Diagnostic(
+                "runtime.targetxml.mixed-resolution",
+                DiagnosticSeverity.Warning,
+                "Runtime observations with the same target and XPath mix inferred and explicit target XML values."));
             return RuntimeEvidenceComparisonStatus.Unknown;
         }
 
@@ -288,9 +313,30 @@ public sealed record RuntimeEvidenceComparison(
             return RuntimeEvidenceComparisonStatus.Unknown;
         }
 
+        if (hasInferredTarget)
+        {
+            return staticAssessment == runtimeAssessment
+                ? RuntimeEvidenceComparisonStatus.InferredMatch
+                : RuntimeEvidenceComparisonStatus.InferredDifferent;
+        }
+
         return staticAssessment == runtimeAssessment
             ? RuntimeEvidenceComparisonStatus.Match
             : RuntimeEvidenceComparisonStatus.Different;
+    }
+
+    private static bool HasInferredTarget(RuntimeEvidenceObservation observation)
+    {
+        return observation.Diagnostics.Any(diagnostic =>
+            string.Equals(diagnostic.Code, "runtime.targetxml.inferred", StringComparison.Ordinal));
+    }
+
+    private static bool IsBlockingComparisonDiagnostic(Diagnostic diagnostic)
+    {
+        return diagnostic.Code is
+            "runtime.ocd.logs.missing"
+            or "runtime.ocd.tool-version.missing"
+            or "runtime.ocd.tool-version.unsupported";
     }
 
     private static string? NormalizeTargetXml(string? value)
