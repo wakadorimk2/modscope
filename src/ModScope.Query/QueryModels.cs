@@ -53,7 +53,8 @@ public enum QuerySourceReferenceKind
     ProfileFile,
     InstanceFile,
     ModDirectory,
-    ModFile
+    ModFile,
+    GameDataFile
 }
 
 public enum QueryXmlParseStatus
@@ -103,6 +104,21 @@ public enum QueryXmlPatchOperationKind
     InsertAfter
 }
 
+public enum QuerySemanticConflictAssessment
+{
+    Compatible,
+    Conflict,
+    Possible,
+    Unknown
+}
+
+public enum QueryEffectiveResultStatus
+{
+    Computed,
+    Unknown,
+    NotAssessed
+}
+
 public sealed record KnowledgeReferenceQuery(
     KnowledgeQueryNodeKind NodeKind,
     string Value,
@@ -131,7 +147,10 @@ public sealed record XmlPatchOperationReadModel(
     IReadOnlyList<XmlReferenceCandidateReadModel> PropertyCandidates,
     IReadOnlyList<XmlReferenceCandidateReadModel> AttributeCandidates,
     IReadOnlyList<DiagnosticReadModel> Diagnostics,
-    SourceReferenceReadModel Source);
+    SourceReferenceReadModel Source)
+{
+    public bool HasChildElements => RawObservation.HasChildElements;
+}
 
 public sealed record ModReferenceContextReadModel(
     string ModKey,
@@ -284,7 +303,88 @@ public sealed record RawXmlObservationReadModel(
     string ElementName,
     IReadOnlyList<XmlAttributeObservationReadModel> Attributes,
     string? InnerText,
-    SourceReferenceReadModel Source);
+    SourceReferenceReadModel Source)
+{
+    public bool HasChildElements { get; init; }
+}
+
+public sealed record SevenDaysToDieBaseDataInput(string DataConfigPath)
+{
+    public string DataConfigDirectory => DataConfigPath;
+}
+
+public sealed record ConflictAnalysisQuery(
+    string? TargetXml = null,
+    string? XPath = null,
+    int? Limit = null);
+
+public sealed record BaseDataFileReadModel(
+    string TargetXml,
+    long Size,
+    string Sha256,
+    QueryXmlParseStatus? ParseStatus,
+    SourceReferenceReadModel Source,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+
+public sealed record SemanticConflictOperationReadModel(
+    string OperationKey,
+    string ModKey,
+    int? Priority,
+    string XmlFileRelativePath,
+    string ElementPath,
+    string RawOperationName,
+    QueryXmlPatchOperationKind? NormalizedKind,
+    string? TargetXml,
+    string? XPath,
+    string? AttributeName,
+    string? Value,
+    SourceReferenceReadModel Source,
+    IReadOnlyList<EvidenceReferenceReadModel> Evidence,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public bool HasChildElements { get; init; }
+}
+
+public sealed record EffectiveChangeReadModel(
+    string MatchPath,
+    string? AttributeName,
+    string? BeforeValue,
+    string? AfterValue,
+    bool ExistedBefore,
+    bool ExistsAfter,
+    SourceReferenceReadModel Source)
+{
+    public string? Before => BeforeValue;
+
+    public string? After => AfterValue;
+}
+
+public sealed record SemanticConflictGroupReadModel(
+    string? TargetXml,
+    string? XPath,
+    QuerySemanticConflictAssessment Assessment,
+    QueryEffectiveResultStatus EffectiveStatus,
+    IReadOnlyList<SemanticConflictOperationReadModel> OperationSequence,
+    IReadOnlyList<EffectiveChangeReadModel> EffectiveChanges,
+    IReadOnlyList<EvidenceReferenceReadModel> Evidence,
+    IReadOnlyList<string> Uncertainties,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public IReadOnlyList<SemanticConflictOperationReadModel> Operations => OperationSequence;
+}
+
+public sealed record ConflictAnalysisReadModel(
+    string SnapshotId,
+    string InstanceName,
+    string ProfileName,
+    IReadOnlyList<BaseDataFileReadModel> BaseFiles,
+    IReadOnlyList<SemanticConflictGroupReadModel> Groups,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public IReadOnlyList<BaseDataFileReadModel> BaseDataFiles => BaseFiles;
+
+    public IReadOnlyList<SemanticConflictGroupReadModel> OperationGroups => Groups;
+}
 
 public sealed record XmlXPathCandidateReadModel(
     string RawValue,

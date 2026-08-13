@@ -1,0 +1,2 @@
+<!DOCTYPE items [<!ENTITY external SYSTEM "file:///not/allowed">]>
+<items>&external;</items>

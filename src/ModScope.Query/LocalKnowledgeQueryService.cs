@@ -38,6 +38,11 @@ public interface ILocalKnowledgeQuery
 
     IReadOnlyList<KnowledgeReferenceReadModel> FindReferences(
         KnowledgeReferenceQuery query);
+
+    ConflictAnalysisReadModel AnalyzeConflicts(
+        SevenDaysToDieBaseDataInput baseData,
+        ConflictAnalysisQuery? query = null,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
@@ -411,6 +416,73 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
         return results.AsReadOnly();
     }
 
+    public ConflictAnalysisReadModel AnalyzeConflicts(
+        SevenDaysToDieBaseDataInput baseData,
+        ConflictAnalysisQuery? query = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(baseData);
+        query ??= new ConflictAnalysisQuery();
+
+        if (query.Limit is < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                query.Limit,
+                "The conflict analysis limit cannot be negative.");
+        }
+
+        var snapshot = RequireSnapshot();
+        if (query.TargetXml is not null && string.IsNullOrWhiteSpace(query.TargetXml))
+        {
+            throw new ArgumentException(
+                "The conflict analysis target XML filter cannot be empty.",
+                nameof(query));
+        }
+
+        if (query.XPath is not null && string.IsNullOrWhiteSpace(query.XPath))
+        {
+            throw new ArgumentException(
+                "The conflict analysis XPath filter cannot be empty.",
+                nameof(query));
+        }
+
+        if (query.Limit == 0)
+        {
+            return QueryProjection.ConflictAnalysis(new SemanticConflictAnalysis(
+                snapshot.SnapshotId,
+                snapshot.InstanceName,
+                snapshot.ProfileName,
+                Array.Empty<BaseDataFileObservation>(),
+                Array.Empty<SemanticConflictGroup>(),
+                Array.Empty<Diagnostic>()));
+        }
+
+        var analysis = SevenDaysToDieConflictAnalyzer.Analyze(
+            snapshot,
+            new SevenDaysToDieBaseDataSource(baseData.DataConfigPath),
+            cancellationToken);
+        var targetFilter = query.TargetXml is null
+            ? null
+            : NormalizeConflictTarget(query.TargetXml);
+        var xpathFilter = query.XPath?.Trim();
+        var filteredGroups = analysis.Groups
+            .Where(group => targetFilter is null
+                || string.Equals(group.TargetXml, targetFilter, StringComparison.Ordinal))
+            .Where(group => xpathFilter is null
+                || string.Equals(group.XPath, xpathFilter, StringComparison.Ordinal));
+
+        if (query.Limit is int limit)
+        {
+            filteredGroups = filteredGroups.Take(limit);
+        }
+
+        return QueryProjection.ConflictAnalysis(analysis with
+        {
+            Groups = filteredGroups.ToList().AsReadOnly()
+        });
+    }
+
     private LocalModSnapshot RequireSnapshot()
     {
         return _snapshot ?? throw new InvalidOperationException(
@@ -687,6 +759,26 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
         return $"mods/{directoryPath}/{normalizedFilePath}";
     }
 
+    private static string NormalizeConflictTarget(string value)
+    {
+        var normalized = value.Trim().Replace('\\', '/');
+        while (normalized.StartsWith("./", StringComparison.Ordinal))
+        {
+            normalized = normalized[2..];
+        }
+
+        if (normalized.StartsWith("Data/Config/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["Data/Config/".Length..];
+        }
+        else if (normalized.StartsWith("Config/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["Config/".Length..];
+        }
+
+        return normalized.TrimStart('/');
+    }
+
     private sealed class ReferenceLookup
     {
         public Dictionary<ReferenceNodeKey, LocalModRecord> NodeOwners { get; } = new();
@@ -881,7 +973,83 @@ internal static class QueryProjection
                 .ToList()
                 .AsReadOnly(),
             observation.InnerText,
-            Source(observation.Source));
+            Source(observation.Source))
+        {
+            HasChildElements = observation.HasChildElements
+        };
+    }
+
+    public static BaseDataFileReadModel BaseDataFile(BaseDataFileObservation file)
+    {
+        return new BaseDataFileReadModel(
+            file.TargetXml,
+            file.Size,
+            file.Sha256,
+            file.ParseStatus is null ? null : MapXmlParseStatus(file.ParseStatus.Value),
+            Source(file.Source),
+            Diagnostics(file.Diagnostics));
+    }
+
+    public static SemanticConflictOperationReadModel SemanticConflictOperation(
+        ModScope.LocalKnowledge.SemanticConflictOperation operation)
+    {
+        return new SemanticConflictOperationReadModel(
+            operation.OperationKey,
+            operation.ModKey,
+            operation.Priority,
+            operation.XmlFileRelativePath,
+            operation.ElementPath,
+            operation.RawOperationName,
+            operation.NormalizedKind is null ? null : MapPatchOperationKind(operation.NormalizedKind.Value),
+            operation.TargetXml,
+            operation.XPath,
+            operation.AttributeName,
+            operation.Value,
+            Source(operation.Source),
+            operation.Evidence.Select(Evidence).ToList().AsReadOnly(),
+            Diagnostics(operation.Diagnostics))
+        {
+            HasChildElements = operation.HasChildElements
+        };
+    }
+
+    public static EffectiveChangeReadModel EffectiveChange(EffectiveChange change)
+    {
+        return new EffectiveChangeReadModel(
+            change.MatchPath,
+            change.AttributeName,
+            change.BeforeValue,
+            change.AfterValue,
+            change.ExistedBefore,
+            change.ExistsAfter,
+            Source(change.Source));
+    }
+
+    public static SemanticConflictGroupReadModel SemanticConflictGroup(
+        ModScope.LocalKnowledge.SemanticConflictGroup group)
+    {
+        return new SemanticConflictGroupReadModel(
+            group.TargetXml,
+            group.XPath,
+            MapSemanticConflictAssessment(group.Assessment),
+            MapEffectiveResultStatus(group.EffectiveStatus),
+            group.OperationSequence.Select(SemanticConflictOperation).ToList().AsReadOnly(),
+            group.EffectiveChanges.Select(EffectiveChange).ToList().AsReadOnly(),
+            group.Evidence.Select(Evidence).ToList().AsReadOnly(),
+            group.Uncertainties,
+            Diagnostics(group.Diagnostics));
+    }
+
+    public static ConflictAnalysisReadModel ConflictAnalysis(
+        ModScope.LocalKnowledge.SemanticConflictAnalysis analysis)
+    {
+        return new ConflictAnalysisReadModel(
+            analysis.SnapshotId,
+            analysis.InstanceName,
+            analysis.ProfileName,
+            analysis.BaseFiles.Select(BaseDataFile).ToList().AsReadOnly(),
+            analysis.Groups.Select(SemanticConflictGroup).ToList().AsReadOnly(),
+            Diagnostics(analysis.Diagnostics));
     }
 
     public static IReadOnlyList<DiagnosticReadModel> Diagnostics(IEnumerable<Diagnostic> diagnostics)
@@ -914,6 +1082,7 @@ internal static class QueryProjection
                 SourceReferenceKind.InstanceFile => QuerySourceReferenceKind.InstanceFile,
                 SourceReferenceKind.ModDirectory => QuerySourceReferenceKind.ModDirectory,
                 SourceReferenceKind.ModFile => QuerySourceReferenceKind.ModFile,
+                SourceReferenceKind.GameDataFile => QuerySourceReferenceKind.GameDataFile,
                 _ => throw new ArgumentOutOfRangeException(nameof(source), source.Kind, null)
             },
             source.RelativePath,
@@ -972,6 +1141,31 @@ internal static class QueryProjection
             XmlPatchOperationKind.InsertBefore => QueryXmlPatchOperationKind.InsertBefore,
             XmlPatchOperationKind.InsertAfter => QueryXmlPatchOperationKind.InsertAfter,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
+        };
+    }
+
+    private static QuerySemanticConflictAssessment MapSemanticConflictAssessment(
+        SemanticConflictAssessment assessment)
+    {
+        return assessment switch
+        {
+            SemanticConflictAssessment.Compatible => QuerySemanticConflictAssessment.Compatible,
+            SemanticConflictAssessment.Conflict => QuerySemanticConflictAssessment.Conflict,
+            SemanticConflictAssessment.Possible => QuerySemanticConflictAssessment.Possible,
+            SemanticConflictAssessment.Unknown => QuerySemanticConflictAssessment.Unknown,
+            _ => throw new ArgumentOutOfRangeException(nameof(assessment), assessment, null)
+        };
+    }
+
+    private static QueryEffectiveResultStatus MapEffectiveResultStatus(
+        EffectiveResultStatus status)
+    {
+        return status switch
+        {
+            EffectiveResultStatus.Computed => QueryEffectiveResultStatus.Computed,
+            EffectiveResultStatus.Unknown => QueryEffectiveResultStatus.Unknown,
+            EffectiveResultStatus.NotAssessed => QueryEffectiveResultStatus.NotAssessed,
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
         };
     }
 
