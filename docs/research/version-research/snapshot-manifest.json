@@ -1,0 +1,88 @@
+{
+  "manifest_scope": "All files in this directory except snapshot-manifest.json",
+  "snapshot_id": "986c7a1d87c2",
+  "observed_at_utc": "2026-08-14T10:01:09Z",
+  "hash_algorithm": "SHA-256",
+  "files": [
+    {
+      "path": "collection-run.json",
+      "bytes": 428,
+      "sha256": "37371db3a44d636f60f52fd65b08d825751e07f34c72f2af1f843dc3a2cdca55"
+    },
+    {
+      "path": "confidence-model.md",
+      "bytes": 3228,
+      "sha256": "1e80aad59564f7dd8053122c0a003ad86104e5785914d5dedba6cbbc28349b8b"
+    },
+    {
+      "path": "consultation-brief.md",
+      "bytes": 7457,
+      "sha256": "6091db9952283342629f39b3989ca3c201148a99eec4fa45ef9a7c4216608f6d"
+    },
+    {
+      "path": "dataset.csv",
+      "bytes": 597837,
+      "sha256": "06834da5862b409e0e6bdb68e86256162986076dec514189bd63ce0886ba61bc"
+    },
+    {
+      "path": "dataset.json",
+      "bytes": 2263076,
+      "sha256": "9b8b0cb49e07f2748d1387b30b39b198075a830343a1acdd997787fa6fc2ba34"
+    },
+    {
+      "path": "findings.md",
+      "bytes": 2544,
+      "sha256": "1c98dc751018c6ff5d9aaaed876bd215e057190d9b1ad638a55340e35e1d0ce7"
+    },
+    {
+      "path": "mismatch-cases.md",
+      "bytes": 4123,
+      "sha256": "544fab3c56945218a00388fcd7b8911fdc7626f4f4e3bd0a0ee8665d950eb11d"
+    },
+    {
+      "path": "mo2-mtime-verification.json",
+      "bytes": 263,
+      "sha256": "2efe7f7436d17810416cfa7ab2080dac1c8b7b96aa6fb54cae7350138c3b8a6d"
+    },
+    {
+      "path": "README.md",
+      "bytes": 4214,
+      "sha256": "9cff2c3117c471f3e075c009609422459378c32a4a6d1ecff59731e729acb575"
+    },
+    {
+      "path": "sanitization-check.json",
+      "bytes": 43,
+      "sha256": "3e44d52f79f65ecc1041869bfd858651eb657ae4964888c615edcf165c7bd11f"
+    },
+    {
+      "path": "smorgasbord.modlists.json",
+      "bytes": 1458,
+      "sha256": "2be6c71fe36a20d68ed9ac29c39f51a09fc1586a1f11e19e5b8c1d72f018ce29"
+    },
+    {
+      "path": "smorgasbord.wabbajack.definition.json",
+      "bytes": 1023,
+      "sha256": "e4511acb55aa39b123b67fbc75055e2b1f1c73c8f86018bba3d27b5dcbe6592e"
+    },
+    {
+      "path": "smorgasbord.wabbajack.definition.json.gz",
+      "bytes": 359,
+      "sha256": "beb8f67774dc3248047e376e28139ed99eb3989632e89ea395f431e931292dc2"
+    },
+    {
+      "path": "smorgasbord.wj-index.json",
+      "bytes": 505,
+      "sha256": "89455eb45fb4642304ad643ab2d8ca0d36a506c84feac0d80e8b7746b21fd18c"
+    },
+    {
+      "path": "smorgasbord.wj-records.json",
+      "bytes": 187522,
+      "sha256": "e9b5999644ef53d2aeb76e5801fd2f0b58b9a550b54ca290ff6539c32ef41f19"
+    },
+    {
+      "path": "wj-fetch-status.json",
+      "bytes": 418,
+      "sha256": "cd836c7354a8b772203e48a9406fcfd6ba3f3fe4ae2b91157ccc668e888eedb4"
+    }
+  ]
+}

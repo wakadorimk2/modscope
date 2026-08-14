@@ -1,0 +1,3 @@
+# Preserve stable LF text and byte-level hashes for the pinned research snapshot.
+docs/research/version-research/** text eol=lf
+docs/research/version-research/*.gz -text
