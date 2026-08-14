@@ -1,0 +1,44 @@
+{
+  "Author": "github/Fluffernuttersandwich",
+  "Hash": "kHE22OOIOcM=",
+  "MungedName": "Smorgasbord.wabbajack_6cd41024-3dd9-4b83-81cd-f13d9f239466",
+  "OriginalFileName": "Smorgasbord.wabbajack",
+  "Parts": [
+    {
+      "Hash": "06vOtNej0sE=",
+      "Index": 0,
+      "Offset": 0,
+      "Size": 2097152
+    },
+    {
+      "Hash": "5vpwkFxbdlQ=",
+      "Index": 1,
+      "Offset": 2097152,
+      "Size": 2097152
+    },
+    {
+      "Hash": "YxU8G8S7bQY=",
+      "Index": 2,
+      "Offset": 4194304,
+      "Size": 2097152
+    },
+    {
+      "Hash": "Stp6/1az1aM=",
+      "Index": 3,
+      "Offset": 6291456,
+      "Size": 2097152
+    },
+    {
+      "Hash": "0S6CFJRBJIU=",
+      "Index": 4,
+      "Offset": 8388608,
+      "Size": 1642900
+    }
+  ],
+  "ServerAssignedUniqueId": null,
+  "ServerAssingedUniqueId": "6cd41024-3dd9-4b83-81cd-f13d9f239466",
+  "Size": 10031508,
+  "UploadedAt": 1786411587,
+  "source_kind": "public_wabbajack_manifest_parts",
+  "source_url": "https://github.com/Fluffernuttersandwich/Smorgasbord"
+}

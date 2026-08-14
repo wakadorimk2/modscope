@@ -1,0 +1,47 @@
+{
+  "DisplayVersionOnlyInInstallerView": false,
+  "author": "FNS",
+  "dateCreated": "1970-01-01T00:00:00Z",
+  "dateUpdated": "2026-08-11T01:26:33.8469109Z",
+  "description": "This list is the modular buffet table of the very best mods available for 7 Days to Die.",
+  "download_metadata": {
+    "Hash": "kHE22OOIOcM=",
+    "NumberOfArchives": 476,
+    "NumberOfInstalledFiles": 18860,
+    "Size": 10031508,
+    "SizeOfArchives": 20867964587,
+    "SizeOfInstalledFiles": 25251110022,
+    "TotalSize": 46119074609
+  },
+  "force_down": false,
+  "game": "sevendaystodie",
+  "image_contains_title": true,
+  "links": {
+    "discordURL": "https://discord.gg/WpVPJWj7Xk",
+    "download": null,
+    "download_reference": "public_wabbajack_manifest",
+    "image": "https://raw.githubusercontent.com/Fluffernuttersandwich/Smorgasbord/main/Smorg5.webp",
+    "machineURL": "Smorgasbord",
+    "nexusCollection": {
+      "collectionId": "445130",
+      "domainName": "7daystodie",
+      "lastRevisionNumber": 39,
+      "slug": "3olqbw"
+    },
+    "readme": "https://raw.githubusercontent.com/Fluffernuttersandwich/Smorgasbord/main/README.md",
+    "websiteURL": "https://github.com/Fluffernuttersandwich/Smorgasbord"
+  },
+  "maintainers": [
+    "github/Fluffernuttersandwich"
+  ],
+  "nsfw": false,
+  "official": false,
+  "repositoryName": "Smorgasbord",
+  "tags": [
+    "QoL",
+    "Vanilla+"
+  ],
+  "title": "Smorgasbord",
+  "utility_list": false,
+  "version": "3.1.1.39"
+}
