@@ -1,0 +1,45 @@
+{
+  "fixture_id": "conflicting-evidence",
+  "source_assertions": [
+    "A039",
+    "A006"
+  ],
+  "subject": "Oakraven Ammo Press",
+  "object": "EFT Overhaul",
+  "statement_type": "compatibility",
+  "relation": "requires_compatibility_patch",
+  "status": "conflicting_evidence",
+  "condition": {
+    "kind": "patch_scope_conflict",
+    "text": "The patch adds EFT Overhaul ammo support, but Smorgasbord notes separately reject the main EFT Overhaul."
+  },
+  "version_scope": {
+    "patch": "2.5.2 observed on Nexus",
+    "text": "Patch description and Smorgasbord list note are not the same deployment context"
+  },
+  "patch": {
+    "name": "Ammo Press Add-On Patch for EFT and Izy v2",
+    "required": true,
+    "version": "2.5.2 observed"
+  },
+  "evidence": [
+    {
+      "source_ref": "src_ammo_patch",
+      "url": "https://www.nexusmods.com/7daystodie/mods/6993",
+      "quote": "Adds support to Escape From Tarkov Overhaul",
+      "locator": "Ammo Press Add-On Patch Nexus description"
+    },
+    {
+      "source_ref": "src_smorg_mod_notes",
+      "url": "https://github.com/ANONYMIZED_AUTHOR/Smorgasbord/blob/main/MOD_NOTES.md",
+      "quote": "Not compatible with the main EFT Overhaul",
+      "locator": "MOD_NOTES.md, overhaul compatibility note"
+    }
+  ],
+  "confidence": "medium",
+  "verification": {
+    "kind": "mixed_source_claims",
+    "runtime_verified": false
+  },
+  "unresolved_reason": "No runtime matrix identifies which EFT package or list configuration was tested."
+}
