@@ -102,7 +102,7 @@ Evidence rules:
 - provenanceとobserved timeを保持します。
 - source claimはruntime verificationではありません。
 - dependencyはcompatibilityではありません。
-- manifest co-presenceはruntime evidenceではありません。
+- manifest/list co-presenceはdependency、compatibility、runtime evidenceではありません。
 
 ## MO2の安全境界
 
@@ -150,9 +150,6 @@ MO2、7DTD、ModInfo.xml、Config XML、XML patch semanticsについて、推測
 
 Unknown is a valid result.を設計原則として扱います。
 Version、Requirements、Compatibilityは、根拠が不足する場合に推測せず、UnresolvedまたはUnknownとして保持します。
-source claimはruntime verifiedと同じ意味ではありません。
-dependencyはcompatibilityと同じ意味ではありません。
-co-presenceはcompatibilityと同じ意味ではありません。
 file overlapはruntime conflictと同じ意味ではありません。
 confirmedは保存したsource claimが確認済みであることを示します。
 confirmedは7DTDの全runtime環境での動作保証を示しません。
@@ -165,6 +162,13 @@ confirmedは7DTDの全runtime環境での動作保証を示しません。
 - diagnostic：解析できなかった入力と理由
 
 入力に未知のXML patch operation、未知の属性、未知のサイト構造がある場合は、破棄せずraw情報とdiagnosticを保持します。
+
+Requirements / Dependenciesでは、次の境界を維持します。
+
+- `Requirement Observation`と`Dependency Edge`を同じ結果へ圧縮しません。
+- `not_observable`は、依存関係の不在を意味しません。`unresolved`は、観測済みだがidentityまたは意味を確定できない状態です。
+- list co-presenceや名前の類似だけをdependency evidenceにしません。
+- target identityを名前だけで自動確定しません。raw targetとsource referenceを保持します。
 
 ## GUIとInspectorの原則
 
