@@ -347,6 +347,18 @@ dependency、compatibility、load-order rule、file overlap、semantic conflict�
 
 Requirementsは、game version、hard dependency、optional dependency、recommended mod、toolまたはscript extender、account、hardware、manual step、unknownへ分けて保持します。
 
+Requirements / Dependenciesは、evidence-backedな段階結果として扱います。
+
+```text
+Source
+  -> Requirement Observation
+  -> Identity Resolution
+  -> Relationship Classification
+  -> Requirement Assertion / Dependency Edge
+```
+
+Requirement Observationは、source上のraw target、relationship wording、locator、evidenceを保持します。Dependency Edgeは、identity resolutionとrelationship classificationの後段結果です。`not_observable`や`unresolved`を依存関係の不在へ変換しません。Structured Requirements、Description、README、local evidenceは、source kindとprovenanceを分けて扱います。
+
 Descriptionなどの自由記述だけでhard dependencyを確定しません。
 
 DependencyをCompatibilityへ統合しません。
@@ -498,6 +510,8 @@ Local contextは、MOD identity confirmationとcurrent profileを照合した派
 - diagnostic
 
 Web pageに情報がない場合は、dependenciesやversionを推測しません。
+
+Requirements表示は、単一のdependency graphへ圧縮しません。target identity、relationship type、version constraint、evidence reference、unresolved reasonを必要な範囲でInspectorへ開示します。MODではないgame、framework、tool、environment、save、manual stepの条件を、MOD identityへ無理にbindingしません。大規模graphはprimary UIにしません。
 
 ### 11.2 Inspector
 
@@ -839,6 +853,7 @@ GUIはQuery layerのprojectionだけを読みます。
 - Agent backendから取得可能なpage evidenceは何か
 - page contentをLocal Mod Knowledgeへ保存する範囲はどこまでか
 - fixtureへ含める実データをどう匿名化するか
+- Web-onlyで未解決だったRequirement target identityを、MO2 `.meta`、`ModInfo.xml`、package identity、profile evidenceでどこまで解決できるか
 
 ## 21. Conceptual repository architecture
 
