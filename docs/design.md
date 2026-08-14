@@ -317,6 +317,24 @@ Desktop hostはcandidate IDから内部保持したpathを解決します。
 
 source path、page URL、取得時刻、parser version、snapshot idなど、再確認に必要なreferenceを保持します。
 
+### 7.4 Requirements / Dependenciesのidentity resolution
+
+Requirementsは、次の段階を分けて扱います。
+
+```text
+Source
+  -> Requirement Observation
+  -> Identity Resolution
+  -> Relationship Classification
+  -> Requirement Assertion / Dependency Edge
+```
+
+Requirement Observationは、raw target、source、locator、evidence、raw relationship wordingを保持します。Dependency Edgeは、identity resolutionとrelationship classificationの後段結果です。Local scanは、まずdependency候補のidentityを解決します。local packageの存在、archive linkage、filename similarity、framework marker、list co-presenceだけではruntime dependencyを確定しません。
+
+将来のdependency edgeは、少なくとも`source`、`evidence`、`confidence`、`resolution_status`、`relationship_type`を保持します。`resolved`はlocal identityの一致を示すだけです。`partially_resolved`、`ambiguous`、`not_found_locally`、`not_applicable`は、identity evidenceの状態を示します。`not_found_locally`は依存先の不在を意味しません。`not_applicable`はtargetが環境条件、手順、翻訳・作者情報、説明文断片などである状態を示します。
+
+この調査はruntime dependencyを検証しません。hard / optionalの意味、packageとModletの1対多関係、patch・fork・bundleの同一性、runtimeでの必要性は人間確認へ残します。これはproduction APIまたは永続JSON schemaの追加を意味しません。
+
 ## 8. Adapter boundaries
 
 ### 8.1 MO2 Adapter
