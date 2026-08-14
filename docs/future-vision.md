@@ -421,7 +421,7 @@ Phase6.5では、Phase6の機能を維持したままWorkspaceの表示責務を
 ModListの標準表示を`ModScope view`にし、`Foundation`、`Compatibility`、`Content`、`Unknown`をQueryのstatic evidenceから表示します。
 `MO2 order`ではactive profileのpriority順を確認できます。
 role assessmentは`Verified`、`Inferred`、`Unknown`を保持し、Foundationは依存関係として断定しません。
-MO2 priorityはprofileの上から下へ`0→N`で保持します。
+MO2 priorityはprofileの上から下へ`0→N`で保持します。`modlist.txt`は画面順と逆向きに保存されるため、末尾からpriorityを採番します。
 ModScope viewはFoundationからUnknownへ表示し、他のreadable MODからtarget XMLとして参照されるMODをbase roleの静的証拠としてFoundation / Inferredへ投影します。
 
 Contextは`RECOGNIZE`、Local awareness、Analysis summary、Inspect導線の順に表示します。

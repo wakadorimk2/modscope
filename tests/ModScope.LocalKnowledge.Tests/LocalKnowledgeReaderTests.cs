@@ -19,9 +19,9 @@ public sealed class LocalKnowledgeReaderTests
         Assert.Equal(2, alphaEntries.Count);
         Assert.Equal("+Alpha Mod", alphaEntries[0].RawLine);
         Assert.Equal(ModEnabledState.Enabled, alphaEntries[0].EnabledState);
-        Assert.Equal(0, alphaEntries[0].Priority);
+        Assert.Equal(3, alphaEntries[0].Priority);
         Assert.Equal(SourceReferenceKind.ProfileFile, alphaEntries[0].PriorityEvidence.Source.Kind);
-        Assert.Equal(3, alphaEntries[1].Priority);
+        Assert.Equal(0, alphaEntries[1].Priority);
         Assert.Contains(alphaEntries[1].Diagnostics, diagnostic => diagnostic.Code == "profile.mod.duplicate");
 
         var beta = Assert.Single(snapshot.ProfileEntries, entry => entry.NormalizedModName == "Beta Mod");
@@ -43,7 +43,7 @@ public sealed class LocalKnowledgeReaderTests
         var alpha = GetMod(snapshot, "Alpha Mod");
         Assert.Equal(ModProfileState.Listed, alpha.ProfileState);
         Assert.Equal(ModEnabledState.Enabled, alpha.EnabledState);
-        Assert.Equal(0, alpha.Priority);
+        Assert.Equal(3, alpha.Priority);
 
         var beta = GetMod(snapshot, "Beta Mod");
         Assert.Equal(ModProfileState.Listed, beta.ProfileState);

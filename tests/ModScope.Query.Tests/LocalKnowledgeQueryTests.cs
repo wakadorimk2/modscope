@@ -96,7 +96,7 @@ public sealed class LocalKnowledgeQueryTests
         Assert.Equal("default", session.ProfileName);
         Assert.Equal(QueryProfileState.Listed, alpha.ProfileState);
         Assert.Equal(QueryEnabledState.Enabled, alpha.EnabledState);
-        Assert.Equal(0, alpha.Priority);
+        Assert.Equal(3, alpha.Priority);
         Assert.Equal("Alpha Display", alpha.DisplayName);
         Assert.Equal("1.2.3", alpha.Version);
         Assert.Equal("https://example.test/alpha", alpha.Website);
@@ -131,7 +131,7 @@ public sealed class LocalKnowledgeQueryTests
         Assert.Equal(LocalContextStatus.Unknown, beforeLoad.Status);
         Assert.Equal(LocalContextStatus.Installed, installed.Status);
         Assert.Equal(QueryEnabledState.Enabled, installed.EnabledState);
-        Assert.Equal(0, installed.Priority);
+        Assert.Equal(3, installed.Priority);
         Assert.Equal("1.2.3", installed.KnownVersion);
         Assert.Equal(LocalContextStatus.NotInstalled, notInstalled.Status);
         Assert.Equal(LocalContextStatus.Unresolved, unresolved.Status);
@@ -225,7 +225,7 @@ public sealed class LocalKnowledgeQueryTests
         Assert.Equal("1.2.3", targetReference.OwnerMod?.Version);
         Assert.Equal(QueryProfileState.Listed, targetReference.OwnerMod?.ProfileState);
         Assert.Equal(QueryEnabledState.Enabled, targetReference.OwnerMod?.EnabledState);
-        Assert.Equal(0, targetReference.OwnerMod?.Priority);
+        Assert.Equal(3, targetReference.OwnerMod?.Priority);
         Assert.Equal("set", targetReference.Operation?.RawOperationName);
         Assert.Equal(QueryXmlPatchOperationKind.Set, targetReference.Operation?.NormalizedKind);
 

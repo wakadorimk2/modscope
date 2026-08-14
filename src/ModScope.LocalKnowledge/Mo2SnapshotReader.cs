@@ -346,8 +346,14 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
     {
         var entries = new List<ProfileModEntry>();
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var priority = 0;
         var lines = ParsingUtilities.SplitLines(text);
+        var priority = lines.Count(line =>
+        {
+            var trimmed = line.Trim();
+            return trimmed.Length > 1
+                && (trimmed[0] == '+' || trimmed[0] == '-')
+                && trimmed[1..].Trim().Length > 0;
+        }) - 1;
 
         for (var index = 0; index < lines.Count; index++)
         {
@@ -419,7 +425,9 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                 continue;
             }
 
-            var currentPriority = priority++;
+            // MO2 writes modlist.txt from the bottom of the visible list to the top.
+            // The last supported profile entry is therefore priority 0.
+            var currentPriority = priority--;
             if (!seenNames.Add(normalizedName))
             {
                 entryDiagnostics.Add(new Diagnostic(
