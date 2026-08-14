@@ -441,7 +441,7 @@ identityがresolvedでも、version observationが一致するとは限りませ
 MO2 separator textはcurator-authored evidenceとしてraw保持します。
 separator textからenable、dependency、compatibilityを断定しません。
 
-詳細な観測値は、[Smorgasbord local inventory follow-up](research/smorgasbord-local-inventory-2026-08-14.md)に記録します。
+詳細な観測値は、[Smorgasbord local inventory follow-up](research/snapshots/2026-08-14-smorgasbord/local-inventory.md)に記録します。
 判断理由は、[Identity and version provenance ADR](adr/identity-and-version-provenance.md)に記録します。
 
 Mod Libraryのrow countはstable local Modlet countです。MO2 package count、archive count、Nexus identity countをrow countとして表示しません。package provenanceは、共有関係とsource referenceとしてInspectorへ表示します。bundle内の各Modletへ固有のNexus File identityを推測しません。
@@ -836,41 +836,11 @@ ModScopeが管理したjunctionだけを削除します。既存junctionは、�
 - Browser engineの自作
 - ModScope独自のdependency resolver、version resolver、source identity resolver
 
-## 16. Browser engine options to investigate
+## 16. Browser engineとAgent backendの境界
 
-技術選定は確定しません。次の候補を比較します。
-
-- WindowsのWebView2などのembedded WebView
-- 既存のsystem browserとの連携
-- browser extensionとlocal companionの組み合わせ
-- browser automationを利用するprototype
-
-比較軸は次のとおりです。
-
-- navigationとJavaScript互換性
-- authenticationとcookieの扱い
-- page observationの取得方法
-- local bridgeの安全性
-- page scriptからlocal dataを隔離できるか
-- Windowsでの配布と更新
-- licensingとmaintenance
-- 将来のSite Adapterとの接続性
-
-ChromiumやBrowser engineそのものを自前で実装する案は採用しません。
-
-## 17. Agent web backend options to investigate
-
-次の候補を比較します。
-
-- structured page observationを受け取るlocal interface
-- local browser automation
-- 既存ブラウザのagent連携
-- 外部agent browser backend
-- Cloudflare Kitesurfなどの候補サービス
-
-比較軸は、認証、再現性、取得できるevidence、privacy、cost、vendor lock-in、failure diagnosticsです。
-
-Agent backendの選定は、Local Mod Knowledgeのschemaと分離します。
+Browser engineとAgent backendは、現在の実装仕様では固定しません。
+WebView2は現在のDesktop hostです。ModScope独自のBrowser engineではありません。
+候補、比較軸、未解決事項は[将来像](future-vision.md)と[Research map](research/README.md)で管理します。
 
 ## 18. Implementation-agnostic decisions
 
@@ -953,17 +923,9 @@ GUIはQuery layerのprojectionだけを読みます。
 
 ## 20. Research questions
 
-- MO2のmodlist.txtの実際の行形式とpriority semanticsは何か
-- profile、mods、downloads、virtual filesystemの境界は何か
-- 欠落MOD、重複MOD名、無効MODをどう表示するか
-- ModInfo.xmlの配置とschema差異は何か
-- 7DTDのXML patch operationとtarget解決規則は何か
-- XPathをどこまで正規化できるか
-- WebView2、既存ブラウザ連携、extension方式の安全性と制約は何か
-- Agent backendから取得可能なpage evidenceは何か
-- page contentをLocal Mod Knowledgeへ保存する範囲はどこまでか
-- fixtureへ含める実データをどう匿名化するか
-- Web-onlyで未解決だったRequirement target identityを、MO2 `.meta`、`ModInfo.xml`、package identity、profile evidenceでどこまで解決できるか
+未解決の調査課題は、この設計文書へ新しい仕様として追加しません。
+調査対象、snapshot、source、未確認事項は[Research map](research/README.md)と各research recordで管理します。
+現在の実装に影響するunknownは、`Risksとunknowns`、ADR、Query resultのdiagnosticへ分けて記録します。
 
 ## 21. Conceptual repository architecture
 
@@ -1005,164 +967,25 @@ tests/
 
 Browser、Local Mod Knowledge、context projection、analysis、mutationを分離します。具体的なdirectoryやmodule名は実装時に再確認します。
 
-## 22. Staged implementation
+## 22. Implementation status
 
-### Phase 0：設計とfixture
+この節は、完了Phaseの詳細な作業履歴ではなく、現在の実装状態を要約します。
+過去の詳細なPhase履歴はGit履歴で追跡します。
 
-実仕様、境界、最小fixture、page observationの仮説を整理します。
+| Phase | 状態 | 現在の設計上の要点 |
+| --- | --- | --- |
+| 0 | 完了 | source boundary、fixture、page observationの前提を定義しました。 |
+| 1 | 完了 | 7DTD + MO2のread-only Browse → Recognize → Local context → Inspectorを成立させました。 |
+| 2 | 完了 | structured Local Mod Knowledge、MO2 source discovery、profile projectionを追加しました。 |
+| 3 | 完了 | QueryとInspectorのneutral read modelを追加しました。 |
+| 4 | 完了 | 匿名synthetic fixtureを基準にsemantic conflictのstatic analysisを追加しました。 |
+| 5 | 実装済み | neutral runtime evidenceとLocal-only RuntimeOCD comparisonを追加しました。 |
+| 6 | 実装済み | Browse-first Workspace UI、Compare、Diagnosis、Historyを追加しました。 |
+| 7 | 実装済み | controlled profile edit、junction deploy、Steam起動のwrite planeを追加しました。 |
+| 7.1 | planned | Installed versionとWeb observed versionのread-only比較を次の候補とします。 |
+| 8 | deferred | 第二gameの需要と共通性が確認できた場合だけGame Adapterを拡張します。 |
 
-### Phase 1：v0.1の最小Browser-first vertical slice
-
-1 profileをread-onlyで読み取ります。Local Mod Knowledgeを生成します。WPF + WebView2上でpage observationを取得し、ユーザー確認したMOD identityとLocal contextを結びます。Inspectorで根拠を開きます。WebView2はbrowser engineの実装資産ではなく、Browsing Layerのhostです。
-
-### Phase 2：structured Local Mod Knowledge（完了）
-
-ModInfo、Config XML、patch operation、target、XPath、reverse indexを拡張します。
-既存のPhase 1 Local Knowledgeを、raw、normalized、inference、diagnostic付きの静的なstructured modelへ拡張します。
-MO2 source discoveryを追加します。
-portable instanceとglobal instanceを、実行中MO2、remembered source、AppData、native pickerのevidence付きで候補化します。
-候補が1件なら自動読込します。複数件ならPickerで選択します。
-external Mods / Profiles pathは、MO2設定から解決したread-only pathだけを扱います。
-RuntimeOCD、semantic conflict、effective result、MO2 writeはこのPhaseの対象外です。
-
-完了判定メモ（2026-08-13）：
-MO2 source discovery、profile切り替え、page observation、MOD identity confirmation、Local context、Inspectorを実MO2のread-only環境で確認しました。
-Core、Resourceなどの配布単位とMO2 record単位のgroupingは未確定です。
-Phase 2ではMO2 recordを独立したraw sourceとして保持し、package groupingは後続課題とします。
-
-### Phase 3：QueryとInspector core（完了）
-
-neutral read modelを安定させます。既存のLocalKnowledgeIndexを、C# Query APIからread-onlyで検索できます。
-Site Adapterは、具体的な必要性が確認されるまで追加しません。
-
-2026-08-13のPhase 3実装範囲は次のとおりです。
-
-- `Mod`、`File`、`XmlFile`、`PatchOperation`、`TargetXml`、`XPath`、`Entity`、`Property`、`Attribute`をQuery対象にします。
-- forward queryとreverse queryを、正規化後のOrdinal完全一致で提供します。
-- pathの区切り文字を正規化します。`TargetXml`では`Config/`接頭辞も既存parserと同じ規則で除去します。
-- Query結果はfrom、to、relation、evidence、owner MODのprofile state、enabled state、priority、operation、diagnosticを含みます。
-- limitは呼び出し側が指定します。未指定時は全件を返します。
-- Inspector read modelはpatch operation、target、XPath、entity、property、attribute、unknown operation、diagnosticを保持します。
-- unknown operation、unresolved owner、inferenceを破棄しません。
-
-この変更の理由は、Phase 2で生成したforward / reverse indexをQuery layerから利用できなかったためです。
-影響範囲は`ModScope.Query`とQuery testsです。
-Desktop bridge、Web UI、agent transportは変更しません。
-Site Adapterを先に追加する代替案は、具体的なサイト要件が未確認のため採用しません。
-semantic conflictとeffective resultはPhase 4の対象として残します。
-
-Phase 3完了判定メモ（2026-08-13）：
-
-- 自動検証では、solution全体の57テスト、solution build、frontendのcheckとbuildが成功しました。buildは警告0件、エラー0件でした。
-- Query testsをPhase 3のQuery semanticsに対する再現可能な受入証拠とします。9種類のQuery node、forward / reverse query、path区切り、`Config/`接頭辞、limit、未ロードsnapshotを検証しました。
-- Query resultはowner MOD、profile state、enabled state、priority、operation、evidence、diagnosticを返します。
-- Inspector read modelはModInfo、file list、XML reference、unknown operation、inference、unresolved owner、diagnosticを保持します。未知の情報を破棄しません。
-- 実MO2のread-only GUI確認では、native pickerでportable sourceを選択し、profile projection、`NotebookServer`のactive profile、verified Websiteのpage observation、Local MOD identity、installed、enabled、priority、version、Inspectorを確認しました。
-- 自動検証と実MO2 GUI確認は別の証拠として扱います。実MO2のabsolute pathは文書へ保存しません。
-- GUI確認前後で、MO2の`modlist.txt`と対象MODの入力ファイルのSHA-256は一致しました。MO2 sourceは変更していません。
-- Phase 3の対象外は、agent transport、Compare UI、Site Adapter、Runtime evidence、MO2 writeです。これらを追加しません。
-
-### Phase 4：semantic conflict（完了）
-
-2026-08-13のPhase 4では、active profileのenabled MODを対象に、target XMLとXPathごとのsemantic conflict解析を追加しました。
-
-- `SevenDaysToDieBaseDataSource`が、明示された7DTD `Data/Config` directoryをread-onlyで読みます。
-- `SevenDaysToDieConflictAnalyzer`が、profile priorityの`0→N`順でoperation sequenceを作ります。
-- semantic conflict groupの`confidence`は、計算済みの`Compatible` / `Conflict`を`High`、`Possible`を`Medium`、`Unknown`または未評価を`Unknown`として返します。
-- priorityの実ゲーム上の勝者方向は確定せず、`inference`とuncertaintyとして保持します。
-- 基準XMLの結果は相対path、SHA-256、`GameDataFile` source referenceで保持します。absolute pathは結果へ出しません。
-- `set`、`setattribute`、`remove`、`removeattribute`、属性値への単純な`append`をeffective subsetとして評価します。
-- child fragment、`prepend`、`insertBefore`、`insertAfter`、`csv`、unknown operation、標準XPathで評価できない式は`unknown`またはdiagnosticとして保持します。
-- 同じ値は`compatible`、異なる値は`conflict`、removeと変更は`conflict`、順序依存または未検証の組み合わせは`possible`とします。
-- base XMLの欠落、parse失敗、XPath no matchは`unknown`とします。
-- Query layerへ`AnalyzeConflicts`と`ConflictAnalysisReadModel`を追加しました。Desktop、Desktop Contracts、Web frontendは変更しません。
-- Runtime evidence、完全なXML patch engine、MO2 write、UI表示はPhase 4の対象外です。
-
-Phase 4の検証は、匿名synthetic fixtureで行います。solution test、build、`git diff --check`を受入証拠とします。
-
-### Phase 5：runtime evidence
-
-Phase 5-Aでは、中立runtime evidence契約を取り込み、Phase 4のstatic conflict groupとtarget XML + XPathで比較します。
-raw result、source reference、diagnosticを保持します。
-Phase 5-Bでは、Runtime comparisonだけを対象にしたLocal-only RuntimeOCD Adapterを追加します。正式schema互換性、DL、導入、UI、MO2 write、RuntimeOCD本体の再配布は含めません。
-
-### Phase 6：Workspace UIの拡張
-
-Browser page、Local context、Inspector、Compare、Diagnosisを段階的に拡張します。高密度Mod Manager UIは作りません。
-
-Phase6のvertical sliceでは、Desktop bridgeへanalysis commandと`UiState.Analysis`を追加しました。
-native folder pickerでbase Data/ConfigとRuntimeOCD logsを選択し、pathをDesktop sessionだけに保持します。
-Context WebViewへstatic conflict、runtime comparison、evidence、provenance、uncertainty、diagnosticを段階表示します。
-Compareは確認済みcandidate MODに絞り、Diagnosisはactive profile全体を表示します。
-Phase4 synthetic fixtureとPhase6 RuntimeOCD logをDesktop outputへpackし、Developer toolsから再現できます。
-MO2 write、AI chat、MCP、browser engine変更、browser syncは実装しません。
-
-### Phase 6.10：Mod Library情報設計（設計固定）
-
-Mod Libraryは、Web browsing workflowを補助するsecondary surfaceです。
-この設計更新では、コードAPI、Bridge contract、frontend実装を変更しません。
-
-将来の実装は、次のread model境界へ従います。
-
-- Query projectionはstable local Modlet単位のrecordと、active profileにだけ存在するProfile unresolved recordを返します。
-- Query projectionはView membership、View count、Search後のresult countを返します。
-- Query projectionはresolution state、version comparison state、package provenance、source referenceを返します。
-- Desktop contractは、Query projectionの情報をfrontend表示用DTOへ変換します。
-- frontendはView membership、count、resolution state、version state、provenanceを計算しません。
-- Saved Viewはアプリ内metadataとして保存し、snapshot再読、profile切替、source更新後に再評価します。
-
-表示規則は、flat table、Name default sort、欠落値の末尾配置、stable MOD keyによる同値解決を使います。
-Library selectionはWeb page identity、Local context、Inspector selectionから分離します。
-
-### Phase 7：controlled write（実装）
-
-Phase 7は、Controlled profile edit、junction deploy、Steam起動のvertical sliceです。
-
-- `src/ModScope.Deployment/`がread planeから独立したwrite planeです。
-- `DeploymentDraft`はprofile識別子、MOD key、enabled状態、順序だけを持ちます。
-- `DeploymentPlan`はplan ID、modlist差分、junction差分、source/profile/game fingerprint、blocking diagnosticを持ちます。
-- `IModDeploymentService.Preview`は実ディスクを再読してplanを作ります。
-- `IModDeploymentService.Apply`はplan IDと明示承認を要求します。
-- `DeploymentResult`は`Applied`、`Blocked`、`RecoveryRequired`を返します。
-- profileのcomment、空行、separator、未知行は`modlist.txt`のraw lineとして保持します。
-- junctionの所有情報はModScope派生manifestに保存します。
-- game rootはMO2 `ModOrganizer.ini`の`General.gamePath`から解決します。
-- frontendへGamePath、MO2 path、LocalModSnapshotを渡しません。
-- `game.launch`はpayloadを持たず、成功したApply後だけ有効です。
-- Steam URIは`steam://rungameid/251570`に固定します。
-- Preview完了後は中央BrowserへDeployment preview tabを開きます。
-- 左ペインは変更件数を表示し、全変更とApply確認はDeployment preview tabへ集約します。
-- Web frontendは`window.confirm`を使いません。
-- 編集中のMOD rowは、左側のdrag handleと`+/-`を近接配置します。
-- ドラッグ中はeditable MODの間に差し込みラインを表示します。
-
-Phase 7の実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施しました。実行中MO2または7DTDを停止しません。
-
-2026-08-14に、ユーザーが実ゲームへ既存worldをロードしてowner Playcheckを完了しました。
-
-owner Playcheckは、automated test、build、GUI evidenceとは別の証拠クラスです。
-
-### Phase 7.1：Installed version vs Web observed version（planned）
-
-Phase 7後の次のread-only vertical sliceは、Installed versionとWeb observed versionの比較です。
-
-入力は、local mod identity、raw local version、local source / provenance、Web URL、title、raw observed version、Web source、observed timeです。
-
-出力は、local version、observed Web version、identity resolution、`equal`、`mismatch`、`incomparable`、`Not assessed`、provenance、observed time、diagnosticsです。
-
-identity未解決時は`Not assessed`とします。比較不能なversion formatは`incomparable`とします。
-
-semverを推測しません。
-
-raw versionを保持します。
-
-共通freshness TTLは定義しません。
-
-このvertical sliceでは、auto update、MO2 write、deployment、Steam launch、requirements auto resolution、compatibility boolean、CLI、multi-game generalization、AI integrationを行いません。
-
-### Phase 8：Game Adapter拡張
-
-第二gameへの需要と共通性が確認できた場合だけ、game adapterの範囲を広げます。
+現在の実装範囲、Bridge contract、Web UI、Deployment契約は、この文書の各責務節と受入条件を正本とします。
 
 ## 23. Acceptance criteria
 

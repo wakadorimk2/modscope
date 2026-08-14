@@ -382,243 +382,86 @@ Write planeが追加されても、ModScopeはMod Managerにはなりません�
 
 ### Phase 0：設計、仕様確認、fixture
 
-source boundary、page observation、MOD identity confirmation、Local context、evidence modelを定義します。
+source boundary、page observation、MOD identity confirmation、Local context、evidence modelを定義しました。
 
 ### Phase 1：v0.1 Browser-first vertical slice（完了）
 
-7DTD + MO2の1 profileをread-onlyで読み取ります。WPF + WebView2上でpage observationを取得します。
-URL/titleの強い一致が一意の場合はMOD identityを自動確認します。
-それ以外はユーザー確認したMOD identityとcurrent profileを照合します。
-Inspectorで根拠を表示します。
-
-v0.1は、site固有Adapter、複数game、完全なsemantic conflict、RuntimeOCD、MO2 write、特定agent backendを含めません。
+7DTD + MO2のread-only Browse → Recognize → Local context → Inspectorを成立させました。
+site固有Adapter、複数game、完全なsemantic conflict、RuntimeOCD、MO2 write、特定agent backendは将来範囲です。
 
 ### Phase 2：Structured Local Mod Knowledge（完了）
 
-ModInfo、Config XML、patch operation、target、XPath、reverse indexを拡張します。
-MO2のouter directoryと、7DTDが読むinner MOD rootを分離して保持します。
-outer直下のrootは`Source`で記録します。
-outer直下の子directoryのrootは`Inference`で記録します。
-depth 2以上の候補はdiagnosticだけを残します。
-rootを解決できないouterは、MOD recordを作らず、raw inventoryとmanifestへ保持します。
-MO2 source discoveryを追加します。
-実行中MO2、remembered source、`%LOCALAPPDATA%\ModOrganizer`、last-used instance情報、native pickerを既知の探索対象にします。
-portable instanceとglobal instanceをcandidateとして統合します。
-candidateにはreadiness、discovery evidence、diagnosticを保持します。
-ready candidateが1件なら自動読込します。
-複数件ならsource cardで選択します。
-external Mods / Profiles pathは、MO2設定から解決したread-only pathだけを扱います。
-RuntimeOCDの実行時結果、semantic conflict、effective result、MO2 writeは後続Phaseで扱います。
+structured Local Mod Knowledge、MO2 source discovery、profile projectionを追加しました。
+MO2のouter / inner root、discovery evidence、diagnostic、read-only pathを分離して保持します。
+RuntimeOCD、semantic conflict、effective result、MO2 writeは後続Phaseの責務です。
 
 ### Phase 3：Query、Inspector、必要なSite Adapter（完了）
 
-neutral read modelを安定させます。必要性が確認できたsiteだけAdapterを追加します。
-
-Phase 3完了メモ（2026-08-13）：
-
-Local Mod Knowledgeのforward / reverse queryとInspector read modelを完了しました。
-Query semanticsはsynthetic fixtureで再現可能に検証します。
-実MO2のread-only統合確認は、source load、profile projection、page observation、Local context、Inspectorを対象にしました。
-Site Adapter、agent transport、Compare UI、Runtime evidence、MO2 writeはPhase 3外として保留します。
+neutral read model、forward / reverse query、Inspector read modelを完了しました。
+必要性が確認できたsiteだけAdapterを追加します。
+agent transport、Compare UI、Runtime evidence、MO2 writeは別Phaseです。
 
 ### Phase 4：Semantic conflict（完了）
 
-Phase 4では、active profileのenabled MODを、target XMLとXPathごとに解析します。
-priority sequenceは`0→N`で表示し、実ゲーム上の勝者方向は未検証のinferenceとして扱います。
-confidenceは、計算済みの`Compatible` / `Conflict`を`High`、`Possible`を`Medium`、`Unknown`または未評価を`Unknown`として表します。
-
-`Data/Config` directoryは入力で明示します。基準XMLはread-onlyで読み、結果には相対path、SHA-256、`GameDataFile` source referenceだけを残します。
-
-effective subsetは`set`、`setattribute`、`remove`、`removeattribute`、属性値への単純な`append`です。
-child fragment、`prepend`、`insertBefore`、`insertAfter`、`csv`、unknown operation、未評価XPathはunknownとして保持します。
-base XMLの欠落、parse失敗、XPath no matchもunknownです。
-
-Query layerの`AnalyzeConflicts`は、target XML、XPath、limitでread modelを絞れます。
-Desktop、Web、Runtime evidence、MO2 write、完全なXML patch engineはPhase 4に含めません。
+active profileのenabled MODをtarget XMLとXPathごとに解析します。
+effective subset、unknown operation、diagnostic、priority方向のuncertaintyを保持します。
+Desktop、Web、Runtime evidence、MO2 write、完全なXML patch engineは別の責務です。
 
 ### Phase 5：Runtime evidence
 
-Phase 5-Aでは、中立runtime evidence契約を取り込み、static conflict resultとtarget XML + XPathで比較します。
-Phase 5-Bでは、Runtime comparisonだけを対象にしたLocal-only RuntimeOCD Adapterを追加します。正式schema互換性、DL、導入、UI、MO2 write、RuntimeOCD本体の再配布は含めません。
+neutral runtime evidenceとLocal-only RuntimeOCD comparisonを実装しました。
+正式schema互換性、RuntimeOCD本体の再配布、MO2 writeは含めません。
 
 ### Phase 6：Workspace UIの拡張
 
-Browser page、Local context、Inspector、Compare、Diagnosisを拡張します。高密度Mod Manager UIは作りません。
-
-Phase6では、Browse-firstのContext WebViewへCompareとDiagnosisを追加しました。
-Desktop bridgeはbase Data/Config picker、RuntimeOCD logs picker、static conflict analysis、runtime evidence comparison、Phase6 fixtureを提供します。
-pathはDesktop sessionだけに保持し、Web stateにはabsolute path、runtime log本文、raw resultを送信しません。
-static evidenceとruntime evidenceを別表示し、target XML、XPath、priority、operation sequence、provenance、uncertainty、diagnosticを段階表示します。
-Compareは確認済みcandidate MODに絞り、Diagnosisはactive profile全体を表示します。
-analysis未実行時は未確認と表示し、空resultから競合なしと推測しません。
-Inspectorはreadable MOD全体を対象にし、patch operation detailを折りたたみ表示します。
-MO2はread-onlyのまま維持します。
+Browser page、Local context、Inspector、Compare、DiagnosisをBrowse-first UIへ統合しました。
+高密度Mod Manager UIと、MO2を直接管理するUIは作りません。
 
 ### Phase 6.5：Browse-first UI情報設計の整理（完了）
 
-Phase6.5では、Phase6の機能を維持したままWorkspaceの表示責務を整理しました。
-ModListの標準表示を`ModScope view`にし、`Foundation`、`Compatibility`、`Content`、`Unknown`をQueryのstatic evidenceから表示します。
-active profileのpriorityは、分類内の決定的な順序へ使用します。
-role assessmentは`Verified`、`Inferred`、`Unknown`を保持し、Foundationは依存関係として断定しません。
-MO2 priorityはprofileの上から下へ`0→N`で保持します。`modlist.txt`は画面順と逆向きに保存されるため、末尾からpriorityを採番します。
-ModScope viewはFoundationからUnknownへ表示し、他のreadable MODからtarget XMLとして参照されるMODをbase roleの静的証拠としてFoundation / Inferredへ投影します。
-
-Contextは`RECOGNIZE`、Local awareness、Analysis summary、Inspect導線の順に表示します。
-SettingsはMO2 sourceを管理し、DebugはPage details、Developer tools、raw diagnosticsを管理します。URL入力は通常Toolbarへ置きます。
-MO2 source未選択時だけOnboardingを表示します。
-
-Browserは既存WebView2のtabを追加し、Home、new tab、tab close、tab selection、bounded history、last page restoreを提供します。Historyは新しいBrowser tabの`about:history`ページで表示します。
-historyとlast pageはURL、title、訪問時刻だけを保存します。
-page本文、raw observation、absolute path、cookie、認証情報は保存しません。
-
-Phase 6.5時点のBridge contract versionは`1`でした。Phase 7でversion `2`へ更新しました。
-新しいtab、history、role stateは既存stateへ追加しました。
-MO2 write、AI、MCP、独自Browser engine、browser syncはPhase6.5へ追加していません。
-
-Phase6.5後のUI細部整理では、通常ToolbarへURL入力を追加し、History導線を整理しました。ModListはcompact rowへ整理し、disabled MODを灰色系で表示します。ContextのANALYSISには、Base Data/Config選択と静的解析を状態連動CTAとして表示します。未解析状態は`Not assessed`とし、競合なしとは推測表示しません。
+ModScope view、progressive disclosure、bounded history、Chrome型Toolbarを整理しました。
+Bridge contractはversion `2`です。
+page本文、absolute path、cookie、認証情報を永続化しません。
+MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません。
 
 ### Phase 6.6：情報減算UI（完了）
 
-Phase6.6では、機能とMO2 read-only境界を維持したまま、通常画面の情報を減らしました。
-中央のWeb pageを主役にし、通常Contextは`RECOGNIZE`と最小Local summaryだけを表示します。
-通常Contextではinstalled / not installedとenabled / disabledだけを表示します。
-profile名、version、priority、evidence、uncertainty、raw diagnostic、XML、provenanceは通常Contextから隠します。
-
-Analysisはstatus lampへまとめます。
-lampは`Running`、`Not assessed`、`Assessed`、`Issue`を文字とtooltipで表示し、クリックでInspector modeを開きます。
-確認済みMODがある場合はMOD Inspectorを開き、確認済みMODがない場合はactive profileのDiagnosisを開きます。
-通常Contextの独立したAnalysis、Diagnostics、Static evidenceカードは表示しません。
-
-InspectorはContext WebView内の置換modeです。
-固定overlayと背景backdropは使いません。
-結論を先に表示し、static evidence、runtime evidence、raw XML、patch operation、raw diagnosticは折りたたみます。
-FilesはInspectorの初期状態で閉じ、展開時だけ全ファイルを表示します。
-Mod Roleはrole chip、assessment chip、短い`Reason:`要約だけを表示し、詳細reasonとrole evidenceは展開表示します。
-Back to Contextで通常Contextへ戻ります。
-profile、MO2 source、analysis inputの変更時は古いInspector表示を閉じます。
-Runtime comparisonの実行導線はDebugへ残します。
-
-通常MOD rowはMOD名、version、enable状態のlampだけを表示します。
-role、assessment、profile state、priority、verified Website状態はhover、keyboard focus、Inspectorで表示します。
-disabled MODは灰色系で表示し、Website導線とInspector導線を維持します。
-`ModScope view`の固定順序とpriority順を維持します。
-
-Browser chromeとMO2 read-only境界は維持します。
-Phase6.6はQuery層、Bridge contract、Desktop host、Browser engineを変更しません。
+通常画面はWeb pageを主役にし、Contextには`RECOGNIZE`と最小Local summaryを表示します。
+詳細なevidence、diagnostic、XML、priorityはInspectorへ段階表示します。
+MO2 read-only境界、Query層、Bridge contract、Desktop host、Browser engineは変更しません。
 
 ### Phase 6.7：起動表示・Chrome風Toolbar・MOD URL導線整理（完了）
 
-Desktop hostはclient area全体へ`LOADING PROFILE` overlayを表示します。
-WebView2初期化、source discovery、source load、foregroundのprofile switchを表示対象にします。
-background profile preloadは表示対象にしません。
-overlayはprofile名、operation phase、completed / totalまたはindeterminate progressを表示し、loading中のclient area操作を無効にします。
-成功後は自動で閉じ、失敗時は既存diagnosticを表示します。
-
-Toolbarは96pxのChrome dark 2段構成にします。
-上段は濃いtabstripです。
-active tabは明るいsurfaceと丸い上端で表示します。
-inactive tabは透明背景と控えめなhoverで表示します。
-tab全体をpillにはしません。
-tab直後のnew tab buttonはtab listの末尾に置き、tabと一緒に横スクロールします。
-下段はnavigation rowです。
-back、forward、reload、homeは左側のcontrol groupへまとめます。
-URL入力は中央のomniboxとして表示します。
-Goはcompactな`↵` iconで表示します。
-History、pane icon、shortcut hintは右側のaction groupへまとめます。
-Toolbarは通常96pxで固定します。
-Historyはpopupではなく新しいBrowser tabの`about:history`ページとして開きます。
-`layout.setToolbarExpanded`は互換性のため維持しますが、通常History操作からは呼び出しません。
-既存のWebView2とBrowser commandを維持します。
-
-`MO2 order`切替を削除し、ModScope viewを固定します。
-表示順は`Foundation`、`Compatibility`、`Content`、`Unknown`です。
-同じ分類内ではMO2 priorityとMOD keyの決定的な順序を使います。
-
-MOD URLは有効なModInfo Websiteを`Verified`として最優先します。
-欠落または無効なWebsiteは、MOD名から7DTD Nexus検索URLを`Inferred`として作ります。
-検索結果から数値IDのMODリンクを抽出し、検索名と正規化後に完全一致する候補が1件だけの場合に正規ページへ遷移します。
-一致しない場合、複数候補の場合、検索結果を解析できない場合は検索ページを表示したままにします。
-URLを作れないMODは`No usable URL`としてクリック不可で表示します。
-検索結果の最上位候補は自動採用しません。
-Verified Websiteの404はdiagnosticとして扱い、自動検索へ変更しません。
-
-`nexusSearchName`は`browser.navigate`にだけ付く一時的なnavigation intentです。
-これはUiState、History metadata、Local Knowledgeへ保存しません。
+LOADING PROFILE表示、Chrome型Toolbar、History page、Mod URL解決の境界を整理しました。
+Verified Websiteと一意一致したNexus検索結果だけを採用し、曖昧な候補は検索ページに残します。
+navigation intentはUiState、History metadata、Local Knowledgeへ保存しません。
 
 ### Phase 6.8：ロード遮断、Chrome palette、History page（完了）
 
-Desktop hostはWPF client areaのWebView2子windowを含めて入力を遮断します。
-foregroundのloading中はToolbar、ModList、Context、Browser tabの`IsEnabled`と`IsHitTestVisible`を無効にします。
-薄いグレーのloading panelはclient areaだけを覆います。
-OSタイトルバーはloading中も操作できます。
-background profile preloadではloading panelを表示しません。
-loading完了または失敗後はclient UIを再有効化します。
-
-ModScopeが所有するsurfaceはChrome dark paletteを使います。
-baseは`#202124`、navigationは`#292a2d`、panelは`#303134`、borderは`#3c4043`です。
-primary textは`#e8eaed`、muted textは`#9aa0a6`です。
-外部Web pageの色は変更しません。
-
-History buttonはpopupを開かず、新しいBrowser tabを開きます。
-新しいtabのtitleは`History`で、内部URLは`about:history`です。
-History pageはDesktop hostが生成し、URL、title、訪問時刻だけを表示します。
-History metadataはbounded local dataとして保存し、page本文、raw observation、absolute path、cookie、認証情報は保存しません。
+foreground loading中の入力遮断、Chrome dark palette、History pageを実装しました。
+HistoryにはURL、title、訪問時刻だけを保存し、page本文、absolute path、cookie、認証情報を保存しません。
 
 ### Phase 6.9：Nexus検索によるMODページ解決（完了）
 
-推定MOD URLは7DTD Nexus検索を起点にします。
-Desktop hostは同一Nexus hostの`/7daystodie/mods/{numericId}`リンクだけを候補にします。
-検索名とリンク表示名を正規化し、完全一致が1件だけの場合に数値IDページへ遷移します。
-空、曖昧、解析不能な検索結果は検索ページに残します。
-手入力のNexus検索は自動解決しません。
-Verified Websiteの404はBrowser diagnosticとして保持します。
-検索結果解析用のnavigation intentはUiStateと永続データへ公開しません。
+7DTD Nexus検索から同一hostの数値MOD IDを候補化します。
+正規化後の完全一致が1件の場合だけ遷移し、空、曖昧、解析不能な結果は検索ページに残します。
 
 ### Phase 7：Controlled write（実装）
 
-Controlled profile edit、junction deploy、Steam起動のvertical sliceを実装します。
-
-- `DeploymentDraft`はprofile識別子、MOD key、enabled状態、順序だけを持ちます。
-- `DeploymentPlan`はplan ID、modlist差分、junction差分、source/profile/game fingerprint、blocking diagnosticを持ちます。
-- `deployment.preview`でhostが実ディスクを再読します。
-- `deployment.apply`はplan IDと明示承認を受け取ります。
-- Applyはtimestamp付きbackup、junction検証、temporary replacement、再読検証、rollbackを行います。
-- `modlist.txt`のcomment、空行、separator、未知行を保持します。
-- ModScope管理junctionだけを削除します。
-- `game.launch`はpayloadを持たず、Apply成功後だけ固定Steam URIを開きます。
-- bridge contractはversion 2です。
-
-実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施しました。実行中processを停止しません。
-
-2026-08-14に、ユーザーが実ゲームへ既存worldをロードしてowner Playcheckを完了しました。
-
-owner Playcheckは、automated test、build、GUI evidenceとは別の証拠クラスです。
+Controlled profile edit、junction deploy、Steam起動をwrite planeへ分離して実装しました。
+Preview、明示承認、backup、rollback、再読検証を必須にします。
+実環境owner Playcheckは、automated test、build、GUI evidenceとは別の証拠クラスです。
 
 ### Phase 7.1：Installed version vs Web observed version（planned）
 
-Phase 7後の次のread-only vertical sliceは、Installed versionとWeb observed versionの比較です。
-
-入力は、local mod identity、raw local version、local source / provenance、Web URL、title、raw observed version、Web source、observed timeです。
-
-出力は、local version、observed Web version、`same`、`web_newer`、`local_newer`、`unknown`、provenance、observed time、diagnosticsです。
-
-比較不能なversion formatは`unknown`とします。
-
-semverを推測しません。
-
-raw versionを保持します。
-
-共通freshness TTLは定義しません。
-
-このvertical sliceでは、auto update、MO2 write、deployment、Steam launch、requirements auto resolution、compatibility boolean、CLI、multi-game generalization、AI integrationを行いません。
-
-次の優先順位は、requirements evidenceの分類です。
-
-その後に、dependency、load-order rule、file overlap、semantic / runtime evidenceを横断表示します。
+次のread-only vertical sliceは、Installed versionとWeb observed versionの比較です。
+identity未解決または比較不能なversion formatは、確定比較へ昇格しません。
+raw version、provenance、observed time、diagnosticを保持します。
+その後にrequirements evidence、dependency、load-order rule、file overlap、semantic / runtime evidenceを横断表示します。
 
 ### Phase 8：Game Adapter拡張
 
-第二gameへの需要と共通性が確認できた場合だけ対応します。
+第二gameの需要と共通性が確認できた場合だけ、Game Adapterを拡張します。
 
 ## 13. 最終的な成功条件
 
@@ -669,63 +512,9 @@ ModScopeは、次の状態を目指します。
 - GUIの認知負荷を増やさないか
 - 将来のsemantic analysis、runtime comparison、Game Adapterを妨げないか
 
-## 16. Web UI vertical slice
+## 16. Current implementation reference
 
-現在のWeb UIは、.NET / C#のpresentation adapterです。
+現在のWeb UI、Browser surface、Bridge contract、Conclusion-first表示、Deployment previewの仕様は、[ModScope設計](design.md)を正本とします。
 
-- Browser WebView2は外部Web pageを表示します。
-- App WebView2はSvelte frontendを表示します。
-- Desktop hostはWebMessage JSON contractを検証します。
-- frontendはQuery projectionだけを表示します。
-- frontendはMO2 source、LocalModSnapshot、filesystemへ直接アクセスしません。
-
-現在のUIは、固定したGlobal Browser chromeを上段に置き、ModList、Browser Content、Contextを下段に分ける3列構成です。
-
-- Toolbar WebView2はnavigation、Home、URL入力、tabs、history、pane iconを表示します。
-- ModList WebView2はactive profileのMOD一覧とprofile selectorを表示します。
-- Browser WebView2は外部Web pageだけを表示します。
-- Context WebView2はLocal context、例外確認、Developer tools、Inspectorを表示します。
-
-Toolbar、ModList、Contextは、同じSvelte bundleを別surfaceとして読み込みます。
-Desktop hostは各App WebViewへ同じstate、error、ready messageをbroadcastします。
-ModListの幅は約280pxです。
-MOD一覧だけをスクロール可能にします。
-ToolbarはBrowser操作とtab metadataを表示します。
-URL直接入力は通常Toolbarで行います。History pageを開いてもToolbar host rowは拡張しません。
-ModListとContextは独立して折りたためます。
-この構成は情報設計の検証用です。
-将来はContextをdrawerまたはoverlayへ折り畳みます。
-
-v0.1では、次を保留します。
-
-- frontend router、downloads
-- AI chat、MCP、Codex automation
-- controlled write plane外のMO2管理操作
-- browser syncとChromium bundling
-
-## 17. Conclusion-first Web UI refinement
-
-現在のUIは、開発者向けのsource操作よりも、pageとLocal contextの結論を優先します。
-
-- 通常画面はページ、status、profile、enabled state、priority、version、evidenceを表示します。
-- 高信頼な一意候補のidentity確認は通常工程です。
-- 複数候補、弱い一致、unresolvedは手動確認の例外導線です。
-- Developer toolsはfixtureと明示sourceを検証するために残しますが、初期状態では閉じます。
-- Browser navigation完了後のObserveはDesktop hostが実行します。
-- Profile selectorは、MO2設定から解決したProfiles directoryにあるprofileだけをread-onlyで切り替えます。
-- Profile switch後はsession、candidates、profile nameを更新し、page observationは維持します。
-- ModListはactive profileの全MODをpriority順で表示します。
-- profileに存在するがMOD directoryがないMODはunresolvedとして表示します。
-- MOD directoryに存在するがprofileに存在しないMODは、折りたたみ式の`Profile外`欄へ表示します。
-- 他profileはactive profile表示後にbackground preloadし、selectorへPending、Loading、Ready、Failedを表示します。
-- background preload中もprofile switchを許可し、選択profileを優先します。
-- 認識失敗時の検索drawerは、全候補をdisplay name、directory name、MOD keyで検索する補助導線として維持します。
-- `ModInfo.xml`の確認済みWebsiteだけを、内蔵Browserで開きます。
-- WebsiteがないMODは、URLを推測せずリンクなしで表示します。
-- 認識失敗時のlocal MOD選択も、同じ検索導線を使用します。
-
-起動時にMO2 source discoveryを実行します。
-候補がない場合は再探索とnative folder pickerを使用します。
-Frontendにはabsolute pathを送信しません。
-page identity自動認識は、正規化URLまたは正規化名称の強い一致が一意の場合だけ行います。
-page本文はmatch queryへ渡しません。
+将来像では、現在のUI細部を再記載しません。
+将来の判断は、Web page first、Local contextのprogressive disclosure、AIなしでのinspect、evidence before inference、controlled writeの原則に従います。
