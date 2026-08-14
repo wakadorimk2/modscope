@@ -1125,6 +1125,8 @@ Inspectorは右ペイン内の置換modeです。
 固定overlayと背景backdropは使用しません。
 Inspectorの上部に`Back to Context`を表示します。
 結論は最初から表示し、static evidence、runtime evidence、raw XML、patch operation、raw diagnosticは閉じた状態にします。
+FilesはInspectorの初期状態で閉じ、展開時だけ全ファイルを表示します。
+Mod Roleはrole chip、assessment chip、短い`Reason:`要約だけを初期表示し、詳細reasonとrole evidenceはdisclosureへ移します。
 profile、MO2 source、analysis inputの変更時は古いInspector表示を閉じます。
 Runtime comparisonの実行導線はDebugへ残します。
 
