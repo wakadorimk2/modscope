@@ -47,7 +47,8 @@ public static class BridgeProtocol
         "analysis.compareRuntimeEvidence",
         "analysis.useFixture",
         "layout.setContextVisible",
-        "layout.setModListVisible"
+        "layout.setModListVisible",
+        "layout.setToolbarExpanded"
     };
 
     public static JsonSerializerOptions JsonOptions { get; } = new()
@@ -213,6 +214,8 @@ public sealed record SwitchProfilePayload(string ProfileName);
 public sealed record SetContextVisiblePayload(bool Visible);
 
 public sealed record SetModListVisiblePayload(bool Visible);
+
+public sealed record SetToolbarExpandedPayload(bool Expanded);
 
 public sealed record BridgeErrorPayload(string Code, string Message);
 

@@ -154,9 +154,31 @@ public sealed class BridgeProtocolTests
             """);
         var modListPayload = BridgeProtocol.ReadPayload<SetModListVisiblePayload>(modListEnvelope.Payload);
 
+        var toolbarEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "toolbar-layout-1",
+              "command": "layout.setToolbarExpanded",
+              "payload": { "expanded": true }
+            }
+            """);
+        var toolbarPayload = BridgeProtocol.ReadPayload<SetToolbarExpandedPayload>(toolbarEnvelope.Payload);
+
         Assert.Equal("Alternate", profilePayload.ProfileName);
         Assert.False(layoutPayload.Visible);
         Assert.False(modListPayload.Visible);
+        Assert.True(toolbarPayload.Expanded);
+    }
+
+    [Fact]
+    public void SerializesToolbarExpandedPayloadInCamelCase()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new SetToolbarExpandedPayload(true),
+            BridgeProtocol.JsonOptions);
+
+        Assert.Equal("{\"expanded\":true}", json);
     }
 
     [Fact]

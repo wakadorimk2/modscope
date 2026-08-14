@@ -140,8 +140,12 @@
 
   function handleHostMessage(message: HostMessage) {
     if (message.kind === 'state') {
+      const addressIsBeingEdited = document.activeElement instanceof HTMLInputElement
+        && document.activeElement.classList.contains('toolbar-address');
       state = message.payload;
-      address = state.browser.url;
+      if (!addressIsBeingEdited) {
+        address = state.browser.url;
+      }
       lastError = null;
       inspectorOpen = Boolean(state.inspector);
       return;
@@ -195,8 +199,15 @@
     send('browser.home');
   }
 
+  function handleHistoryToggle(event: Event) {
+    const details = event.currentTarget as HTMLDetailsElement;
+    historyOpen = details.open;
+    send('layout.setToolbarExpanded', { expanded: historyOpen });
+  }
+
   function selectHistory(entryId: string) {
     historyOpen = false;
+    send('layout.setToolbarExpanded', { expanded: false });
     send('browser.selectHistory', { entryId });
   }
 
@@ -437,6 +448,47 @@
     }
   }
 
+  function analysisSummaryStatus(): string {
+    if (analysisBusy) {
+      return analysisOperationLabel();
+    }
+
+    if (state.analysis.diagnostics.some((diagnostic) => diagnostic.severity.toLowerCase() === 'error')) {
+      return 'Failed';
+    }
+
+    return state.analysis.conflict ? 'Assessed' : 'Not assessed';
+  }
+
+  function analysisSummaryStatusClass(): string {
+    if (analysisBusy) {
+      return 'analysis-status-possible';
+    }
+
+    if (state.analysis.diagnostics.some((diagnostic) => diagnostic.severity.toLowerCase() === 'error')) {
+      return 'analysis-status-different';
+    }
+
+    return state.analysis.conflict ? 'analysis-status-ready' : 'analysis-status-not-assessed';
+  }
+
+  function staticAnalysisActionLabel(): string {
+    if (!state.analysis.inputs.baseDataReady) {
+      return 'Select base Data/Config';
+    }
+
+    return state.analysis.conflict ? 'Re-run static analysis' : 'Analyze static';
+  }
+
+  function startStaticAnalysis() {
+    if (!state.analysis.inputs.baseDataReady) {
+      send('analysis.selectBaseData');
+      return;
+    }
+
+    send('analysis.analyzeConflicts');
+  }
+
   function operationLabel(): string {
     const operation = state.knowledge.operation;
     const profile = operation.targetProfileName ? ` ${operation.targetProfileName}` : '';
@@ -576,11 +628,11 @@
         </select>
       </label>
 
-      <div class="profile-count-grid sidebar-count-grid">
-        <div><span>In profile</span><strong>{profileCandidates.length}</strong></div>
-        <div><span>Enabled</span><strong>{enabledProfileCandidates.length}</strong></div>
-        <div><span>Disabled</span><strong>{disabledProfileCandidates.length}</strong></div>
-        <div><span>Unresolved</span><strong>{unresolvedProfileCandidates.length}</strong></div>
+      <div class="profile-count-summary" aria-label="Profile MOD counts">
+        <span>In profile <strong>{profileCandidates.length}</strong></span>
+        <span>Enabled <strong>{enabledProfileCandidates.length}</strong></span>
+        <span>Disabled <strong>{disabledProfileCandidates.length}</strong></span>
+        <span>Unresolved <strong>{unresolvedProfileCandidates.length}</strong></span>
       </div>
 
       <div class="mod-list-scroll" aria-label="Active profile MOD list">
@@ -588,59 +640,12 @@
           <div class="mod-list-section-label">PROFILE MODLIST · {profileCandidates.length}</div>
           <div class="mod-list-items">
             {#each profileCandidates as candidate (candidate.modKey)}
-              <article class="mod-list-item">
-                {#if isWebsiteUrl(candidate.website)}
-                  <button
-                    type="button"
-                    class="mod-list-item-main"
-                    aria-label={`Open ${modDisplayName(candidate)} page`}
-                    onclick={() => openModPage(candidate)}
-                  >
-                    <strong>{modDisplayName(candidate)}</strong>
-                    {#if candidate.version}<span>v{candidate.version}</span>{/if}
-                  </button>
-                {:else}
-                  <div class="mod-list-item-main mod-card-main-disabled">
-                    <strong>{modDisplayName(candidate)}</strong>
-                    {#if candidate.version}<span>v{candidate.version}</span>{/if}
-                  </div>
-                {/if}
-                <div class="mod-card-meta">
-                  <span class="role-chip role-{roleLabel(candidate).toLowerCase()}">{roleLabel(candidate)}</span>
-                  <span class="status-chip status-role-assessment">{roleAssessmentLabel(candidate)}</span>
-                  <span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span>
-                  <span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span>
-                  <span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span>
-                  <span class="mod-link-hint">
-                    {isWebsiteUrl(candidate.website) ? 'Open page' : 'No verified page'}
-                  </span>
-                </div>
-                {#if candidate.role}
-                  <details class="role-detail">
-                    <summary>Role evidence</summary>
-                    <p class="analysis-meta">{candidate.role.reason}</p>
-                    {#if candidate.role.evidence.length > 0}
-                      {#each candidate.role.evidence as evidence}
-                        <p class="provenance-line">{formatLabel(evidence.kind)} · {evidence.detail} · {evidence.source.relativePath}</p>
-                      {/each}
-                    {:else}
-                      <p class="subtle">Unknown because no readable static evidence is available.</p>
-                    {/if}
-                  </details>
-                {/if}
-              </article>
-            {/each}
-          </div>
-        {:else}
-          <p class="empty-state">No MOD entry is available in this profile.</p>
-        {/if}
-
-        <details class="profile-outside-section">
-          <summary>Profile外 · {unlistedProfileCandidates.length}</summary>
-          {#if unlistedProfileCandidates.length > 0}
-            <div class="mod-list-items">
-              {#each unlistedProfileCandidates as candidate (candidate.modKey)}
-                <article class="mod-list-item">
+              <article
+                class="mod-list-item"
+                class:mod-list-item-disabled={candidate.enabledState === 'disabled'}
+                class:mod-list-item-unresolved={candidate.profileState === 'unresolved'}
+              >
+                <div class="mod-list-item-top">
                   {#if isWebsiteUrl(candidate.website)}
                     <button
                       type="button"
@@ -657,22 +662,70 @@
                       {#if candidate.version}<span>v{candidate.version}</span>{/if}
                     </div>
                   {/if}
+                  <button
+                    type="button"
+                    class="icon-button compact-icon-button mod-list-item-inspect"
+                    title="Inspect evidence"
+                    aria-label={`Inspect ${modDisplayName(candidate)} evidence`}
+                    onclick={() => openInspectorForMod(candidate.modKey)}
+                  >⌕</button>
+                </div>
+                <div class="mod-card-meta">
+                  <span class="role-chip role-{roleLabel(candidate).toLowerCase()}">{roleLabel(candidate)}</span>
+                  <span class="status-chip status-role-assessment">{roleAssessmentLabel(candidate)}</span>
+                  <span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span>
+                  <span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span>
+                  <span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span>
+                </div>
+              </article>
+            {/each}
+          </div>
+        {:else}
+          <p class="empty-state">No MOD entry is available in this profile.</p>
+        {/if}
+
+        <details class="profile-outside-section">
+          <summary>Profile外 · {unlistedProfileCandidates.length}</summary>
+          {#if unlistedProfileCandidates.length > 0}
+            <div class="mod-list-items">
+              {#each unlistedProfileCandidates as candidate (candidate.modKey)}
+                <article
+                  class="mod-list-item"
+                  class:mod-list-item-disabled={candidate.enabledState === 'disabled'}
+                  class:mod-list-item-unresolved={candidate.profileState === 'unresolved'}
+                >
+                  <div class="mod-list-item-top">
+                    {#if isWebsiteUrl(candidate.website)}
+                      <button
+                        type="button"
+                        class="mod-list-item-main"
+                        aria-label={`Open ${modDisplayName(candidate)} page`}
+                        onclick={() => openModPage(candidate)}
+                      >
+                        <strong>{modDisplayName(candidate)}</strong>
+                        {#if candidate.version}<span>v{candidate.version}</span>{/if}
+                      </button>
+                    {:else}
+                      <div class="mod-list-item-main mod-card-main-disabled">
+                        <strong>{modDisplayName(candidate)}</strong>
+                        {#if candidate.version}<span>v{candidate.version}</span>{/if}
+                      </div>
+                    {/if}
+                    <button
+                      type="button"
+                      class="icon-button compact-icon-button mod-list-item-inspect"
+                      title="Inspect evidence"
+                      aria-label={`Inspect ${modDisplayName(candidate)} evidence`}
+                      onclick={() => openInspectorForMod(candidate.modKey)}
+                    >⌕</button>
+                  </div>
                   <div class="mod-card-meta">
                     <span class="role-chip role-{roleLabel(candidate).toLowerCase()}">{roleLabel(candidate)}</span>
                     <span class="status-chip status-role-assessment">{roleAssessmentLabel(candidate)}</span>
                     <span class="status-chip status-unlisted">Profile外</span>
                     <span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span>
                     <span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span>
-                    <span class="mod-link-hint">
-                      {isWebsiteUrl(candidate.website) ? 'Open page' : 'No verified page'}
-                    </span>
                   </div>
-                  {#if candidate.role}
-                    <details class="role-detail">
-                      <summary>Role evidence</summary>
-                      <p class="analysis-meta">{candidate.role.reason}</p>
-                    </details>
-                  {/if}
                 </article>
               {/each}
             </div>
@@ -699,6 +752,15 @@
 
       <button class="icon-button" title="Home" aria-label="Open Browse Home" onclick={openHome}>⌂</button>
 
+      <input
+        class="toolbar-address"
+        aria-label="Browser URL"
+        placeholder="https://example.com"
+        bind:value={address}
+        onkeydown={(event) => event.key === 'Enter' && navigate()}
+      />
+      <button class="secondary-button toolbar-go-button" type="button" onclick={navigate}>Go</button>
+
       <div class="browser-tabs" aria-label="Browser tabs">
         {#each state.browser.tabs as tab (tab.tabId)}
           <div
@@ -720,8 +782,16 @@
         <button type="button" class="icon-button compact-icon-button" title="New tab" aria-label="New tab" onclick={openNewTab}>+</button>
       </div>
 
-      <details class="history-menu">
-        <summary class="icon-button" title="History" aria-label="Open history">◷</summary>
+      <details
+        class="history-menu"
+        bind:open={historyOpen}
+        ontoggle={handleHistoryToggle}
+      >
+        <summary
+          class="icon-button"
+          title={`History (${state.browser.history.length})`}
+          aria-label={`Open history (${state.browser.history.length} entries)`}
+        >◷</summary>
         <div class="history-popover">
           <strong>History</strong>
           {#if state.browser.history.length === 0}
@@ -985,8 +1055,8 @@
           <h2 id="analysis-title">Compare &amp; Diagnose</h2>
           <p class="summary-meta">Static evidence and runtime evidence stay separate.</p>
         </div>
-        <span class="status-chip {analysisStatusClass(state.analysis.operation.kind)}">
-          {analysisOperationLabel()}
+        <span class="status-chip {analysisSummaryStatusClass()}">
+          {analysisSummaryStatus()}
         </span>
       </div>
 
@@ -998,6 +1068,15 @@
           Runtime logs · {state.analysis.inputs.runtimeLogsReady ? 'Ready' : 'Not selected'}
         </span>
         {#if analysisBusy}<span class="subtle" role="status">{analysisOperationLabel()}…</span>{/if}
+      </div>
+
+      <div class="analysis-summary-actions">
+        <button
+          class="primary-button"
+          disabled={operationBlocksInteraction}
+          onclick={startStaticAnalysis}
+        >{staticAnalysisActionLabel()}</button>
+        <span class="subtle">Static XML analysis uses the selected base Data/Config folder.</span>
       </div>
 
       {#if state.analysis.diagnostics.length > 0}
@@ -1273,18 +1352,6 @@
         <button class="primary-button" disabled={operationBlocksInteraction} onclick={loadSource}>Load source</button>
         <button class="secondary-button" onclick={() => send('browser.observe')}>Observe now</button>
       </div>
-
-      <details class="advanced-browser-tools">
-        <summary>Advanced navigation</summary>
-        <div class="advanced-navigation-row">
-          <input
-            aria-label="Advanced URL"
-            bind:value={address}
-            onkeydown={(event) => event.key === 'Enter' && navigate()}
-          />
-          <button class="secondary-button" type="button" onclick={navigate}>Go</button>
-        </div>
-      </details>
 
       <div class="analysis-developer-tools">
         <div class="analysis-tool-header">

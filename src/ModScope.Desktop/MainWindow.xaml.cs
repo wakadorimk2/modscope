@@ -9,6 +9,9 @@ namespace ModScope.Desktop;
 
 public partial class MainWindow : Window
 {
+    private const double ToolbarCollapsedHeight = 72;
+    private const double ToolbarExpandedHeight = 440;
+
     private const string AppHostName = "appassets.modscope";
     private readonly DesktopSessionController _controller = new();
     private bool _toolbarReady;
@@ -662,6 +665,20 @@ public partial class MainWindow : Window
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
+            case "layout.setToolbarExpanded":
+            {
+                if (!command.Payload.TryGetProperty("expanded", out var expanded)
+                    || expanded.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                {
+                    throw new BridgeProtocolException("The toolbar expanded state must be a boolean.");
+                }
+
+                var payload = BridgeProtocol.ReadPayload<SetToolbarExpandedPayload>(command.Payload);
+                ToolbarRow.Height = new GridLength(
+                    payload.Expanded ? ToolbarExpandedHeight : ToolbarCollapsedHeight);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
             case "inspector.open":
             {
                 var payload = BridgeProtocol.ReadPayload<InspectorOpenPayload>(command.Payload);
@@ -873,8 +890,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        SendMessage("error", new BridgeErrorPayload(code, message), requestId, targetWebView);
         SendState(requestId, targetWebView);
+        SendMessage("error", new BridgeErrorPayload(code, message), requestId, targetWebView);
     }
 
     private void SendMessage<T>(
