@@ -26,6 +26,8 @@ ModScopeは、MODをWeb上で探し、吟味し、比較する作業を、ユー
 
 ModScopeは、AIを使わなくてもbrowse、inspect、compare、local environmentの理解が成立することを目指します。AI agentは、同じLocal Mod Knowledgeへ効率よくアクセスできます。
 
+ModScope reports what is known, why it is believed, and what remains unknown.
+
 ## 3. Core problem
 
 現在のMOD調査では、Web上の候補MODと、MO2が管理する現在環境を別々に確認します。
@@ -135,6 +137,20 @@ MODの発見と評価は、MOD一覧から始まるとは限りません。ラ�
 - 任意のMO2管理操作と、未承認のMO2 write
 - MO2設定にない外部profile pathの探索
 - v0.1での複数Site Adapter
+
+### 5.5 Prior-art-derived boundary
+
+MO2、Wabbajack、Vortexは、mod management、list distribution、deployment、load-order、またはmanager-side conflict resolutionをそれぞれ提供します。
+
+ModScopeは、これらの成熟機能を置き換えません。
+
+- MO2のprofile、enable、priority、virtual filesystem、launchを置き換えません。
+- Wabbajackのinstaller、distribution、list compilationを再実装しません。
+- Vortexのdeployment、dependency resolver、manager-side conflict resolutionを再実装しません。
+
+ModScopeは、local stateとWeb observationをprovenance付きで比較・理解する補完層です。
+
+Prior-artの詳細、公式source、調査対象版、未確認事項は、research noteへ記録します。
 
 ## 6. Conceptual architecture
 
@@ -317,7 +333,39 @@ Desktop hostはcandidate IDから内部保持したpathを解決します。
 
 source path、page URL、取得時刻、parser version、snapshot idなど、再確認に必要なreferenceを保持します。
 
-### 7.4 Identityとversion provenance
+情報不足の場合は推測で確定しません。
+
+`Unknown`、`Unresolved`、`Not assessed`は正常な結果です。
+
+判定に使うraw value、source、source locator、observed time、provenance、confidence、verification level、unresolved reason、diagnosticを可能な限り保持します。
+
+local version、Nexus mod version、Nexus file version、Wabbajack list version、game versionは別の値として扱います。
+
+dependency、compatibility、load-order rule、file overlap、semantic conflict、runtime observationは別の関係として扱います。
+
+### 7.4 Requirementsとcompatibilityの意味
+
+Requirementsは、game version、hard dependency、optional dependency、recommended mod、toolまたはscript extender、account、hardware、manual step、unknownへ分けて保持します。
+
+Descriptionなどの自由記述だけでhard dependencyを確定しません。
+
+DependencyをCompatibilityへ統合しません。
+
+Compatibilityは、単一booleanではなく、条件付きのevidence-backed assertionとして扱います。
+
+`CompatibilityAssertion`は、conditions、evidence、confidence、verification level、review state、unresolved reasonを持ち得る概念上の説明単位です。
+
+これはproduction schemaではありません。
+
+概念モデルでは、`status`、`confidence`、`verification`を別フィールドとして扱います。
+
+`status`、`confidence`、`verification`は統合しません。
+
+既存Phase 4のstatic conflict resultは、source-specificな解析結果として維持します。
+
+static conflict resultを、一般的なruntime compatibilityの証拠として扱いません。
+
+### 7.5 Identityとversion provenance
 
 ModScopeLabのinventoryで、archive、MO2 package、Modlet、Nexus Mod、Nexus Fileは別のentityであることを確認しました。
 packageから複数のModletが生成される関係を保持します。
@@ -961,7 +1009,29 @@ Phase 7は、Controlled profile edit、junction deploy、Steam起動のvertical 
 - 編集中のMOD rowは、左側のdrag handleと`+/-`を近接配置します。
 - ドラッグ中はeditable MODの間に差し込みラインを表示します。
 
-Phase 7の実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施します。実行中MO2または7DTDを停止しません。
+Phase 7の実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施しました。実行中MO2または7DTDを停止しません。
+
+2026-08-14に、ユーザーが実ゲームへ既存worldをロードしてowner Playcheckを完了しました。
+
+owner Playcheckは、automated test、build、GUI evidenceとは別の証拠クラスです。
+
+### Phase 7.1：Installed version vs Web observed version（planned）
+
+Phase 7後の次のread-only vertical sliceは、Installed versionとWeb observed versionの比較です。
+
+入力は、local mod identity、raw local version、local source / provenance、Web URL、title、raw observed version、Web source、observed timeです。
+
+出力は、local version、observed Web version、`same`、`web_newer`、`local_newer`、`unknown`、provenance、observed time、diagnosticsです。
+
+比較不能なversion formatは`unknown`とします。
+
+semverを推測しません。
+
+raw versionを保持します。
+
+共通freshness TTLは定義しません。
+
+このvertical sliceでは、auto update、MO2 write、deployment、Steam launch、requirements auto resolution、compatibility boolean、CLI、multi-game generalization、AI integrationを行いません。
 
 ### Phase 8：Game Adapter拡張
 
