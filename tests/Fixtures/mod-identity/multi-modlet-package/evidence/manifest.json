@@ -1,0 +1,247 @@
+{
+  "scenario": "multi-modlet-package",
+  "entities": [
+    {
+      "kind": "archive",
+      "id": "archive-1",
+      "name": "synthetic-izy-like.zip"
+    },
+    {
+      "kind": "package",
+      "id": "package-1",
+      "name": "izy-like-package",
+      "relativePath": "mods/izy-like-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-01",
+      "name": "Synthetic IZY Modlet 01",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-01/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-02",
+      "name": "Synthetic IZY Modlet 02",
+      "version": "1.1.0",
+      "relativePath": "mods/izy-like-package/modlet-02/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-03",
+      "name": "Synthetic IZY Modlet 03",
+      "version": "2.0.0",
+      "relativePath": "mods/izy-like-package/modlet-03/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-04",
+      "name": "Synthetic IZY Modlet 04",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-04/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-05",
+      "name": "Synthetic IZY Modlet 05",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-05/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-06",
+      "name": "Synthetic IZY Modlet 06",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-06/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-07",
+      "name": "Synthetic IZY Modlet 07",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-07/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-08",
+      "name": "Synthetic IZY Modlet 08",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-08/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-09",
+      "name": "Synthetic IZY Modlet 09",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-09/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-10",
+      "name": "Synthetic IZY Modlet 10",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-10/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-11",
+      "name": "Synthetic IZY Modlet 11",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-11/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-12",
+      "name": "Synthetic IZY Modlet 12",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-12/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-13",
+      "name": "Synthetic IZY Modlet 13",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-13/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-14",
+      "name": "Synthetic IZY Modlet 14",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-14/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-15",
+      "name": "Synthetic IZY Modlet 15",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-15/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-16",
+      "name": "Synthetic IZY Modlet 16",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-16/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-17",
+      "name": "Synthetic IZY Modlet 17",
+      "version": "1.0.0",
+      "relativePath": "mods/izy-like-package/modlet-17/ModInfo.xml"
+    }
+  ],
+  "relations": [
+    {
+      "from": "archive-1",
+      "type": "contains",
+      "to": "package-1"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-01"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-02"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-03"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-04"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-05"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-06"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-07"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-08"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-09"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-10"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-11"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-12"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-13"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-14"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-15"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-16"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-17"
+    }
+  ],
+  "observations": [
+    {
+      "type": "package-has-multiple-modlets",
+      "target": "package-1",
+      "value": 17
+    },
+    {
+      "type": "package-version-not-inferred",
+      "target": "package-1",
+      "value": "Modlet versions differ."
+    }
+  ],
+  "expected": {
+    "identityStatus": "unresolved",
+    "versionStatus": "not-comparable",
+    "notes": [
+      "Do not collapse the package into one Modlet identity.",
+      "Do not assign one package version to all child Modlets."
+    ]
+  }
+}

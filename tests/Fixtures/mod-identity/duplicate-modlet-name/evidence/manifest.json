@@ -1,0 +1,62 @@
+{
+  "scenario": "duplicate-modlet-name",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "package-1",
+      "name": "synthetic-package-alpha",
+      "relativePath": "mods/synthetic-package-alpha"
+    },
+    {
+      "kind": "package",
+      "id": "package-2",
+      "name": "synthetic-package-beta",
+      "relativePath": "mods/synthetic-package-beta"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-1",
+      "name": "Synthetic Shared Modlet",
+      "version": "1.0.0",
+      "relativePath": "mods/synthetic-package-alpha/shared-modlet/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-2",
+      "name": "Synthetic Shared Modlet",
+      "version": "2.0.0",
+      "relativePath": "mods/synthetic-package-beta/shared-modlet/ModInfo.xml"
+    }
+  ],
+  "relations": [
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-1"
+    },
+    {
+      "from": "package-2",
+      "type": "contains",
+      "to": "modlet-2"
+    }
+  ],
+  "observations": [
+    {
+      "type": "duplicate-modinfo-name",
+      "target": "modlet-1",
+      "value": "Synthetic Shared Modlet"
+    },
+    {
+      "type": "duplicate-modinfo-name",
+      "target": "modlet-2",
+      "value": "Synthetic Shared Modlet"
+    }
+  ],
+  "expected": {
+    "identityStatus": "ambiguous",
+    "versionStatus": "not-comparable",
+    "notes": [
+      "The two relative paths remain distinct local identities."
+    ]
+  }
+}

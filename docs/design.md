@@ -377,6 +377,21 @@ Compatibilityは、単一booleanではなく、条件付きのevidence-backed as
 
 static conflict resultを、一般的なruntime compatibilityの証拠として扱いません。
 
+### 7.5 Identityとversion provenance
+
+ModScopeLabのinventoryで、archive、MO2 package、Modlet、Nexus Mod、Nexus Fileは別のentityであることを確認しました。
+packageから複数のModletが生成される関係を保持します。
+`ModInfo.Name`、package名、archive名だけでstable identityを確定しません。
+
+version comparisonは、local Modletと対象Nexus Fileのidentityを解決した後だけ実行します。
+identityまたはversionが欠落、曖昧、比較不能の場合は`Unknown`または`not-comparable`として返します。
+比較不能をversion matchとして扱いません。
+
+MO2 separator textはcurator-authored evidenceとしてraw保持します。
+separator textからenable、dependency、compatibilityを断定しません。
+
+詳細な観測値と判断理由は、[Identity and version provenance ADR](adr/identity-and-version-provenance.md)に記録します。
+
 ## 8. Adapter boundaries
 
 ### 8.1 MO2 Adapter
