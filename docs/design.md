@@ -1109,6 +1109,40 @@ Desktop hostはbrowser persistenceをlocal metadataへ限定します。
 History popupの表示状態はDesktop sessionだけで保持します。Toolbar高さは永続化しません。
 MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません。
 
+### 25.2 Phase6.6 情報減算UI
+
+Phase6.6は、既存のBrowse、Recognize、Analysis、Inspectorの結果を維持し、通常画面の情報量だけを減らします。
+Browser chrome、MO2 read-only境界、Query projectionは変更しません。
+
+通常Contextは`RECOGNIZE`と最小Local summaryだけを表示します。
+Local summaryは、installed / not installedとenabled / disabledだけを表示します。
+profile名、version、priority、evidence、uncertainty、raw diagnostic、XML、provenanceは通常Contextへ表示しません。
+Analysisは小さなstatus lampで`Running`、`Not assessed`、`Assessed`、`Issue`を文字とtooltipで示します。
+lampはInspector modeを開きます。
+確認済みMODがある場合はMOD Inspectorを開き、確認済みMODがない場合はactive profileのDiagnosisを開きます。
+
+Inspectorは右ペイン内の置換modeです。
+固定overlayと背景backdropは使用しません。
+Inspectorの上部に`Back to Context`を表示します。
+結論は最初から表示し、static evidence、runtime evidence、raw XML、patch operation、raw diagnosticは閉じた状態にします。
+profile、MO2 source、analysis inputの変更時は古いInspector表示を閉じます。
+Runtime comparisonの実行導線はDebugへ残します。
+
+通常MOD rowはMOD名、version、enable状態のlampだけを表示します。
+role、assessment、profile state、priority、verified Website状態はhover、keyboard focus、Inspectorで表示します。
+disabled MODは名前、背景、lampを灰色系で表示します。
+MOD名はellipsisで省略します。
+Website導線、Inspector導線、`ModScope view`、`MO2 order`、priority順は維持します。
+
+### 25.3 Phase6.6 表示状態と境界
+
+Context、Settings、Debugのmode切替は維持します。
+通常Contextから独立した`ANALYSIS`、`DIAGNOSTICS`、`STATIC EVIDENCE`の展開カードを削除します。
+raw diagnosticはDebugだけに表示します。
+InspectorはContext WebView内で完結し、中央BrowserとBrowser chromeを覆いません。
+通常Contextの背景と境界は低コントラストにし、中央Web pageを主役として維持します。
+MO2 write、AI、MCP、独自Browser engineは追加しません。
+
 ### 24.3 読み込み性能とProfile投影
 
 静的MOD knowledgeとProfile projectionを分離します。

@@ -19,7 +19,10 @@
 
   let state: UiState = initialState;
   let address = initialState.browser.url;
-  let inspectorOpen = false;
+  let contextPanelMode: 'context' | 'inspector' = 'context';
+  let inspectorView: 'mod' | 'diagnosis' = 'mod';
+  let inspectorModKey: string | null = null;
+  let dismissedInspectorModKey: string | null = null;
   let modSearchOpen = false;
   let modSearchMode: 'browse' | 'recognition' = 'browse';
   let modSearchQuery = '';
@@ -147,7 +150,21 @@
         address = state.browser.url;
       }
       lastError = null;
-      inspectorOpen = Boolean(state.inspector);
+      if (surface === 'context' && state.inspector?.modKey) {
+        if (state.inspector.modKey !== dismissedInspectorModKey) {
+          contextPanelMode = 'inspector';
+          inspectorView = 'mod';
+          inspectorModKey = state.inspector.modKey;
+        }
+      }
+      if (
+        contextPanelMode === 'inspector'
+        && inspectorView === 'mod'
+        && inspectorModKey
+        && state.inspector?.modKey !== inspectorModKey
+      ) {
+        closeInspector();
+      }
       return;
     }
 
@@ -158,7 +175,29 @@
 
   function send(command: string, payload: unknown = {}) {
     lastError = null;
+    if (shouldCloseInspectorFor(command)) {
+      closeInspector();
+    }
     bridge?.send(command, payload);
+  }
+
+  function shouldCloseInspectorFor(command: string): boolean {
+    return [
+      'browser.home',
+      'browser.newTab',
+      'browser.selectHistory',
+      'browser.selectTab',
+      'browser.navigate',
+      'identity.confirm',
+      'knowledge.loadSource',
+      'knowledge.selectRoot',
+      'knowledge.selectSource',
+      'knowledge.switchProfile',
+      'knowledge.useFixture',
+      'analysis.selectBaseData',
+      'analysis.selectRuntimeLogs',
+      'analysis.useFixture'
+    ].includes(command);
   }
 
   function navigate() {
@@ -274,12 +313,44 @@
   function openInspector() {
     if (state.localContext?.localModKey) {
       openInspectorForMod(state.localContext.localModKey);
+    } else {
+      openProfileDiagnosis();
     }
   }
 
   function openInspectorForMod(modKey: string) {
-    inspectorOpen = true;
+    inspectorView = 'mod';
+    inspectorModKey = modKey;
+    dismissedInspectorModKey = null;
+    contextPanelMode = 'inspector';
     send('inspector.open', { modKey });
+  }
+
+  function openProfileDiagnosis() {
+    inspectorView = 'diagnosis';
+    inspectorModKey = null;
+    dismissedInspectorModKey = null;
+    contextPanelMode = 'inspector';
+  }
+
+  function openAnalysisInspector() {
+    if (state.localContext?.localModKey) {
+      openInspectorForMod(state.localContext.localModKey);
+      return;
+    }
+
+    openProfileDiagnosis();
+  }
+
+  function showCandidateCompare(): boolean {
+    return inspectorView === 'mod';
+  }
+
+  function closeInspector() {
+    dismissedInspectorModKey = state.inspector?.modKey ?? inspectorModKey;
+    contextPanelMode = 'context';
+    inspectorView = 'mod';
+    inspectorModKey = null;
   }
 
   function compareRuntimeEvidence() {
@@ -450,11 +521,11 @@
 
   function analysisSummaryStatus(): string {
     if (analysisBusy) {
-      return analysisOperationLabel();
+      return 'Running';
     }
 
     if (state.analysis.diagnostics.some((diagnostic) => diagnostic.severity.toLowerCase() === 'error')) {
-      return 'Failed';
+      return 'Issue';
     }
 
     return state.analysis.conflict ? 'Assessed' : 'Not assessed';
@@ -487,6 +558,20 @@
     }
 
     send('analysis.analyzeConflicts');
+  }
+
+  function modTooltip(candidate: ModCandidateUiState): string {
+    const website = isWebsiteUrl(candidate.website) ? 'Verified Website' : 'No verified page';
+    return [
+      `${roleLabel(candidate)} · ${roleAssessmentLabel(candidate)}`,
+      formatLabel(candidate.profileState),
+      `Priority ${candidate.priority ?? 'Unknown'}`,
+      website
+    ].join(' · ');
+  }
+
+  function enabledLampLabel(candidate: ModCandidateUiState): string {
+    return candidate.enabledState === 'enabled' ? 'Enabled' : formatLabel(candidate.enabledState);
   }
 
   function operationLabel(): string {
@@ -644,6 +729,7 @@
                 class="mod-list-item"
                 class:mod-list-item-disabled={candidate.enabledState === 'disabled'}
                 class:mod-list-item-unresolved={candidate.profileState === 'unresolved'}
+                title={modTooltip(candidate)}
               >
                 <div class="mod-list-item-top">
                   {#if isWebsiteUrl(candidate.website)}
@@ -669,14 +755,15 @@
                     aria-label={`Inspect ${modDisplayName(candidate)} evidence`}
                     onclick={() => openInspectorForMod(candidate.modKey)}
                   >⌕</button>
+                  <span
+                    class="mod-enabled-lamp"
+                    class:enabled={candidate.enabledState === 'enabled'}
+                    class:disabled={candidate.enabledState !== 'enabled'}
+                    role="img"
+                    aria-label={enabledLampLabel(candidate)}
+                  ></span>
                 </div>
-                <div class="mod-card-meta">
-                  <span class="role-chip role-{roleLabel(candidate).toLowerCase()}">{roleLabel(candidate)}</span>
-                  <span class="status-chip status-role-assessment">{roleAssessmentLabel(candidate)}</span>
-                  <span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span>
-                  <span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span>
-                  <span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span>
-                </div>
+                <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)}</span>
               </article>
             {/each}
           </div>
@@ -693,6 +780,7 @@
                   class="mod-list-item"
                   class:mod-list-item-disabled={candidate.enabledState === 'disabled'}
                   class:mod-list-item-unresolved={candidate.profileState === 'unresolved'}
+                  title={modTooltip(candidate)}
                 >
                   <div class="mod-list-item-top">
                     {#if isWebsiteUrl(candidate.website)}
@@ -718,14 +806,15 @@
                       aria-label={`Inspect ${modDisplayName(candidate)} evidence`}
                       onclick={() => openInspectorForMod(candidate.modKey)}
                     >⌕</button>
+                    <span
+                      class="mod-enabled-lamp"
+                      class:enabled={candidate.enabledState === 'enabled'}
+                      class:disabled={candidate.enabledState !== 'enabled'}
+                      role="img"
+                      aria-label={enabledLampLabel(candidate)}
+                    ></span>
                   </div>
-                  <div class="mod-card-meta">
-                    <span class="role-chip role-{roleLabel(candidate).toLowerCase()}">{roleLabel(candidate)}</span>
-                    <span class="status-chip status-role-assessment">{roleAssessmentLabel(candidate)}</span>
-                    <span class="status-chip status-unlisted">Profile外</span>
-                    <span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span>
-                    <span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span>
-                  </div>
+                  <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)} · Profile outside</span>
                 </article>
               {/each}
             </div>
@@ -927,81 +1016,43 @@
       </section>
     {/if}
 
-    {#if contextMode === 'context' && state.knowledge.session}
-    <section class="panel context-summary-panel">
-      {#if hasConclusion() && state.localContext}
-        <div class="summary-header">
+    {#if contextMode === 'context' && state.knowledge.session && contextPanelMode === 'context'}
+      <section class="panel context-summary-panel" aria-labelledby="recognize-title">
+        <div class="recognize-header">
           <div>
             <span class="eyebrow">RECOGNIZE</span>
-            <h2>{pageIdentity() || 'Current page'}</h2>
-            <p class="summary-meta">
-              {state.localContext.profileName || 'Profile unknown'}
-              {#if state.localContext.knownVersion} · v{state.localContext.knownVersion}{/if}
-            </p>
+            {#if hasConclusion() && state.localContext}
+              <h2 id="recognize-title">{pageIdentity() || 'Current page'}</h2>
+            {:else if state.observation}
+              <h2 id="recognize-title">Couldn’t recognize this page</h2>
+            {:else}
+              <h2 id="recognize-title">Browse a MOD page</h2>
+            {/if}
           </div>
-          <span class="status-chip {statusClass(state.localContext.status)}">
-            {formatLabel(state.localContext.status)}
-          </span>
+          <button
+            class="analysis-lamp"
+            class:analysis-lamp-issue={analysisSummaryStatusClass() === 'analysis-status-different'}
+            class:analysis-lamp-ready={analysisSummaryStatusClass() === 'analysis-status-ready'}
+            disabled={operationBlocksInteraction}
+            title={`Open analysis inspector · ${analysisSummaryStatus()}`}
+            aria-label={`Open analysis inspector · ${analysisSummaryStatus()}`}
+            onclick={openAnalysisInspector}
+          >
+            <span class="analysis-lamp-dot" aria-hidden="true"></span>
+            <span>{analysisSummaryStatus()}</span>
+          </button>
         </div>
 
-        <div class="local-awareness-heading">
-          <span class="eyebrow">LOCAL AWARENESS</span>
-          <span class="subtle">Active profile context</span>
-        </div>
-        <div class="summary-grid">
-          <div><span>Enabled</span><strong>{formatLabel(state.localContext.enabledState)}</strong></div>
-          <div><span>Priority</span><strong>{state.localContext.priority ?? 'Unknown'}</strong></div>
-          <div><span>Version</span><strong>{state.localContext.knownVersion || 'Unknown'}</strong></div>
-        </div>
-
-        {#if state.localContext.evidence.length > 0}
-          <div class="evidence-strip">
-            <span class="eyebrow">EVIDENCE</span>
-            {#each state.localContext.evidence as evidence}
-              <span class="evidence-tag">
-                <span class="status-dot" aria-hidden="true">✓</span>
-                {formatLabel(evidence.kind)} · <code>{evidence.source.relativePath}</code>
-              </span>
-            {/each}
+        {#if hasConclusion() && state.localContext}
+          <div class="local-summary-line" aria-label="Local MOD summary">
+            <span class="status-chip {statusClass(state.localContext.status)}">{formatLabel(state.localContext.status)}</span>
+            <span class="status-chip {statusClass(state.localContext.enabledState)}">{formatLabel(state.localContext.enabledState)}</span>
           </div>
-        {/if}
-
-        {#if state.localContext.uncertainties.length > 0}
-          <div class="notice-list">
-            {#each state.localContext.uncertainties as uncertainty}
-              <p class="notice">{uncertainty}</p>
-            {/each}
-          </div>
-        {/if}
-
-        {#if state.localContext.diagnostics.length > 0}
-          <div class="diagnostic-list">
-            <p class="diagnostic-summary">{groupDiagnostics(state.localContext.diagnostics).length} types · {state.localContext.diagnostics.length} occurrences · details in Debug</p>
-            {#each groupDiagnostics(state.localContext.diagnostics) as group}
-              <p class={diagnosticClass(group.diagnostic.severity)}>
-                <strong>{group.diagnostic.code}</strong>
-                {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
-                {group.diagnostic.message}
-              </p>
-            {/each}
-          </div>
-        {/if}
-
-        {#if state.localContext.status === 'installed' && state.localContext.localModKey}
-          <button class="primary-button action-button" onclick={openInspector}>Inspect</button>
-        {/if}
-      {:else if state.observation && !hasConclusion()}
-        <div class="exception-card">
-          <span class="eyebrow">RECOGNIZE</span>
-          <h2>Couldn’t recognize this page</h2>
-          <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
-
-          {#if state.localContext}
-            <span class="status-chip {statusClass(state.localContext.status)}">
-              {formatLabel(state.localContext.status)}
-            </span>
+          {#if state.localContext.status === 'installed' && state.localContext.localModKey}
+            <button class="secondary-button action-button" onclick={openInspector}>Inspect MOD</button>
           {/if}
-
+        {:else if state.observation}
+          <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
           {#if state.knowledge.candidates.length > 0}
             <p class="subtle">Search the local MOD catalog to confirm the page identity.</p>
             <div class="action-row">
@@ -1015,40 +1066,21 @@
               <button class="secondary-button" type="button" onclick={() => confirmIdentity(null)}>Mark as not installed</button>
             </div>
           {/if}
-
-          {#if state.localContext?.uncertainties.length}
-            <div class="notice-list">
-              {#each state.localContext.uncertainties as uncertainty}
-                <p class="notice">{uncertainty}</p>
-              {/each}
-            </div>
-          {/if}
-
-          {#if state.localContext?.diagnostics.length}
-            <div class="diagnostic-list">
-              <p class="diagnostic-summary">{groupDiagnostics(state.localContext.diagnostics).length} types · {state.localContext.diagnostics.length} occurrences · details in Debug</p>
-              {#each groupDiagnostics(state.localContext.diagnostics) as group}
-                <p class={diagnosticClass(group.diagnostic.severity)}>
-                  <strong>{group.diagnostic.code}</strong>
-                  {#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}
-                  {group.diagnostic.message}
-                </p>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {:else}
-        <div class="empty-card">
-          <span class="eyebrow">RECOGNIZE</span>
-          <h2>Browse a MOD page</h2>
+        {:else}
           <p class="subtle">ModScope will observe the current page and show local context here.</p>
-        </div>
-      {/if}
-    </section>
+        {/if}
+      </section>
     {/if}
 
-    {#if contextMode === 'context' && state.knowledge.session}
-    <section class="panel analysis-panel" aria-labelledby="analysis-title">
+    {#if contextMode === 'context' && state.knowledge.session && contextPanelMode === 'inspector' && inspectorView === 'diagnosis'}
+    <section class="panel analysis-panel inspector-analysis-panel" aria-labelledby="analysis-title">
+      <div class="inspector-mode-header">
+        <div>
+          <span class="eyebrow">INSPECTOR</span>
+          <h2>{inspectorView === 'diagnosis' ? 'Profile diagnosis' : state.inspector?.directoryName || 'Loading evidence'}</h2>
+        </div>
+        <button class="secondary-button" type="button" onclick={closeInspector}>Back to Context</button>
+      </div>
       <div class="summary-header">
         <div>
           <span class="eyebrow">ANALYSIS</span>
@@ -1089,6 +1121,7 @@
         </div>
       {/if}
 
+      {#if showCandidateCompare()}
       <details class="analysis-section" open>
         <summary>
           <span>Compare</span>
@@ -1179,6 +1212,7 @@
           </div>
         {/if}
       </details>
+      {/if}
 
       <details class="analysis-section" open>
         <summary>
@@ -1242,7 +1276,7 @@
         {/if}
       </details>
 
-      <details class="analysis-section" open>
+      <details class="analysis-section">
         <summary>
           <span>Runtime evidence</span>
           <span class="subtle">RuntimeOCD comparison</span>
@@ -1301,7 +1335,7 @@
     </section>
     {/if}
 
-    {#if contextMode === 'context' && state.knowledge.session && state.diagnostics.length > 0}
+    {#if contextMode === 'debug' && state.knowledge.session && state.diagnostics.length > 0}
       {@const diagnosticGroups = groupDiagnostics(state.diagnostics)}
       <section class="panel diagnostics-panel">
         <span class="eyebrow">DIAGNOSTICS</span>
@@ -1508,14 +1542,39 @@
       </aside>
     {/if}
 
-    {#if inspectorOpen}
-      <aside class="inspector-drawer">
-        <div class="drawer-heading">
+    {#if contextMode === 'context' && state.knowledge.session && contextPanelMode === 'inspector' && inspectorView === 'mod'}
+      <section class="panel inspector-panel">
+        <div class="drawer-heading inspector-panel-heading">
           <div>
             <span class="eyebrow">INSPECTOR</span>
             <h2>{state.inspector?.directoryName || 'Loading evidence'}</h2>
           </div>
-          <button class="icon-button" title="Close inspector" aria-label="Close inspector" onclick={() => (inspectorOpen = false)}>×</button>
+          <button class="secondary-button" type="button" onclick={closeInspector}>Back to Context</button>
+        </div>
+
+        <div class="drawer-section inspector-analysis-summary">
+          <div class="inspector-analysis-summary-header">
+            <div>
+              <span class="eyebrow">ANALYSIS</span>
+              <strong>{analysisSummaryStatus()}</strong>
+            </div>
+            <span class="status-chip {analysisSummaryStatusClass()}">{analysisSummaryStatus()}</span>
+          </div>
+
+          {#if !state.analysis.inputs.baseDataReady}
+            <p class="subtle">Base Data/Config is not selected.</p>
+            <button class="primary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>Select base Data/Config</button>
+          {:else if analysisBusy}
+            <p class="subtle" role="status">{analysisOperationLabel()}…</p>
+          {:else}
+            <button class="secondary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>{staticAnalysisActionLabel()}</button>
+          {/if}
+
+          {#if state.analysis.conflict}
+            <p class="analysis-meta">Static analysis result is available in the closed evidence sections below.</p>
+          {:else}
+            <p class="notice">Not assessed. This is not a no-conflict conclusion.</p>
+          {/if}
         </div>
 
         {#if state.inspector}
@@ -1645,7 +1704,7 @@
         {:else}
           <p class="empty-state">Inspector evidence is loading.</p>
         {/if}
-      </aside>
+      </section>
     {/if}
   </main>
 {/if}

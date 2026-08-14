@@ -438,6 +438,33 @@ MO2 write、AI、MCP、独自Browser engine、browser syncはPhase6.5へ追加�
 
 Phase6.5後のUI細部整理では、通常ToolbarへURL入力を追加し、History popupのclipを解消しました。ModListはcompact rowへ整理し、disabled MODを灰色系で表示します。ContextのANALYSISには、Base Data/Config選択と静的解析を状態連動CTAとして表示します。未解析状態は`Not assessed`とし、競合なしとは推測表示しません。
 
+### Phase 6.6：情報減算UI（完了）
+
+Phase6.6では、機能とMO2 read-only境界を維持したまま、通常画面の情報を減らしました。
+中央のWeb pageを主役にし、通常Contextは`RECOGNIZE`と最小Local summaryだけを表示します。
+通常Contextではinstalled / not installedとenabled / disabledだけを表示します。
+profile名、version、priority、evidence、uncertainty、raw diagnostic、XML、provenanceは通常Contextから隠します。
+
+Analysisはstatus lampへまとめます。
+lampは`Running`、`Not assessed`、`Assessed`、`Issue`を文字とtooltipで表示し、クリックでInspector modeを開きます。
+確認済みMODがある場合はMOD Inspectorを開き、確認済みMODがない場合はactive profileのDiagnosisを開きます。
+通常Contextの独立したAnalysis、Diagnostics、Static evidenceカードは表示しません。
+
+InspectorはContext WebView内の置換modeです。
+固定overlayと背景backdropは使いません。
+結論を先に表示し、static evidence、runtime evidence、raw XML、patch operation、raw diagnosticは折りたたみます。
+Back to Contextで通常Contextへ戻ります。
+profile、MO2 source、analysis inputの変更時は古いInspector表示を閉じます。
+Runtime comparisonの実行導線はDebugへ残します。
+
+通常MOD rowはMOD名、version、enable状態のlampだけを表示します。
+role、assessment、profile state、priority、verified Website状態はhover、keyboard focus、Inspectorで表示します。
+disabled MODは灰色系で表示し、Website導線とInspector導線を維持します。
+`ModScope view`と`MO2 order`の並び順は変更しません。
+
+Browser chromeとMO2 read-only境界は維持します。
+Phase6.6はQuery層、Bridge contract、Desktop host、Browser engineを変更しません。
+
 ### Phase 7：Controlled write
 
 必要性が確認できた場合に、dry-runと明示承認付きのMO2操作を追加します。
