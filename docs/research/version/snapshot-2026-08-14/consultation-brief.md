@@ -238,8 +238,8 @@ Mediumは表示・manual review用です。
 
 参照用の成果物はこちらです。
 
-- [dataset.csv](./dataset.csv)
-- [dataset.json](./dataset.json)
+- [dataset.csv](artifacts/dataset.csv)
+- [dataset.json](artifacts/dataset.json)
 - [mismatch-cases.md](./mismatch-cases.md)
 - [confidence-model.md](./confidence-model.md)
 - [findings.md](./findings.md)

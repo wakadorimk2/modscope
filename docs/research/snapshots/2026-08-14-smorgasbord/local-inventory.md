@@ -199,5 +199,5 @@ identity mapping済みrecordへ、次のsourceを同じartifact identity上で�
 
 ## 関連資料
 
-- [Identity and version provenance ADR](../adr/identity-and-version-provenance.md)
-- [Synthetic identity fixtures](../../tests/Fixtures/mod-identity/README.md)
+- [Identity and version provenance ADR](../../../adr/identity-and-version-provenance.md)
+- [Synthetic identity fixtures](../../../../tests/Fixtures/mod-identity/README.md)
