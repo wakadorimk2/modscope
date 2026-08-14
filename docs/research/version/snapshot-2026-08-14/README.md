@@ -95,7 +95,7 @@ local path referenceはsnapshot内の相対pathだけを使います。
 
 `sanitization-check.json`と`mo2-mtime-verification.json`は、調査時の確認結果です。
 このrepositoryでlive sourceを再取得しません。
-保存ファイルの完全性は`[snapshot-manifest.json](./snapshot-manifest.json)`で確認します。
+保存ファイルの完全性は`[snapshot-manifest.json](artifacts/snapshot-manifest.json)`で確認します。
 
 ## Repository boundary
 

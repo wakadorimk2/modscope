@@ -70,12 +70,12 @@ patch/fork/bundle identity, and runtime necessity.
 
 ## Research artifacts
 
-- [Before / after](requirements-local-resolution/before-after.md)
-- [Findings](requirements-local-resolution/findings.md)
-- [False-positive cases](requirements-local-resolution/false-positive-cases.md)
-- [Resolution results](requirements-local-resolution/resolution-results.csv)
-- [Resolution evidence](requirements-local-resolution/resolution-evidence.json)
-- [Local inventory](requirements-local-resolution/local-inventory.json)
+- [Before / after](before-after.md)
+- [Findings](findings.md)
+- [False-positive cases](false-positive-cases.md)
+- [Resolution results](artifacts/resolution-results.csv)
+- [Resolution evidence](artifacts/resolution-evidence.json)
+- [Local inventory](artifacts/local-inventory.json)
 
 ## Privacy and reproducibility boundary
 

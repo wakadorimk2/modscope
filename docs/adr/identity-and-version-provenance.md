@@ -90,5 +90,5 @@ raw、normalized、static evidence、inference、uncertainty、diagnostic、prov
 
 ## Evidence
 
-- [Smorgasbord local inventory](../research/smorgasbord-local-inventory-2026-08-14.md)
+- [Smorgasbord local inventory](../research/snapshots/2026-08-14-smorgasbord/local-inventory.md)
 - [Synthetic identity fixtures](../../tests/Fixtures/mod-identity/README.md)
