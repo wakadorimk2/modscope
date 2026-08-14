@@ -24,6 +24,7 @@
   let inspectorView: 'mod' | 'diagnosis' = 'mod';
   let inspectorModKey: string | null = null;
   let dismissedInspectorModKey: string | null = null;
+  let handledAutoInspectToken: string | null = null;
   let inspectorFilesOpen = false;
   let modSearchOpen = false;
   let modSearchMode: 'browse' | 'recognition' = 'browse';
@@ -159,6 +160,13 @@
       }
       lastError = null;
       if (surface === 'context' && state.inspector?.modKey) {
+        if (
+          state.identity.autoInspectToken
+          && state.identity.autoInspectToken !== handledAutoInspectToken
+        ) {
+          handledAutoInspectToken = state.identity.autoInspectToken;
+          dismissedInspectorModKey = null;
+        }
         if (state.inspector.modKey !== dismissedInspectorModKey) {
           if (state.inspector.modKey !== inspectorModKey) {
             inspectorFilesOpen = false;
@@ -695,10 +703,21 @@
 
   function staticAnalysisActionLabel(): string {
     if (!state.analysis.inputs.baseDataReady) {
-      return 'Select base Data/Config';
+      return '別のData\\Configを選択';
     }
 
     return state.analysis.conflict ? 'Re-run static analysis' : 'Analyze static';
+  }
+
+  function baseDataStatusLabel(): string {
+    switch (state.analysis.inputs.baseDataStatus) {
+      case 'inferred':
+        return 'MO2 gamePathからData\\Configを検出済み';
+      case 'manual':
+        return '別のData\\Configを選択済み';
+      default:
+        return 'Data\\Configが見つかりません';
+    }
   }
 
   function startStaticAnalysis() {
@@ -1280,11 +1299,29 @@
             <span class="status-chip {statusClass(state.localContext.status)}">{formatLabel(state.localContext.status)}</span>
             <span class="status-chip {statusClass(state.localContext.enabledState)}">{formatLabel(state.localContext.enabledState)}</span>
           </div>
+          {#if state.identity.recognitionStatus === 'auto-confirmed' && state.identity.matches.length > 0}
+            <p class="subtle">Auto-confirmed from {formatLabel(state.identity.matches[0].matchKind)} evidence.</p>
+            <p class="analysis-meta">{state.identity.matches[0].evidence}</p>
+          {/if}
           {#if state.localContext.status === 'installed' && state.localContext.localModKey}
             <button class="secondary-button action-button" onclick={openInspector}>Inspect MOD</button>
           {/if}
         {:else if state.observation}
           <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
+          {#if state.identity.matches.length > 0}
+            <div class="recognition-candidate-list" aria-label="Local MOD recognition candidates">
+              {#each state.identity.matches.slice(0, 6) as match}
+                <article class="recognition-candidate">
+                  <div class="recognition-candidate-heading">
+                    <strong>{match.displayName || match.directoryName || match.modKey}</strong>
+                    <span class="status-chip {match.strength === 'strong' ? 'status-ready' : 'status-unknown'}">{formatLabel(match.strength)}</span>
+                  </div>
+                  <p class="analysis-meta">{match.evidence}</p>
+                  <p class="subtle">{match.profileState} · {match.enabledState} · {match.modKey}</p>
+                </article>
+              {/each}
+            </div>
+          {/if}
           {#if state.knowledge.candidates.length > 0}
             <p class="subtle">Search the local MOD catalog to confirm the page identity.</p>
             <div class="action-row">
@@ -1594,7 +1631,7 @@
           <div><span>Title</span><strong>{state.observation.title || 'Untitled page'}</strong></div>
           <div><span>Observed</span><strong>{state.observation.observedAtUtc}</strong></div>
         </div>
-        <pre>{state.observation.contentPreview || 'No body text was returned.'}</pre>
+        <p class="subtle">Page body stays in the Desktop session and is not sent to Web state.</p>
         {#if state.observation.diagnostics.length > 0}
           {#each state.observation.diagnostics as diagnostic}
             <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
@@ -1627,7 +1664,7 @@
           </div>
           <div class="analysis-badges">
             <span class="status-chip {state.analysis.inputs.baseDataReady ? 'status-ready' : 'status-unknown'}">
-              Base {state.analysis.inputs.baseDataReady ? 'ready' : 'missing'}
+              {baseDataStatusLabel()}
             </span>
             <span class="status-chip {state.analysis.inputs.runtimeLogsReady ? 'status-ready' : 'status-unknown'}">
               Logs {state.analysis.inputs.runtimeLogsReady ? 'ready' : 'missing'}
@@ -1635,7 +1672,7 @@
           </div>
         </div>
         <div class="developer-actions">
-          <button class="secondary-button" disabled={operationBlocksInteraction} onclick={() => send('analysis.selectBaseData')}>Select base Data/Config</button>
+          <button class="secondary-button" disabled={operationBlocksInteraction} onclick={() => send('analysis.selectBaseData')}>別のData\Configを選択</button>
           <button class="secondary-button" disabled={operationBlocksInteraction} onclick={() => send('analysis.selectRuntimeLogs')}>Select runtime logs</button>
           <button
             class="primary-button"
@@ -1794,11 +1831,12 @@
           </div>
 
           {#if !state.analysis.inputs.baseDataReady}
-            <p class="subtle">Base Data/Config is not selected.</p>
-            <button class="primary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>Select base Data/Config</button>
+            <p class="subtle">{baseDataStatusLabel()}</p>
+            <button class="primary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>{staticAnalysisActionLabel()}</button>
           {:else if analysisBusy}
             <p class="subtle" role="status">{analysisOperationLabel()}…</p>
           {:else}
+            <p class="subtle">{baseDataStatusLabel()}</p>
             <button class="secondary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>{staticAnalysisActionLabel()}</button>
           {/if}
 

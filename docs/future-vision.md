@@ -14,7 +14,10 @@ Web pageはprimary surfaceです。Local contextはprogressive disclosureしま�
 
 ユーザーは、Nexus Mods、ランキングサイト、GitHub、Wiki、forum、作者サイト、ガイドサイトなどを自由に閲覧します。
 
-ModScopeは、現在のpageを主画面に置きます。page observationから候補MODを示します。v0.1では、ユーザーがMOD identityを確認します。
+ModScopeは、現在のpageを主画面に置きます。
+page observationのURLとtitleから候補MODを示します。
+強い一致が1件だけの場合はidentityを自動確認します。
+複数候補、弱い一致、unresolved recordはユーザー確認へ戻します。
 
 確認後、ModScopeはcurrent profileとのLocal contextを表示します。
 
@@ -179,7 +182,13 @@ Web pageの情報とMO2の事実を同じsourceとして扱いません。各値
 
 未知サイトでも、URL、title、基本page content、取得時刻、extraction statusを扱えることを目指します。
 
-pageからMOD identityが自動確定しない場合があります。その場合は、ユーザー確認またはunresolvedを使います。
+pageからMOD identityが自動確定しない場合があります。
+その場合は、候補表示、ユーザー確認、またはunresolvedを使います。
+自動認識は正規化したURLとtitleだけを使い、page本文は使いません。
+
+強いURL一致は、scheme、query、fragment、末尾slashを正規化したhost/pathの一致です。
+強い名称一致は、Unicode、空白、大文字小文字を正規化したtitleと、ModKey、DisplayName、DirectoryNameの完全一致です。
+部分一致は候補表示だけに使います。
 
 ### 6.2 Site Adapter
 
@@ -361,7 +370,10 @@ source boundary、page observation、MOD identity confirmation、Local context�
 
 ### Phase 1：v0.1 Browser-first vertical slice（完了）
 
-7DTD + MO2の1 profileをread-onlyで読み取ります。WPF + WebView2上でpage observationを取得します。ユーザー確認したMOD identityとcurrent profileを照合します。Inspectorで根拠を表示します。
+7DTD + MO2の1 profileをread-onlyで読み取ります。WPF + WebView2上でpage observationを取得します。
+URL/titleの強い一致が一意の場合はMOD identityを自動確認します。
+それ以外はユーザー確認したMOD identityとcurrent profileを照合します。
+Inspectorで根拠を表示します。
 
 v0.1は、site固有Adapter、複数game、完全なsemantic conflict、RuntimeOCD、MO2 write、特定agent backendを含めません。
 
@@ -654,7 +666,8 @@ v0.1では、次を保留します。
 現在のUIは、開発者向けのsource操作よりも、pageとLocal contextの結論を優先します。
 
 - 通常画面はページ、status、profile、enabled state、priority、version、evidenceを表示します。
-- identity確認は通常工程ではなく、認識失敗時の例外導線です。
+- 高信頼な一意候補のidentity確認は通常工程です。
+- 複数候補、弱い一致、unresolvedは手動確認の例外導線です。
 - Developer toolsはfixtureと明示sourceを検証するために残しますが、初期状態では閉じます。
 - Browser navigation完了後のObserveはDesktop hostが実行します。
 - Profile selectorは、MO2設定から解決したProfiles directoryにあるprofileだけをread-onlyで切り替えます。
@@ -672,4 +685,5 @@ v0.1では、次を保留します。
 起動時にMO2 source discoveryを実行します。
 候補がない場合は再探索とnative folder pickerを使用します。
 Frontendにはabsolute pathを送信しません。
-page identity自動認識は実装しません。
+page identity自動認識は、正規化URLまたは正規化名称の強い一致が一意の場合だけ行います。
+page本文はmatch queryへ渡しません。

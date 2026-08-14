@@ -219,7 +219,7 @@ function mockAnalysisForFixture(): UiState['analysis'] {
   });
 
   return {
-    inputs: { baseDataReady: true, runtimeLogsReady: true },
+    inputs: { baseDataReady: true, runtimeLogsReady: true, baseDataStatus: 'inferred' },
     conflict: {
       snapshotId: 'mock:snapshot',
       instanceName: 'synthetic-instance',
@@ -396,7 +396,6 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
     next.observation = {
       url: next.browser.url,
       title: next.browser.title || 'Mock page',
-      contentPreview: 'Development mock observation.',
       observedAtUtc: new Date().toISOString(),
       source: 'Mock WebView2',
       extractionStatus: 'succeeded',
@@ -445,7 +444,7 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
   } else if (command === 'analysis.selectBaseData') {
     next.analysis = {
       ...next.analysis,
-      inputs: { ...next.analysis.inputs, baseDataReady: true },
+      inputs: { ...next.analysis.inputs, baseDataReady: true, baseDataStatus: 'manual' },
       conflict: null,
       runtimeComparison: null,
       diagnostics: []
@@ -501,7 +500,13 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
   } else if (command === 'analysis.useFixture') {
     const fixtureState = mockStateForCommand(next, 'knowledge.useFixture', {});
     next = fixtureState;
-    next.identity = { candidateIdentity: 'Alpha Mod', selectedLocalModKey: 'Alpha Mod' };
+    next.identity = {
+      candidateIdentity: 'Alpha Mod',
+      selectedLocalModKey: 'Alpha Mod',
+      recognitionStatus: 'manual-confirmed',
+      matches: [],
+      autoInspectToken: null
+    };
     next.localContext = {
       candidateIdentity: 'Alpha Mod',
       status: 'installed',
@@ -530,7 +535,13 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
           loadState: profile.name === profileName ? 'ready' : profile.loadState
         }))
       };
-      next.identity = { candidateIdentity: '', selectedLocalModKey: null };
+      next.identity = {
+        candidateIdentity: '',
+        selectedLocalModKey: null,
+        recognitionStatus: 'not-searched',
+        matches: [],
+        autoInspectToken: null
+      };
       next.localContext = null;
       next.inspector = null;
       next.analysis = initialState.analysis;

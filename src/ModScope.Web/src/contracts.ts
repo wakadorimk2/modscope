@@ -47,7 +47,6 @@ export type EvidenceReferenceUiState = {
 export type PageObservationUiState = {
   url: string;
   title: string;
-  contentPreview?: string | null;
   observedAtUtc: string;
   source: string;
   extractionStatus: string;
@@ -131,9 +130,24 @@ export type SourceDiscoveryUiState = {
   selectedCandidateId?: string | null;
 };
 
+export type LocalModMatchUiState = {
+  modKey: string;
+  directoryName: string;
+  displayName?: string | null;
+  profileState: string;
+  enabledState: string;
+  matchKind: string;
+  strength: string;
+  evidence: string;
+  autoConfirmEligible: boolean;
+};
+
 export type IdentityUiState = {
   candidateIdentity: string;
   selectedLocalModKey?: string | null;
+  recognitionStatus: string;
+  matches: LocalModMatchUiState[];
+  autoInspectToken?: string | null;
 };
 
 export type LocalContextUiState = {
@@ -345,6 +359,7 @@ export type RuntimeEvidenceComparisonUiState = {
 export type AnalysisInputUiState = {
   baseDataReady: boolean;
   runtimeLogsReady: boolean;
+  baseDataStatus: 'inferred' | 'manual' | 'missing' | string;
 };
 
 export type AnalysisOperationUiState = {
@@ -462,14 +477,18 @@ export const initialState: UiState = {
   },
   identity: {
     candidateIdentity: '',
-    selectedLocalModKey: null
+    selectedLocalModKey: null,
+    recognitionStatus: 'not-searched',
+    matches: [],
+    autoInspectToken: null
   },
   localContext: null,
   inspector: null,
   analysis: {
     inputs: {
       baseDataReady: false,
-      runtimeLogsReady: false
+      runtimeLogsReady: false,
+      baseDataStatus: 'missing'
     },
     conflict: null,
     runtimeComparison: null,

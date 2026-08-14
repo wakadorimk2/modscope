@@ -64,15 +64,30 @@ internal static class DesktopStateMapper
         RuntimeEvidenceComparisonReadModel? runtimeComparison,
         bool baseDataReady,
         bool runtimeLogsReady,
+        string baseDataStatus,
         AnalysisOperationUiState operation,
         IReadOnlyList<DiagnosticUiState> diagnostics)
     {
         return new AnalysisUiState(
-            new AnalysisInputUiState(baseDataReady, runtimeLogsReady),
+            new AnalysisInputUiState(baseDataReady, runtimeLogsReady, baseDataStatus),
             conflict is null ? null : ConflictAnalysis(conflict),
             runtimeComparison is null ? null : RuntimeEvidenceComparison(runtimeComparison),
             operation,
             diagnostics);
+    }
+
+    internal static LocalModMatchUiState LocalModMatch(LocalModMatchReadModel value)
+    {
+        return new LocalModMatchUiState(
+            value.ModKey,
+            value.DirectoryName,
+            value.DisplayName,
+            EnumText(value.ProfileState),
+            EnumText(value.EnabledState),
+            EnumText(value.MatchKind),
+            EnumText(value.Strength),
+            value.Evidence,
+            value.AutoConfirmEligible);
     }
 
     private static SourceDiscoveryUiState SourceDiscovery(
@@ -177,7 +192,6 @@ internal static class DesktopStateMapper
         return new PageObservationUiState(
             value.Url.ToString(),
             value.Title,
-            value.BoundedContentPreview,
             value.ObservedAtUtc,
             value.Source,
             EnumText(value.ExtractionStatus),
