@@ -954,7 +954,7 @@ MO2 write、AI chat、MCP、browser engine変更、browser syncは実装しま�
 
 Desktopは4つのWebView2を、Global Browser chrome + MOD list + Content / Contextとして配置します。
 
-- Toolbar WebView2：全幅のURL、navigation、MOD list toggle、Context toggle
+- Toolbar WebView2：全幅のnavigation、Home、tabs、history、pane icon
 - ModList WebView2：active profileのMOD一覧、profile selector、profile preload state
 - Browser WebView2：ユーザーが閲覧する外部Web page
 - Context WebView2：Local context、例外確認、Developer tools、Inspector
@@ -1061,6 +1061,51 @@ resultが空でも`競合なし`とは表示しません。
 Inspectorは確認済みcandidate MOD以外のreadable MODも開けます。
 raw XML、XPath、attribute、patch detailは折りたたんで表示します。
 MO2はread-onlyのまま維持します。
+
+### 25.1 Phase6.5 Browse-first UI情報設計
+
+Phase6.5は、既存のBrowse、Recognize、Inspect、Compare、Diagnosisを壊さずに表示責務を整理します。
+routerは追加しません。
+Context WebView内のmode切替を使用します。
+
+Toolbarは、左ペインと右ペインをアイコンで切り替えます。
+アイコンにはtooltipとaria-labelを付けます。
+Ctrl/Cmd+IのContext shortcutは維持します。
+
+ModListの標準表示は`ModScope view`です。
+`Foundation`、`Compatibility`、`Content`、`Unknown`の順に分類します。
+分類はQuery layerのstatic evidenceだけを使います。
+`Foundation`は依存関係を意味しません。
+role assessmentは`Verified`、`Inferred`、`Unknown`で表示します。
+分類内の順序はMO2 priorityを維持し、同順位はMOD keyで決定します。
+`MO2 order`はactive profileのpriority順をそのまま表示します。
+根拠がないMODは`Unknown`へ置きます。
+MO2のpriorityはprofileの上から下へ`0→N`で保持します。
+ModScope viewは`Foundation`、`Compatibility`、`Content`、`Unknown`の順で表示し、分類内だけpriority順を使います。
+他のreadable MODからtarget XMLとして参照されるMODは、base roleの静的証拠として`Foundation / Inferred`へ投影します。
+これは依存関係やゲーム内のwinner方向を断定しません。
+
+Contextの表示順は`RECOGNIZE`、Local awareness、Analysis summary、Inspect導線です。
+通常Contextは対応可能なdiagnostic要約と件数だけを表示します。
+raw code、raw value、source detail、Page details、Developer toolsはDebugへ移します。
+SettingsはMO2 sourceの状態、変更、再読込、復旧操作だけを表示します。
+MO2 source未選択時はOnboardingを表示します。
+source選択後は通常Contextからsource cardを隠します。
+
+Browserは既存WebView2を使用します。
+各tabは独立したWebView2を持ちます。
+tabのURL、title、navigation、scroll、form stateは実行中のWebView2が保持します。
+起動時は保存済みtab URLを再読込し、保存済みlast pageをactive tabへ復元します。
+保存がない場合はローカルBrowse Homeを開きます。
+Historyはbounded metadataとしてURL、title、訪問時刻だけを保存します。
+page本文、raw observation、absolute path、cookie、認証情報は保存しません。
+URL直接入力はDebugのAdvanced navigationだけに置きます。
+
+Bridge contract versionは`1`を維持します。
+Browser tab、History、active tab、MOD roleのstateは既存stateへ追加します。
+`browser.newTab`、`browser.selectTab`、`browser.closeTab`、`browser.home`、`browser.selectHistory`はactive tabへ適用します。
+Desktop hostはbrowser persistenceをlocal metadataへ限定します。
+MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません。
 
 ### 24.3 読み込み性能とProfile投影
 

@@ -15,6 +15,20 @@ public partial class MainWindow : Window
     private bool _modListReady;
     private bool _contextReady;
     private bool _sourceDiscoveryStarted;
+    private readonly BrowserStateStore _browserStateStore = BrowserStateStore.CreateDefault();
+    private readonly Dictionary<string, BrowserTabHostState> _browserTabs = new(StringComparer.Ordinal);
+    private IReadOnlyList<BrowserHistoryEntryUiState> _browserHistory = Array.Empty<BrowserHistoryEntryUiState>();
+    private string? _activeBrowserTabId;
+    private int _browserTabSequence;
+
+    private const string HomeHtml = """
+        <!doctype html>
+        <html lang="en">
+        <head><meta charset="utf-8"><title>ModScope Home</title>
+        <style>body{font-family:Segoe UI,sans-serif;background:#0b1120;color:#e5e7eb;padding:48px;line-height:1.6}main{max-width:720px;margin:auto;background:#111827;border:1px solid #334155;border-radius:18px;padding:32px}h1{margin-top:0;color:#f8fafc}p{color:#cbd5e1}.hint{color:#93c5fd}</style></head>
+        <body><main><h1>ModScope Browse Home</h1><p>Open a page from your normal browser workflow, then use Recognize to connect it to local MOD knowledge.</p><p class="hint">Tabs, titles, and bounded history are stored as metadata only.</p></main></body>
+        </html>
+        """;
 
     public MainWindow()
     {
@@ -27,13 +41,10 @@ public partial class MainWindow : Window
     {
         try
         {
-            await Browser.EnsureCoreWebView2Async();
             await ToolbarShell.EnsureCoreWebView2Async();
             await ModListWebView.EnsureCoreWebView2Async();
             await ContextWebView.EnsureCoreWebView2Async();
 
-            Browser.NavigationCompleted += Browser_NavigationCompleted;
-            Browser.CoreWebView2.DocumentTitleChanged += Browser_DocumentTitleChanged;
             ToolbarShell.NavigationStarting += AppShell_NavigationStarting;
             ToolbarShell.NavigationCompleted += AppShell_NavigationCompleted;
             ToolbarShell.CoreWebView2.WebMessageReceived += AppShell_WebMessageReceived;
@@ -64,10 +75,8 @@ public partial class MainWindow : Window
                 SendState();
             }
 
-            var demoPage = Path.Combine(AppContext.BaseDirectory, "Fixtures", "alpha-mod.html");
-            Browser.Source = File.Exists(demoPage)
-                ? new Uri(demoPage)
-                : new Uri("about:blank");
+            await RestoreBrowserTabsAsync();
+            SendState();
         }
         catch (Exception exception)
         {
@@ -79,6 +88,204 @@ public partial class MainWindow : Window
                 SendError("browser.initialization.failed", exception.Message);
             }
         }
+    }
+
+    private async Task RestoreBrowserTabsAsync()
+    {
+        var persisted = _browserStateStore.Load();
+        _browserHistory = persisted.History;
+
+        foreach (var tab in persisted.Tabs)
+        {
+            await CreateBrowserTabAsync(tab.TabId, tab.Url, tab.Title, activate: false);
+        }
+
+        if (_browserTabs.Count == 0)
+        {
+            await CreateBrowserTabAsync(null, null, null, activate: true);
+            return;
+        }
+
+        var activeTabId = persisted.ActiveTabId is not null && _browserTabs.ContainsKey(persisted.ActiveTabId)
+            ? persisted.ActiveTabId
+            : _browserTabs.Keys.First();
+        await ActivateBrowserTabAsync(activeTabId);
+    }
+
+    private async Task<BrowserTabHostState> CreateBrowserTabAsync(
+        string? requestedTabId,
+        string? initialUrl,
+        string? initialTitle,
+        bool activate)
+    {
+        var tabId = string.IsNullOrWhiteSpace(requestedTabId)
+            ? NextBrowserTabId()
+            : requestedTabId.Trim();
+        while (_browserTabs.ContainsKey(tabId))
+        {
+            tabId = NextBrowserTabId();
+        }
+
+        var webView = new Microsoft.Web.WebView2.Wpf.WebView2();
+        var tab = new BrowserTabHostState(tabId, webView)
+        {
+            Title = string.IsNullOrWhiteSpace(initialTitle) ? "New tab" : initialTitle.Trim()
+        };
+        _browserTabs.Add(tabId, tab);
+        BrowserHost.Children.Add(webView);
+        webView.Visibility = Visibility.Collapsed;
+
+        await webView.EnsureCoreWebView2Async();
+        webView.NavigationCompleted += Browser_NavigationCompleted;
+        webView.CoreWebView2.DocumentTitleChanged += Browser_DocumentTitleChanged;
+
+        if (IsExternalBrowserUrl(initialUrl, out var initialUri))
+        {
+            tab.Url = initialUri.ToString();
+            webView.Source = initialUri;
+        }
+        else
+        {
+            NavigateHome(tab);
+        }
+
+        if (activate)
+        {
+            await ActivateBrowserTabAsync(tabId);
+        }
+
+        return tab;
+    }
+
+    private async Task ActivateBrowserTabAsync(string tabId)
+    {
+        if (!_browserTabs.TryGetValue(tabId, out var tab))
+        {
+            throw new BridgeProtocolException("The browser tab was not found.");
+        }
+
+        foreach (var item in _browserTabs.Values)
+        {
+            item.WebView.Visibility = ReferenceEquals(item, tab)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        _activeBrowserTabId = tab.TabId;
+        if (tab.WebView.CoreWebView2 is not null)
+        {
+            await ObservePageAsync(null, null, tab);
+        }
+
+        SaveBrowserState();
+        SendState();
+    }
+
+    private async Task CloseBrowserTabAsync(string tabId)
+    {
+        if (!_browserTabs.TryGetValue(tabId, out var tab))
+        {
+            throw new BridgeProtocolException("The browser tab was not found.");
+        }
+
+        if (_browserTabs.Count == 1)
+        {
+            _activeBrowserTabId = tab.TabId;
+            NavigateHome(tab);
+            SaveBrowserState();
+            SendState();
+            return;
+        }
+
+        var wasActive = string.Equals(_activeBrowserTabId, tab.TabId, StringComparison.Ordinal);
+        var nextTabId = _browserTabs.Keys.FirstOrDefault(id => !string.Equals(id, tabId, StringComparison.Ordinal));
+        BrowserHost.Children.Remove(tab.WebView);
+        _browserTabs.Remove(tabId);
+        if (wasActive && nextTabId is not null)
+        {
+            await ActivateBrowserTabAsync(nextTabId);
+        }
+        else
+        {
+            SaveBrowserState();
+            SendState();
+        }
+    }
+
+    private void NavigateHome(BrowserTabHostState tab)
+    {
+        tab.Url = "about:blank";
+        tab.Title = "ModScope Home";
+        tab.WebView.NavigateToString(HomeHtml);
+        _controller.SetStatus("Browse Home is open.");
+    }
+
+    private BrowserTabHostState? ActiveBrowserTab =>
+        _activeBrowserTabId is not null && _browserTabs.TryGetValue(_activeBrowserTabId, out var tab)
+            ? tab
+            : null;
+
+    private BrowserTabHostState? FindBrowserTab(object? sender)
+    {
+        return sender is Microsoft.Web.WebView2.Wpf.WebView2 webView
+            ? _browserTabs.Values.FirstOrDefault(tab => ReferenceEquals(tab.WebView, webView))
+            : null;
+    }
+
+    private string NextBrowserTabId()
+    {
+        do
+        {
+            _browserTabSequence++;
+        }
+        while (_browserTabs.ContainsKey($"tab-{_browserTabSequence}"));
+
+        return $"tab-{_browserTabSequence}";
+    }
+
+    private void AddBrowserHistory(BrowserTabHostState tab)
+    {
+        if (!IsExternalBrowserUrl(tab.Url, out var uri))
+        {
+            return;
+        }
+
+        var entry = new BrowserHistoryEntryUiState(
+            Guid.NewGuid().ToString("N"),
+            string.IsNullOrWhiteSpace(tab.Title) ? uri.Host : tab.Title,
+            uri.ToString(),
+            DateTimeOffset.UtcNow);
+        _browserHistory = new[] { entry }
+            .Concat(_browserHistory.Where(item => !string.Equals(item.Url, entry.Url, StringComparison.OrdinalIgnoreCase)))
+            .Take(100)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    private void SaveBrowserState()
+    {
+        var tabs = _browserTabs.Values
+            .Select(tab => new BrowserTabUiState(
+                tab.TabId,
+                tab.Title,
+                tab.Url,
+                tab.WebView.CanGoBack,
+                tab.WebView.CanGoForward,
+                string.Equals(tab.TabId, _activeBrowserTabId, StringComparison.Ordinal)))
+            .ToList();
+        _browserStateStore.Save(tabs, _activeBrowserTabId, _browserHistory);
+    }
+
+    private static bool IsExternalBrowserUrl(string? value, out Uri uri)
+    {
+        if (Uri.TryCreate(value, UriKind.Absolute, out uri!)
+            && uri.Scheme is "http" or "https")
+        {
+            return true;
+        }
+
+        uri = new Uri("about:blank");
+        return false;
     }
 
     private static void ConfigureFrontend(
@@ -196,36 +403,99 @@ public partial class MainWindow : Window
             case "frontend.ready":
                 SendState(command.RequestId, sourceWebView);
                 break;
+            case "browser.newTab":
+                await CreateBrowserTabAsync(null, null, null, activate: true);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            case "browser.selectTab":
+            {
+                var payload = BridgeProtocol.ReadPayload<BrowserTabPayload>(command.Payload);
+                await ActivateBrowserTabAsync(payload.TabId);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "browser.closeTab":
+            {
+                var payload = BridgeProtocol.ReadPayload<BrowserTabPayload>(command.Payload);
+                await CloseBrowserTabAsync(payload.TabId);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "browser.home":
+            {
+                var browserTab = ActiveBrowserTab
+                    ?? throw new InvalidOperationException("The browser tab is not initialized.");
+                NavigateHome(browserTab);
+                SaveBrowserState();
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "browser.selectHistory":
+            {
+                var payload = BridgeProtocol.ReadPayload<BrowserHistoryPayload>(command.Payload);
+                var entry = _browserHistory.FirstOrDefault(item =>
+                    string.Equals(item.EntryId, payload.EntryId, StringComparison.Ordinal));
+                if (entry is null || !IsExternalBrowserUrl(entry.Url, out var historyUri))
+                {
+                    throw new BridgeProtocolException("The browser history entry was not found.");
+                }
+
+                var browserTab = ActiveBrowserTab
+                    ?? throw new InvalidOperationException("The browser tab is not initialized.");
+                browserTab.WebView.Source = historyUri;
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
             case "browser.navigate":
             {
                 var payload = BridgeProtocol.ReadPayload<NavigatePayload>(command.Payload);
-                if (!BridgeProtocol.TryGetSupportedBrowserUri(payload.Url, out var uri))
+                if (!BridgeProtocol.TryGetSupportedBrowserUri(payload.Url, out var uri)
+                    || uri is null)
                 {
                     throw new BridgeProtocolException(
                         "Use an absolute http, https, file, or about URL.");
                 }
 
                 _controller.SetStatus($"Navigating to {uri}.");
-                Browser.Source = uri;
+                if (_activeBrowserTabId is not { } activeTabId)
+                {
+                    throw new InvalidOperationException("The browser tab is not initialized.");
+                }
+                if (!_browserTabs.TryGetValue(activeTabId, out var activeTab)
+                    || activeTab is null)
+                {
+                    throw new InvalidOperationException("The browser tab is not initialized.");
+                }
+                activeTab.Url = uri.ToString();
+                activeTab?.Navigate(uri);
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
             case "browser.back":
-                if (Browser.CanGoBack)
+            {
+                var browser = ActiveBrowserTab?.WebView
+                    ?? throw new InvalidOperationException("The browser tab is not initialized.");
+                if (browser.CanGoBack)
                 {
-                    Browser.GoBack();
+                    browser.GoBack();
                 }
                 SendState(command.RequestId, sourceWebView);
                 break;
+            }
             case "browser.forward":
-                if (Browser.CanGoForward)
+            {
+                var browser = ActiveBrowserTab?.WebView
+                    ?? throw new InvalidOperationException("The browser tab is not initialized.");
+                if (browser.CanGoForward)
                 {
-                    Browser.GoForward();
+                    browser.GoForward();
                 }
                 SendState(command.RequestId, sourceWebView);
                 break;
+            }
             case "browser.reload":
-                Browser.Reload();
+                (ActiveBrowserTab?.WebView
+                    ?? throw new InvalidOperationException("The browser tab is not initialized.")).Reload();
                 SendState(command.RequestId, sourceWebView);
                 break;
             case "browser.observe":
@@ -406,20 +676,36 @@ public partial class MainWindow : Window
 
     private async Task ObservePageAsync(
         Microsoft.Web.WebView2.Wpf.WebView2? targetWebView,
-        string? requestId)
+        string? requestId,
+        BrowserTabHostState? browserTab = null)
     {
-        if (Browser.CoreWebView2 is null)
+        var tab = browserTab ?? ActiveBrowserTab;
+        if (tab?.WebView.CoreWebView2 is null)
         {
             throw new InvalidOperationException("The browser WebView2 is not initialized.");
         }
 
+        var browser = tab.WebView;
+        tab.Url = browser.Source?.ToString() ?? "about:blank";
+        tab.Title = string.IsNullOrWhiteSpace(browser.CoreWebView2.DocumentTitle)
+            ? tab.Title
+            : browser.CoreWebView2.DocumentTitle;
+        AddBrowserHistory(tab);
+        SaveBrowserState();
+
+        if (!ReferenceEquals(tab, ActiveBrowserTab))
+        {
+            SendState();
+            return;
+        }
+
         try
         {
-            var serializedContent = await Browser.ExecuteScriptAsync(
+            var serializedContent = await browser.ExecuteScriptAsync(
                 "document.body ? document.body.innerText : null");
             var content = JsonSerializer.Deserialize<string>(serializedContent);
-            var pageUri = Browser.Source ?? new Uri("about:blank");
-            var title = Browser.CoreWebView2.DocumentTitle ?? string.Empty;
+            var pageUri = browser.Source ?? new Uri("about:blank");
+            var title = browser.CoreWebView2.DocumentTitle ?? string.Empty;
             var extractionStatus = content is null
                 ? PageExtractionStatus.Partial
                 : PageExtractionStatus.Succeeded;
@@ -436,10 +722,10 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            var pageUri = Browser.Source ?? new Uri("about:blank");
+            var pageUri = browser.Source ?? new Uri("about:blank");
             _controller.SetObservation(new PageObservation(
                 pageUri,
-                Browser.CoreWebView2.DocumentTitle ?? string.Empty,
+                browser.CoreWebView2.DocumentTitle ?? string.Empty,
                 null,
                 DateTimeOffset.UtcNow,
                 "WebView2",
@@ -459,11 +745,28 @@ public partial class MainWindow : Window
         object? sender,
         CoreWebView2NavigationCompletedEventArgs e)
     {
+        var tab = FindBrowserTab(sender);
+        if (tab is null)
+        {
+            return;
+        }
+
+        tab.Url = tab.WebView.Source?.ToString() ?? "about:blank";
+        tab.Title = string.IsNullOrWhiteSpace(tab.WebView.CoreWebView2?.DocumentTitle)
+            ? tab.Title
+            : tab.WebView.CoreWebView2.DocumentTitle;
         if (!e.IsSuccess)
         {
+            if (!ReferenceEquals(tab, ActiveBrowserTab))
+            {
+                SaveBrowserState();
+                SendState();
+                return;
+            }
+
             _controller.SetObservation(new PageObservation(
-                Browser.Source ?? new Uri("about:blank"),
-                Browser.CoreWebView2?.DocumentTitle ?? string.Empty,
+                tab.WebView.Source ?? new Uri("about:blank"),
+                tab.WebView.CoreWebView2?.DocumentTitle ?? string.Empty,
                 null,
                 DateTimeOffset.UtcNow,
                 "WebView2",
@@ -479,11 +782,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        await ObservePageAsync(null, null);
+        await ObservePageAsync(null, null, tab);
     }
 
     private void Browser_DocumentTitleChanged(object? sender, object e)
     {
+        var tab = FindBrowserTab(sender);
+        if (tab is not null && tab.WebView.CoreWebView2 is not null)
+        {
+            tab.Title = string.IsNullOrWhiteSpace(tab.WebView.CoreWebView2.DocumentTitle)
+                ? tab.Title
+                : tab.WebView.CoreWebView2.DocumentTitle;
+            SaveBrowserState();
+        }
+
         SendState();
     }
 
@@ -491,18 +803,31 @@ public partial class MainWindow : Window
         string? requestId = null,
         Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
     {
-        if (Browser.CoreWebView2 is null
+        var browserTab = ActiveBrowserTab;
+        if (browserTab?.WebView.CoreWebView2 is null
             || ((!_toolbarReady && !_modListReady && !_contextReady)
                 && targetWebView?.CoreWebView2 is null))
         {
             return;
         }
 
+        var browser = browserTab.WebView;
         var browserState = new BrowserUiState(
-            Browser.Source?.ToString() ?? "about:blank",
-            Browser.CoreWebView2.DocumentTitle ?? string.Empty,
-            Browser.CanGoBack,
-            Browser.CanGoForward);
+            browser.Source?.ToString() ?? "about:blank",
+            browser.CoreWebView2.DocumentTitle ?? browserTab.Title,
+            browser.CanGoBack,
+            browser.CanGoForward,
+            _browserTabs.Values
+                .Select(tab => new BrowserTabUiState(
+                    tab.TabId,
+                    tab.Title,
+                    tab.Url,
+                    tab.WebView.CanGoBack,
+                    tab.WebView.CanGoForward,
+                    string.Equals(tab.TabId, _activeBrowserTabId, StringComparison.Ordinal)))
+                .ToList(),
+            _activeBrowserTabId,
+            _browserHistory);
         var state = _controller.BuildState(browserState);
         SendMessage("state", state, requestId, targetWebView);
     }

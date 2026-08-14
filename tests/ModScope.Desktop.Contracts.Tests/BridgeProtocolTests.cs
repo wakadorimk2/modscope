@@ -410,4 +410,61 @@ public sealed class BridgeProtocolTests
         Assert.Contains("\"hasChildElements\":false", json);
         Assert.Contains("\"xPathCandidates\"", json);
     }
+
+    [Fact]
+    public void ParsesBrowserTabCommandsAndSerializesMetadataOnly()
+    {
+        foreach (var command in new[]
+        {
+            "browser.newTab",
+            "browser.selectTab",
+            "browser.closeTab",
+            "browser.home",
+            "browser.selectHistory"
+        })
+        {
+            var payload = command switch
+            {
+                "browser.selectTab" or "browser.closeTab" => """{"tabId":"tab-1"}""",
+                "browser.selectHistory" => """{"entryId":"history-1"}""",
+                _ => "{}"
+            };
+            var envelope = BridgeProtocol.ParseCommand($$"""
+                {
+                  "contractVersion": 1,
+                  "requestId": "request-1",
+                  "command": "{{command}}",
+                  "payload": {{payload}}
+                }
+                """);
+            Assert.Equal(command, envelope.Command);
+        }
+
+        var browser = new BrowserUiState(
+            "https://example.test/mod",
+            "Example MOD",
+            true,
+            false,
+            new[]
+            {
+                new BrowserTabUiState("tab-1", "Example MOD", "https://example.test/mod", true, false, true)
+            },
+            "tab-1",
+            new[]
+            {
+                new BrowserHistoryEntryUiState(
+                    "history-1",
+                    "Example MOD",
+                    "https://example.test/mod",
+                    DateTimeOffset.Parse("2026-08-14T00:00:00Z"))
+            });
+
+        var json = System.Text.Json.JsonSerializer.Serialize(browser, BridgeProtocol.JsonOptions);
+
+        Assert.Contains("\"tabs\"", json);
+        Assert.Contains("\"activeTabId\":\"tab-1\"", json);
+        Assert.Contains("\"history\"", json);
+        Assert.DoesNotContain("C:\\\\Users\\\\wakad", json);
+        Assert.DoesNotContain("raw runtime log", json);
+    }
 }

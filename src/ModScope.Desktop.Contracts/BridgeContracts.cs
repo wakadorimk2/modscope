@@ -23,6 +23,11 @@ public static class BridgeProtocol
     private static readonly HashSet<string> KnownCommands = new(StringComparer.Ordinal)
     {
         "browser.navigate",
+        "browser.newTab",
+        "browser.selectTab",
+        "browser.closeTab",
+        "browser.home",
+        "browser.selectHistory",
         "browser.back",
         "browser.forward",
         "browser.reload",
@@ -178,6 +183,10 @@ public sealed record BridgeMessageEnvelope(
 
 public sealed record NavigatePayload(string Url);
 
+public sealed record BrowserTabPayload(string TabId);
+
+public sealed record BrowserHistoryPayload(string EntryId);
+
 public sealed record LoadSourcePayload(
     string InstanceName,
     string ProfileName,
@@ -207,11 +216,28 @@ public sealed record SetModListVisiblePayload(bool Visible);
 
 public sealed record BridgeErrorPayload(string Code, string Message);
 
+public sealed record BrowserTabUiState(
+    string TabId,
+    string Title,
+    string Url,
+    bool CanGoBack,
+    bool CanGoForward,
+    bool IsActive);
+
+public sealed record BrowserHistoryEntryUiState(
+    string EntryId,
+    string Title,
+    string Url,
+    DateTimeOffset VisitedAtUtc);
+
 public sealed record BrowserUiState(
     string Url,
     string Title,
     bool CanGoBack,
-    bool CanGoForward);
+    bool CanGoForward,
+    IReadOnlyList<BrowserTabUiState>? Tabs = null,
+    string? ActiveTabId = null,
+    IReadOnlyList<BrowserHistoryEntryUiState>? History = null);
 
 public sealed record SourceReferenceUiState(
     string Kind,
@@ -248,6 +274,17 @@ public sealed record KnowledgeSessionUiState(
     int SchemaVersion,
     IReadOnlyList<DiagnosticUiState> Diagnostics);
 
+public sealed record ModRoleEvidenceUiState(
+    string Kind,
+    string Detail,
+    SourceReferenceUiState Source);
+
+public sealed record ModRoleUiState(
+    string Role,
+    string Assessment,
+    string Reason,
+    IReadOnlyList<ModRoleEvidenceUiState> Evidence);
+
 public sealed record ModCandidateUiState(
     string ModKey,
     string DirectoryName,
@@ -259,7 +296,8 @@ public sealed record ModCandidateUiState(
     int? Priority,
     SourceReferenceUiState Source,
     EvidenceReferenceUiState? PriorityEvidence,
-    IReadOnlyList<DiagnosticUiState> Diagnostics);
+    IReadOnlyList<DiagnosticUiState> Diagnostics,
+    ModRoleUiState? Role = null);
 
 public sealed record ProfileUiState(string Name, string LoadState);
 
