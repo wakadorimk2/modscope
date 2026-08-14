@@ -1,0 +1,2 @@
+# Synthetic ambiguous metadata fixture
++synthetic-ambiguous-package

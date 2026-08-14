@@ -1,0 +1,3 @@
+# Synthetic duplicate ModInfo.Name fixture
++synthetic-package-alpha
++synthetic-package-beta

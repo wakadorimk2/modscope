@@ -1,0 +1,61 @@
+{
+  "scenario": "missing-meta",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "package-1",
+      "name": "synthetic-missing-meta-package",
+      "relativePath": "mods/synthetic-missing-meta-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-1",
+      "name": "Synthetic Missing Meta Version",
+      "version": "3.0.0",
+      "relativePath": "mods/synthetic-missing-meta-package/missing-meta-modlet/ModInfo.xml"
+    },
+    {
+      "kind": "nexus-mod",
+      "id": "nexus-mod-1",
+      "modId": "synthetic-mod-5001"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-1",
+      "fileId": "synthetic-file-6001",
+      "version": null
+    }
+  ],
+  "relations": [
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-1"
+    },
+    {
+      "from": "modlet-1",
+      "type": "candidate-source",
+      "to": "nexus-file-1"
+    },
+    {
+      "from": "nexus-file-1",
+      "type": "belongs-to",
+      "to": "nexus-mod-1"
+    }
+  ],
+  "observations": [
+    {
+      "type": "missing-meta-version",
+      "target": "nexus-file-1",
+      "value": null
+    }
+  ],
+  "expected": {
+    "identityStatus": "resolved",
+    "versionStatus": "not-comparable",
+    "notes": [
+      "A resolved modID/fileID does not make a missing version comparable.",
+      "Do not report a version match."
+    ]
+  }
+}
