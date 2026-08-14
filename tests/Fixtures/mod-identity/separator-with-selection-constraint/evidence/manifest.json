@@ -1,0 +1,102 @@
+{
+  "scenario": "separator-with-selection-constraint",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "separator-1",
+      "name": "Backpack - ONLY USE ONE BACKPACK MOD! Steelshot UI already comes with a backpack and toolbelt!_separator",
+      "relativePath": "mods/sep-backpack_separator"
+    },
+    {
+      "kind": "package",
+      "id": "separator-2",
+      "name": "Hard Requirements - Do not disable or many mods won't work and it could destroy a save_separator",
+      "relativePath": "mods/sep-hard-requirements_separator"
+    },
+    {
+      "kind": "package",
+      "id": "separator-3",
+      "name": "HUD-UI Suite - Choose One! Cat, Steelshot, AGF, or disable all! Do not mix and match from HUD-UI Suites!_separator",
+      "relativePath": "mods/sep-hud-choice_separator"
+    },
+    {
+      "kind": "package",
+      "id": "separator-4",
+      "name": "Major Biome Changes - Must be enabled when you first load into a world! Don't toggle mid-save!_separator",
+      "relativePath": "mods/sep-save-safety_separator"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-cat",
+      "name": "Synthetic Cat Choice",
+      "relativePath": "mods/choice-cat/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-steelshot",
+      "name": "Synthetic Steelshot Choice",
+      "relativePath": "mods/choice-steelshot/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-agf",
+      "name": "Synthetic AGF Choice",
+      "relativePath": "mods/choice-agf/ModInfo.xml"
+    }
+  ],
+  "relations": [
+    {
+      "from": "separator-1",
+      "type": "curates",
+      "to": "modlet-cat"
+    },
+    {
+      "from": "separator-1",
+      "type": "curates",
+      "to": "modlet-steelshot"
+    },
+    {
+      "from": "separator-1",
+      "type": "curates",
+      "to": "modlet-agf"
+    }
+  ],
+  "observations": [
+    {
+      "type": "separator-text",
+      "target": "separator-1",
+      "authority": "curator-authored",
+      "constraint": "selection",
+      "value": "ONLY USE ONE BACKPACK MOD"
+    },
+    {
+      "type": "separator-text",
+      "target": "separator-2",
+      "authority": "curator-authored",
+      "constraint": "requirement",
+      "value": "Hard Requirements - Do not disable"
+    },
+    {
+      "type": "separator-text",
+      "target": "separator-3",
+      "authority": "curator-authored",
+      "constraint": "selection",
+      "value": "Choose One! Cat, Steelshot, AGF"
+    },
+    {
+      "type": "separator-text",
+      "target": "separator-4",
+      "authority": "curator-authored",
+      "constraint": "save-safety",
+      "value": "Do not toggle mid-save"
+    }
+  ],
+  "expected": {
+    "identityStatus": "not-applicable",
+    "versionStatus": "not-assessed",
+    "notes": [
+      "Preserve raw separator text.",
+      "Treat the text as advisory evidence, not machine-authoritative dependency data."
+    ]
+  }
+}

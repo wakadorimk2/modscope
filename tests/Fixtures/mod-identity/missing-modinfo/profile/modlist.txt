@@ -1,0 +1,2 @@
+# Synthetic missing ModInfo fixture
++synthetic-missing-modinfo-package

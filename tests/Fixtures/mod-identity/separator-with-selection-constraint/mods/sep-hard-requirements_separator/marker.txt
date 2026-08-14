@@ -1,0 +1,1 @@
+Synthetic separator package. No ModInfo.xml by design.
