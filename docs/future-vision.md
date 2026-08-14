@@ -428,7 +428,7 @@ Contextは`RECOGNIZE`、Local awareness、Analysis summary、Inspect導線の順
 SettingsはMO2 sourceを管理し、DebugはPage details、Developer tools、raw diagnosticsを管理します。URL入力は通常Toolbarへ置きます。
 MO2 source未選択時だけOnboardingを表示します。
 
-Browserは既存WebView2のtabを追加し、Home、new tab、tab close、tab selection、bounded history、last page restoreを提供します。HistoryはToolbar rowを一時拡張してrich popupを表示します。
+Browserは既存WebView2のtabを追加し、Home、new tab、tab close、tab selection、bounded history、last page restoreを提供します。Historyは新しいBrowser tabの`about:history`ページで表示します。
 historyとlast pageはURL、title、訪問時刻だけを保存します。
 page本文、raw observation、absolute path、cookie、認証情報は保存しません。
 
@@ -436,7 +436,7 @@ Bridge contract versionは`1`のままです。
 新しいtab、history、role stateは既存stateへ追加しました。
 MO2 write、AI、MCP、独自Browser engine、browser syncはPhase6.5へ追加していません。
 
-Phase6.5後のUI細部整理では、通常ToolbarへURL入力を追加し、History popupのclipを解消しました。ModListはcompact rowへ整理し、disabled MODを灰色系で表示します。ContextのANALYSISには、Base Data/Config選択と静的解析を状態連動CTAとして表示します。未解析状態は`Not assessed`とし、競合なしとは推測表示しません。
+Phase6.5後のUI細部整理では、通常ToolbarへURL入力を追加し、History導線を整理しました。ModListはcompact rowへ整理し、disabled MODを灰色系で表示します。ContextのANALYSISには、Base Data/Config選択と静的解析を状態連動CTAとして表示します。未解析状態は`Not assessed`とし、競合なしとは推測表示しません。
 
 ### Phase 6.6：情報減算UI（完了）
 
@@ -486,8 +486,10 @@ back、forward、reload、homeは左側のcontrol groupへまとめます。
 URL入力は中央のomniboxとして表示します。
 Goはcompactな`↵` iconで表示します。
 History、pane icon、shortcut hintは右側のaction groupへまとめます。
-History展開時は440pxへ拡張します。
-既存のWebView2、Browser command、`layout.setToolbarExpanded`を維持します。
+Toolbarは通常96pxで固定します。
+Historyはpopupではなく新しいBrowser tabの`about:history`ページとして開きます。
+`layout.setToolbarExpanded`は互換性のため維持しますが、通常History操作からは呼び出しません。
+既存のWebView2とBrowser commandを維持します。
 
 `MO2 order`切替を削除し、ModScope viewを固定します。
 表示順は`Foundation`、`Compatibility`、`Content`、`Unknown`です。
@@ -498,6 +500,25 @@ MOD URLは有効なModInfo Websiteを`Verified`として最優先します。
 slugを作れない場合はNexus検索URLへfallbackします。
 URLを作れないMODは`No usable URL`としてクリック不可で表示します。
 推定URLはページの存在確認ではありません。
+
+### Phase 6.8：ロード遮断、Chrome palette、History page（完了）
+
+Desktop hostはWPF client areaのWebView2子windowを含めて入力を遮断します。
+foregroundのloading中はToolbar、ModList、Context、Browser tabの`IsEnabled`と`IsHitTestVisible`を無効にします。
+薄いグレーのloading panelはclient areaだけを覆います。
+OSタイトルバーはloading中も操作できます。
+background profile preloadではloading panelを表示しません。
+loading完了または失敗後はclient UIを再有効化します。
+
+ModScopeが所有するsurfaceはChrome dark paletteを使います。
+baseは`#202124`、navigationは`#292a2d`、panelは`#303134`、borderは`#3c4043`です。
+primary textは`#e8eaed`、muted textは`#9aa0a6`です。
+外部Web pageの色は変更しません。
+
+History buttonはpopupを開かず、新しいBrowser tabを開きます。
+新しいtabのtitleは`History`で、内部URLは`about:history`です。
+History pageはDesktop hostが生成し、URL、title、訪問時刻だけを表示します。
+History metadataはbounded local dataとして保存し、page本文、raw observation、absolute path、cookie、認証情報は保存しません。
 
 ### Phase 7：Controlled write
 
@@ -578,7 +599,7 @@ Desktop hostは各App WebViewへ同じstate、error、ready messageをbroadcast�
 ModListの幅は約280pxです。
 MOD一覧だけをスクロール可能にします。
 ToolbarはBrowser操作とtab metadataを表示します。
-URL直接入力は通常Toolbarで行います。History popupを開く間だけToolbar host rowを拡張します。
+URL直接入力は通常Toolbarで行います。History pageを開いてもToolbar host rowは拡張しません。
 ModListとContextは独立して折りたためます。
 この構成は情報設計の検証用です。
 将来はContextをdrawerまたはoverlayへ折り畳みます。

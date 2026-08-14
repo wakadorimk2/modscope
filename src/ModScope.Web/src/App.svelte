@@ -30,7 +30,6 @@
   let pageDetailsOpen = false;
   let developerToolsOpen = false;
   let contextMode: 'context' | 'settings' | 'debug' = 'context';
-  let historyOpen = false;
   let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
   let operationRailTimer: number | undefined;
@@ -186,6 +185,7 @@
     return [
       'browser.home',
       'browser.newTab',
+      'browser.history',
       'browser.selectHistory',
       'browser.selectTab',
       'browser.navigate',
@@ -239,21 +239,8 @@
     send('browser.home');
   }
 
-  function handleHistoryToggle(event: Event) {
-    const details = event.currentTarget as HTMLDetailsElement;
-    historyOpen = details.open;
-    send('layout.setToolbarExpanded', { expanded: historyOpen });
-  }
-
-  function selectHistory(entryId: string) {
-    historyOpen = false;
-    send('layout.setToolbarExpanded', { expanded: false });
-    send('browser.selectHistory', { entryId });
-  }
-
-  function formatVisitedAt(value: string): string {
-    const date = new Date(value);
-    return Number.isNaN(date.valueOf()) ? 'Unknown time' : date.toLocaleString();
+  function openHistory() {
+    send('browser.history');
   }
 
   function handleShortcut(event: KeyboardEvent) {
@@ -914,31 +901,12 @@
       </div>
 
       <div class="toolbar-actions" aria-label="Browser actions">
-        <details
-          class="history-menu"
-          bind:open={historyOpen}
-          ontoggle={handleHistoryToggle}
-        >
-          <summary
-            class="icon-button"
-            title={`History (${state.browser.history.length})`}
-            aria-label={`Open history (${state.browser.history.length} entries)`}
-          >◷</summary>
-          <div class="history-popover">
-            <strong>History</strong>
-            {#if state.browser.history.length === 0}
-              <p class="subtle">No visited pages.</p>
-            {:else}
-              {#each state.browser.history as entry (entry.entryId)}
-                <button type="button" class="history-entry" onclick={() => selectHistory(entry.entryId)}>
-                  <strong>{entry.title || 'Untitled page'}</strong>
-                  <span>{entry.url}</span>
-                  <small>{formatVisitedAt(entry.visitedAtUtc)}</small>
-                </button>
-              {/each}
-            {/if}
-          </div>
-        </details>
+        <button
+          class="icon-button history-button"
+          title={`Open History in a new tab (${state.browser.history.length} entries)`}
+          aria-label={`Open History in a new tab (${state.browser.history.length} entries)`}
+          onclick={openHistory}
+        >◷</button>
 
         <button
           class="pane-toggle-button"

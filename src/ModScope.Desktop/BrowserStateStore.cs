@@ -125,8 +125,17 @@ internal sealed class BrowserStateStore
 
     private static bool IsPersistableUrl(string? value)
     {
-        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            && uri.Scheme is "http" or "https"
-            && !string.Equals(uri.Host, "appassets.modscope", StringComparison.OrdinalIgnoreCase);
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        if (uri.Scheme is "http" or "https")
+        {
+            return !string.Equals(uri.Host, "appassets.modscope", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return uri.Scheme == "about"
+            && string.Equals(uri.AbsoluteUri, "about:history", StringComparison.OrdinalIgnoreCase);
     }
 }

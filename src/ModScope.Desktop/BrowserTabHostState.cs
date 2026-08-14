@@ -18,8 +18,11 @@ internal sealed class BrowserTabHostState
 
     public string Url { get; set; } = "about:blank";
 
+    public string? InternalPage { get; set; }
+
     public void Navigate(Uri uri)
     {
+        InternalPage = null;
         WebView.Source = uri;
     }
 }

@@ -358,6 +358,10 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
         canGoForward: selected.canGoForward
       };
     }
+  } else if (command === 'browser.history') {
+    createMockBrowserTab(next);
+    updateMockBrowserTab(next, 'about:history', 'History');
+    next.statusMessage = 'History opened in a new tab.';
   } else if (command === 'browser.home') {
     updateMockBrowserTab(next, 'about:blank', 'ModScope Home');
   } else if (command === 'browser.selectHistory' && typeof payload === 'object' && payload !== null) {

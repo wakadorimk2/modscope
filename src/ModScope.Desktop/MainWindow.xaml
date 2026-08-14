@@ -7,7 +7,7 @@
         MinHeight="760"
         Width="1450"
         Height="900">
-    <Grid Background="#0B1120">
+    <Grid Background="#202124">
         <Grid.RowDefinitions>
             <RowDefinition x:Name="ToolbarRow" Height="96" />
             <RowDefinition Height="*" />
@@ -18,19 +18,19 @@
             <ColumnDefinition x:Name="ContextColumn" Width="2*" />
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="8,8,8,0" CornerRadius="12" Background="#111827">
+        <Border x:Name="ToolbarHost" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="8,8,8,0" CornerRadius="12" Background="#292A2D">
             <wv2:WebView2 x:Name="ToolbarShell" />
         </Border>
 
-        <Border x:Name="ModListShell" Grid.Row="1" Grid.Column="0" Margin="8,8,0,8" CornerRadius="12" Background="#111827">
+        <Border x:Name="ModListShell" Grid.Row="1" Grid.Column="0" Margin="8,8,0,8" CornerRadius="12" Background="#292A2D">
             <wv2:WebView2 x:Name="ModListWebView" />
         </Border>
 
-        <Border Grid.Row="1" Grid.Column="1" Margin="8" CornerRadius="12" Background="#111827">
+        <Border Grid.Row="1" Grid.Column="1" Margin="8" CornerRadius="12" Background="#292A2D">
             <Grid x:Name="BrowserHost" />
         </Border>
 
-        <Border x:Name="ContextShell" Grid.Row="1" Grid.Column="2" Margin="0,8,8,8" CornerRadius="12" Background="#0B1120">
+        <Border x:Name="ContextShell" Grid.Row="1" Grid.Column="2" Margin="0,8,8,8" CornerRadius="12" Background="#292A2D">
             <wv2:WebView2 x:Name="ContextWebView" />
         </Border>
 
@@ -40,34 +40,43 @@
                 Grid.Column="0"
                 Grid.ColumnSpan="3"
                 Panel.ZIndex="100"
-                Background="#E60B1120"
+                Background="#A8E5E7EB"
                 IsHitTestVisible="True"
                 Visibility="Visible"
                 AutomationProperties.Name="Loading local profile">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
-                <TextBlock Text="LOADING PROFILE"
-                           Foreground="#BAE6FD"
-                           FontSize="18"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Center" />
-                <TextBlock x:Name="LoadingOverlayTitle"
-                           Margin="0,12,0,0"
-                           Text="Loading local MO2 knowledge..."
-                           Foreground="#E2E8F0"
-                           FontSize="14"
-                           HorizontalAlignment="Center" />
-                <TextBlock x:Name="LoadingOverlayPhase"
-                           Margin="0,6,0,0"
-                           Foreground="#94A3B8"
-                           FontSize="12"
-                           HorizontalAlignment="Center" />
-                <ProgressBar x:Name="LoadingOverlayProgress"
-                             Margin="0,18,0,0"
-                             Height="6"
-                             Minimum="0"
-                             Maximum="100"
-                             IsIndeterminate="True" />
-            </StackPanel>
+            <Border Width="390"
+                    Padding="28"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="#EEF1F3F4"
+                    BorderBrush="#B8BEC5"
+                    BorderThickness="1"
+                    CornerRadius="10">
+                <StackPanel>
+                    <TextBlock Text="LOADING PROFILE"
+                               Foreground="#202124"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center" />
+                    <TextBlock x:Name="LoadingOverlayTitle"
+                               Margin="0,12,0,0"
+                               Text="Loading local MO2 knowledge..."
+                               Foreground="#202124"
+                               FontSize="14"
+                               HorizontalAlignment="Center" />
+                    <TextBlock x:Name="LoadingOverlayPhase"
+                               Margin="0,6,0,0"
+                               Foreground="#4B5563"
+                               FontSize="12"
+                               HorizontalAlignment="Center" />
+                    <ProgressBar x:Name="LoadingOverlayProgress"
+                                 Margin="0,18,0,0"
+                                 Height="6"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 IsIndeterminate="True" />
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </Window>

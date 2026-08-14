@@ -442,6 +442,7 @@ public sealed class BridgeProtocolTests
             "browser.selectTab",
             "browser.closeTab",
             "browser.home",
+            "browser.history",
             "browser.selectHistory"
         })
         {

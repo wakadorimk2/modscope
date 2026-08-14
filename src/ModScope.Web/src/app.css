@@ -1,7 +1,13 @@
 :root {
   font-family: Inter, "Segoe UI", system-ui, sans-serif;
-  color: #e5e7eb;
-  background: #0b1120;
+  --chrome-base: #202124;
+  --chrome-navigation: #292a2d;
+  --chrome-panel: #303134;
+  --chrome-border: #3c4043;
+  --chrome-text: #e8eaed;
+  --chrome-muted: #9aa0a6;
+  color: var(--chrome-text);
+  background: var(--chrome-base);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -17,12 +23,15 @@ body,
   min-height: 100%;
 }
 
+html:has(.toolbar-surface),
+body:has(.toolbar-surface) {
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   min-width: 0;
-  background:
-    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 32rem),
-    #0b1120;
+  background: var(--chrome-base);
 }
 
 button,
@@ -43,17 +52,18 @@ button:disabled {
 .shell {
   min-height: 100vh;
   padding: 18px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(11, 17, 32, 0.98));
+  background: var(--chrome-base);
 }
 
 .toolbar-surface {
   display: flex;
   height: 100%;
+  width: 100%;
   min-height: 0;
   flex-direction: column;
-  overflow: visible;
+  overflow: hidden;
   padding: 0;
-  background: #202124;
+  background: var(--chrome-base);
 }
 
 .toolbar-row {
@@ -61,7 +71,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
   flex-wrap: nowrap;
 }
 
@@ -72,7 +82,8 @@ button:disabled {
   gap: 0;
   padding: 0 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: #202124;
+  overflow: hidden;
+  background: var(--chrome-base);
 }
 
 .toolbar-tabs-row .browser-tabs {
@@ -86,21 +97,22 @@ button:disabled {
 .toolbar-controls-row {
   flex: 1 1 auto;
   min-height: 56px;
+  overflow: hidden;
   padding: 0 12px;
-  background: #292a2d;
+  background: var(--chrome-navigation);
 }
 
 .toolbar-omnibox {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   align-items: center;
   gap: 5px;
   min-width: 0;
   height: 36px;
   padding: 3px 4px 3px 14px;
-  border: 1px solid #5f6368;
+  border: 1px solid var(--chrome-border);
   border-radius: 18px;
-  background: #202124;
+  background: var(--chrome-base);
 }
 
 .mod-list-surface {
@@ -110,7 +122,7 @@ button:disabled {
   flex-direction: column;
   overflow: hidden;
   padding: 12px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(11, 17, 32, 0.98));
+  background: var(--chrome-base);
 }
 
 .mod-list-header,
@@ -222,7 +234,7 @@ button:disabled {
   padding: 5px 6px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 7px;
-  background: rgba(30, 41, 59, 0.42);
+  background: var(--chrome-navigation);
 }
 
 .mod-list-item:hover,
@@ -233,7 +245,7 @@ button:disabled {
 
 .mod-list-item-disabled {
   border-color: rgba(100, 116, 139, 0.2);
-  background: rgba(30, 41, 59, 0.24);
+  background: rgba(41, 42, 45, 0.72);
   filter: grayscale(0.6);
   opacity: 0.62;
 }
@@ -379,16 +391,19 @@ button:disabled {
 
 .toolbar-navigation {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   align-items: center;
   gap: 2px;
+  min-width: 0;
 }
 
 .toolbar-actions {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   align-items: center;
   gap: 3px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .mod-list-item-inspect {
@@ -440,7 +455,7 @@ button:disabled {
   overflow-wrap: anywhere;
   border: 1px solid rgba(125, 211, 252, 0.26);
   border-radius: 7px;
-  background: #111827;
+  background: var(--chrome-panel);
   box-shadow: 0 10px 24px rgba(2, 6, 23, 0.42);
   color: #cbd5e1;
   font-size: 10px;
@@ -574,59 +589,6 @@ button:disabled {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.history-menu {
-  position: relative;
-  z-index: 6;
-  flex: 0 0 auto;
-}
-
-.history-menu > summary {
-  display: grid;
-  place-items: center;
-  list-style: none;
-}
-
-.history-menu > summary::-webkit-details-marker {
-  display: none;
-}
-
-.history-popover {
-  position: absolute;
-  top: 40px;
-  right: 0;
-  z-index: 5;
-  display: grid;
-  gap: 8px;
-  width: min(360px, 80vw);
-  max-height: 360px;
-  padding: 12px;
-  overflow: auto;
-  border: 1px solid rgba(125, 211, 252, 0.3);
-  border-radius: 10px;
-  background: #111827;
-  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.52);
-}
-
-.history-entry {
-  display: grid;
-  gap: 3px;
-  padding: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 8px;
-  background: rgba(30, 41, 59, 0.48);
-  color: #e2e8f0;
-  text-align: left;
-}
-
-.history-entry span,
-.history-entry small {
-  overflow: hidden;
-  color: #94a3b8;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .toolbar-address {
   flex: 1 1 auto;
   min-width: 0;
@@ -666,7 +628,7 @@ button:disabled {
 
 .toolbar-navigation .icon-button,
 .toolbar-actions .pane-toggle-button,
-.toolbar-actions .history-menu > summary {
+.toolbar-actions .history-button {
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
@@ -678,7 +640,7 @@ button:disabled {
 
 .toolbar-navigation .icon-button:hover:not(:disabled),
 .toolbar-actions .pane-toggle-button:hover:not(:disabled),
-.toolbar-actions .history-menu > summary:hover {
+.toolbar-actions .history-button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.12);
   color: #f1f3f4;
 }
@@ -791,10 +753,10 @@ h2 {
 .panel {
   margin-bottom: 12px;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--chrome-border);
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.72);
-  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.16);
+  background: var(--chrome-panel);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
 }
 
 .muted-badge,
@@ -1115,8 +1077,8 @@ select:focus {
 
 .context-summary-panel {
   min-height: 0;
-  border-color: rgba(148, 163, 184, 0.11);
-  background: rgba(15, 23, 42, 0.42);
+  border-color: var(--chrome-border);
+  background: var(--chrome-panel);
   box-shadow: none;
 }
 
@@ -1821,7 +1783,7 @@ label select {
   padding: 20px;
   overflow: auto;
   border-left: 1px solid rgba(125, 211, 252, 0.3);
-  background: #111827;
+  background: var(--chrome-panel);
   box-shadow: -20px 0 50px rgba(2, 6, 23, 0.52);
 }
 

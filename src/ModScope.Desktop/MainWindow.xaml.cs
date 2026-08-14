@@ -29,7 +29,7 @@ public partial class MainWindow : Window
         <!doctype html>
         <html lang="en">
         <head><meta charset="utf-8"><title>ModScope Home</title>
-        <style>body{font-family:Segoe UI,sans-serif;background:#0b1120;color:#e5e7eb;padding:48px;line-height:1.6}main{max-width:720px;margin:auto;background:#111827;border:1px solid #334155;border-radius:18px;padding:32px}h1{margin-top:0;color:#f8fafc}p{color:#cbd5e1}.hint{color:#93c5fd}</style></head>
+        <style>body{font-family:Segoe UI,sans-serif;background:#202124;color:#e8eaed;padding:48px;line-height:1.6}main{max-width:720px;margin:auto;background:#303134;border:1px solid #3c4043;border-radius:14px;padding:32px}h1{margin-top:0;color:#e8eaed}p{color:#bdc1c6}.hint{color:#8ab4f8}</style></head>
         <body><main><h1>ModScope Browse Home</h1><p>Open a page from your normal browser workflow, then use Recognize to connect it to local MOD knowledge.</p><p class="hint">Tabs, titles, and bounded history are stored as metadata only.</p></main></body>
         </html>
         """;
@@ -49,6 +49,7 @@ public partial class MainWindow : Window
             await ToolbarShell.EnsureCoreWebView2Async();
             await ModListWebView.EnsureCoreWebView2Async();
             await ContextWebView.EnsureCoreWebView2Async();
+            UpdateLoadingOverlay();
 
             ToolbarShell.NavigationStarting += AppShell_NavigationStarting;
             ToolbarShell.NavigationCompleted += AppShell_NavigationCompleted;
@@ -89,6 +90,7 @@ public partial class MainWindow : Window
         {
             _startupLoading = false;
             LoadingOverlay.Visibility = Visibility.Collapsed;
+            SetClientInteractionEnabled(true);
             _controller.SetStatus("WebView2 initialization failed.");
             if (ToolbarShell.CoreWebView2 is not null
                 || ModListWebView.CoreWebView2 is not null
@@ -148,15 +150,22 @@ public partial class MainWindow : Window
         webView.NavigationCompleted += Browser_NavigationCompleted;
         webView.CoreWebView2.DocumentTitleChanged += Browser_DocumentTitleChanged;
 
-        if (IsExternalBrowserUrl(initialUrl, out var initialUri))
+        if (IsHistoryUrl(initialUrl))
+        {
+            NavigateHistory(tab);
+        }
+        else if (IsExternalBrowserUrl(initialUrl, out var initialUri))
         {
             tab.Url = initialUri.ToString();
+            tab.InternalPage = null;
             webView.Source = initialUri;
         }
         else
         {
             NavigateHome(tab);
         }
+
+        SetClientInteractionEnabled(!IsForegroundLoading());
 
         if (activate)
         {
@@ -223,10 +232,54 @@ public partial class MainWindow : Window
 
     private void NavigateHome(BrowserTabHostState tab)
     {
+        tab.InternalPage = "home";
         tab.Url = "about:blank";
         tab.Title = "ModScope Home";
         tab.WebView.NavigateToString(HomeHtml);
         _controller.SetStatus("Browse Home is open.");
+    }
+
+    private void NavigateHistory(BrowserTabHostState tab)
+    {
+        tab.InternalPage = "history";
+        tab.Url = "about:history";
+        tab.Title = "History";
+        tab.WebView.NavigateToString(RenderHistoryHtml());
+        _controller.SetStatus("Browser history is open.");
+    }
+
+    private string RenderHistoryHtml()
+    {
+        var entries = _browserHistory
+            .Select(entry =>
+            {
+                var title = System.Net.WebUtility.HtmlEncode(
+                    string.IsNullOrWhiteSpace(entry.Title) ? "Untitled page" : entry.Title);
+                var url = System.Net.WebUtility.HtmlEncode(entry.Url);
+                var visitedAt = System.Net.WebUtility.HtmlEncode(entry.VisitedAtUtc.ToString("u"));
+                return $"<li><a href=\"{url}\"><strong>{title}</strong><span>{url}</span><time datetime=\"{System.Net.WebUtility.HtmlEncode(entry.VisitedAtUtc.ToString("O"))}\">{visitedAt} UTC</time></a></li>";
+            });
+        var list = string.Join(Environment.NewLine, entries);
+        var body = string.IsNullOrWhiteSpace(list)
+            ? "<p class=\"empty\">No visited pages.</p>"
+            : $"<ol>{list}</ol>";
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+            <head><meta charset="utf-8"><title>History</title>
+            <style>
+            :root{color-scheme:dark}
+            *{box-sizing:border-box}
+            body{margin:0;padding:40px;font-family:Segoe UI,sans-serif;background:#202124;color:#e8eaed;line-height:1.5}
+            main{max-width:900px;margin:0 auto;padding:28px;background:#303134;border:1px solid #3c4043;border-radius:14px}
+            h1{margin:0 0 6px;font-size:24px}p{color:#bdc1c6}ol{display:grid;gap:8px;margin:24px 0 0;padding:0;list-style:none}
+            li{margin:0}a{display:grid;gap:3px;padding:12px 14px;border:1px solid #3c4043;border-radius:10px;color:#e8eaed;text-decoration:none;background:#292a2d}
+            a:hover{background:#35363a;border-color:#5f6368}a span,a time{overflow:hidden;color:#9aa0a6;font-size:12px;text-overflow:ellipsis;white-space:nowrap}a time{font-size:11px}.empty{margin:24px 0 4px}
+            </style></head>
+            <body><main><h1>History</h1><p>Saved page metadata only: URL, title, and visited time.</p>{{body}}</main></body>
+            </html>
+            """;
     }
 
     private BrowserTabHostState? ActiveBrowserTab =>
@@ -295,6 +348,12 @@ public partial class MainWindow : Window
 
         uri = new Uri("about:blank");
         return false;
+    }
+
+    private static bool IsHistoryUrl(string? value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && string.Equals(uri.AbsoluteUri, "about:history", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void ConfigureFrontend(
@@ -439,6 +498,12 @@ public partial class MainWindow : Window
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
+            case "browser.history":
+            {
+                await CreateBrowserTabAsync(null, "about:history", "History", activate: true);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
             case "browser.selectHistory":
             {
                 var payload = BridgeProtocol.ReadPayload<BrowserHistoryPayload>(command.Payload);
@@ -451,7 +516,8 @@ public partial class MainWindow : Window
 
                 var browserTab = ActiveBrowserTab
                     ?? throw new InvalidOperationException("The browser tab is not initialized.");
-                browserTab.WebView.Source = historyUri;
+                browserTab.Navigate(historyUri);
+                browserTab.Url = historyUri.ToString();
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
@@ -475,8 +541,15 @@ public partial class MainWindow : Window
                 {
                     throw new InvalidOperationException("The browser tab is not initialized.");
                 }
+                if (IsHistoryUrl(uri.ToString()))
+                {
+                    NavigateHistory(activeTab);
+                    SaveBrowserState();
+                    SendState(command.RequestId, sourceWebView);
+                    break;
+                }
                 activeTab.Url = uri.ToString();
-                activeTab?.Navigate(uri);
+                activeTab.Navigate(uri);
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
@@ -709,7 +782,9 @@ public partial class MainWindow : Window
         }
 
         var browser = tab.WebView;
-        tab.Url = browser.Source?.ToString() ?? "about:blank";
+        tab.Url = tab.InternalPage == "history"
+            ? "about:history"
+            : browser.Source?.ToString() ?? "about:blank";
         tab.Title = string.IsNullOrWhiteSpace(browser.CoreWebView2.DocumentTitle)
             ? tab.Title
             : browser.CoreWebView2.DocumentTitle;
@@ -727,7 +802,9 @@ public partial class MainWindow : Window
             var serializedContent = await browser.ExecuteScriptAsync(
                 "document.body ? document.body.innerText : null");
             var content = JsonSerializer.Deserialize<string>(serializedContent);
-            var pageUri = browser.Source ?? new Uri("about:blank");
+            var pageUri = tab.InternalPage == "history"
+                ? new Uri("about:history")
+                : browser.Source ?? new Uri("about:blank");
             var title = browser.CoreWebView2.DocumentTitle ?? string.Empty;
             var extractionStatus = content is null
                 ? PageExtractionStatus.Partial
@@ -745,7 +822,9 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            var pageUri = browser.Source ?? new Uri("about:blank");
+            var pageUri = tab.InternalPage == "history"
+                ? new Uri("about:history")
+                : browser.Source ?? new Uri("about:blank");
             _controller.SetObservation(new PageObservation(
                 pageUri,
                 browser.CoreWebView2.DocumentTitle ?? string.Empty,
@@ -774,10 +853,32 @@ public partial class MainWindow : Window
             return;
         }
 
-        tab.Url = tab.WebView.Source?.ToString() ?? "about:blank";
-        tab.Title = string.IsNullOrWhiteSpace(tab.WebView.CoreWebView2?.DocumentTitle)
+        var source = tab.WebView.Source?.ToString() ?? "about:blank";
+        var documentTitle = tab.WebView.CoreWebView2?.DocumentTitle;
+        if (tab.InternalPage is null
+            && string.Equals(source, "about:blank", StringComparison.OrdinalIgnoreCase))
+        {
+            tab.InternalPage = documentTitle switch
+            {
+                "History" => "history",
+                "ModScope Home" => "home",
+                _ => null
+            };
+        }
+
+        if (!string.Equals(source, "about:blank", StringComparison.OrdinalIgnoreCase))
+        {
+            tab.InternalPage = null;
+        }
+
+        tab.Url = tab.InternalPage switch
+        {
+            "history" => "about:history",
+            _ => source
+        };
+        tab.Title = string.IsNullOrWhiteSpace(documentTitle)
             ? tab.Title
-            : tab.WebView.CoreWebView2.DocumentTitle;
+            : documentTitle;
         if (!e.IsSuccess)
         {
             if (!ReferenceEquals(tab, ActiveBrowserTab))
@@ -788,8 +889,10 @@ public partial class MainWindow : Window
             }
 
             _controller.SetObservation(new PageObservation(
-                tab.WebView.Source ?? new Uri("about:blank"),
-                tab.WebView.CoreWebView2?.DocumentTitle ?? string.Empty,
+                tab.InternalPage == "history"
+                    ? new Uri("about:history")
+                    : tab.WebView.Source ?? new Uri("about:blank"),
+                documentTitle ?? string.Empty,
                 null,
                 DateTimeOffset.UtcNow,
                 "WebView2",
@@ -813,9 +916,26 @@ public partial class MainWindow : Window
         var tab = FindBrowserTab(sender);
         if (tab is not null && tab.WebView.CoreWebView2 is not null)
         {
-            tab.Title = string.IsNullOrWhiteSpace(tab.WebView.CoreWebView2.DocumentTitle)
+            var title = tab.WebView.CoreWebView2.DocumentTitle;
+            if (tab.InternalPage is null
+                && string.Equals(tab.WebView.Source?.ToString(), "about:blank", StringComparison.OrdinalIgnoreCase))
+            {
+                tab.InternalPage = title switch
+                {
+                    "History" => "history",
+                    "ModScope Home" => "home",
+                    _ => null
+                };
+            }
+
+            if (tab.InternalPage == "history")
+            {
+                tab.Url = "about:history";
+            }
+
+            tab.Title = string.IsNullOrWhiteSpace(title)
                 ? tab.Title
-                : tab.WebView.CoreWebView2.DocumentTitle;
+                : title;
             SaveBrowserState();
         }
 
@@ -836,8 +956,8 @@ public partial class MainWindow : Window
 
         var browser = browserTab.WebView;
         var browserState = new BrowserUiState(
-            browser.Source?.ToString() ?? "about:blank",
-            browser.CoreWebView2.DocumentTitle ?? browserTab.Title,
+            browserTab.Url,
+            browserTab.Title,
             browser.CanGoBack,
             browser.CanGoForward,
             _browserTabs.Values
@@ -874,8 +994,9 @@ public partial class MainWindow : Window
     private void UpdateLoadingOverlay()
     {
         var operation = _controller.CurrentOperation;
-        var showOverlay = _startupLoading || (operation.IsBusy && !operation.IsBackground);
+        var showOverlay = IsForegroundLoading(operation);
         LoadingOverlay.Visibility = showOverlay ? Visibility.Visible : Visibility.Collapsed;
+        SetClientInteractionEnabled(!showOverlay);
         if (!showOverlay)
         {
             return;
@@ -900,6 +1021,51 @@ public partial class MainWindow : Window
         {
             LoadingOverlayProgress.IsIndeterminate = true;
         }
+    }
+
+    private bool IsForegroundLoading()
+    {
+        return IsForegroundLoading(_controller.CurrentOperation);
+    }
+
+    private bool IsForegroundLoading(KnowledgeOperationUiState operation)
+    {
+        return _startupLoading || (operation.IsBusy && !operation.IsBackground);
+    }
+
+    private void SetClientInteractionEnabled(bool enabled)
+    {
+        ToolbarHost.IsEnabled = enabled;
+        ToolbarHost.IsHitTestVisible = enabled;
+        ModListShell.IsEnabled = enabled;
+        ModListShell.IsHitTestVisible = enabled;
+        ContextShell.IsEnabled = enabled;
+        ContextShell.IsHitTestVisible = enabled;
+        SetWebViewInteractionEnabled(ToolbarShell, enabled);
+        SetWebViewInteractionEnabled(ModListWebView, enabled);
+        SetWebViewInteractionEnabled(ContextWebView, enabled);
+        BrowserHost.IsEnabled = enabled;
+        BrowserHost.IsHitTestVisible = enabled;
+
+        foreach (var tab in _browserTabs.Values)
+        {
+            SetWebViewInteractionEnabled(tab.WebView, enabled);
+        }
+
+        LoadingOverlay.IsHitTestVisible = !enabled;
+    }
+
+    private static void SetWebViewInteractionEnabled(
+        Microsoft.Web.WebView2.Wpf.WebView2 webView,
+        bool enabled)
+    {
+        if (webView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        webView.IsEnabled = enabled;
+        webView.IsHitTestVisible = enabled;
     }
 
     private static string? ChooseMo2Root()
