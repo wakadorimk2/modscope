@@ -58,13 +58,38 @@ button:disabled {
 
 .toolbar-row {
   display: flex;
-  flex: 0 0 46px;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 46px;
   overflow: visible;
   flex-wrap: nowrap;
+}
+
+.toolbar-tabs-row {
+  flex: 0 0 32px;
+  min-height: 32px;
+  gap: 6px;
+}
+
+.toolbar-tabs-row .browser-tabs {
+  flex: 1 1 auto;
+}
+
+.toolbar-controls-row {
+  flex: 0 0 44px;
+  min-height: 44px;
+}
+
+.toolbar-omnibox {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.32);
 }
 
 .mod-list-surface {
@@ -550,16 +575,22 @@ button:disabled {
 }
 
 .toolbar-address {
-  flex: 0 1 280px;
-  min-width: 160px;
-  height: 34px;
-  padding: 7px 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: 30px;
+  padding: 5px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
 }
 
 .toolbar-go-button {
   flex: 0 0 auto;
-  min-height: 34px;
-  padding: 7px 10px;
+  min-height: 28px;
+  height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
 }
 
 .profile-picker {
@@ -697,8 +728,7 @@ h2 {
   color: #86efac;
 }
 
-.context-mode-switch,
-.mod-list-view-switch {
+.context-mode-switch {
   display: flex;
   gap: 4px;
   padding: 3px;
@@ -711,8 +741,7 @@ h2 {
   margin-bottom: 12px;
 }
 
-.context-mode-switch button,
-.mod-list-view-switch button {
+.context-mode-switch button {
   flex: 1 1 0;
   padding: 7px 9px;
   border: 0;
@@ -723,15 +752,9 @@ h2 {
   font-weight: 700;
 }
 
-.context-mode-switch button.active,
-.mod-list-view-switch button.active {
+.context-mode-switch button.active {
   background: rgba(14, 116, 144, 0.36);
   color: #e0f2fe;
-}
-
-.mod-list-view-switch {
-  flex: 0 0 auto;
-  margin-top: 12px;
 }
 
 .role-chip {
@@ -1402,13 +1425,17 @@ select:focus {
 
 .mod-card-main-disabled {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-width: 0;
+  cursor: default;
   padding: 2px;
 }
 
 .mod-card-main-disabled strong {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: #cbd5e1;

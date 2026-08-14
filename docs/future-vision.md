@@ -419,7 +419,7 @@ MO2はread-onlyのまま維持します。
 
 Phase6.5では、Phase6の機能を維持したままWorkspaceの表示責務を整理しました。
 ModListの標準表示を`ModScope view`にし、`Foundation`、`Compatibility`、`Content`、`Unknown`をQueryのstatic evidenceから表示します。
-`MO2 order`ではactive profileのpriority順を確認できます。
+active profileのpriorityは、分類内の決定的な順序へ使用します。
 role assessmentは`Verified`、`Inferred`、`Unknown`を保持し、Foundationは依存関係として断定しません。
 MO2 priorityはprofileの上から下へ`0→N`で保持します。`modlist.txt`は画面順と逆向きに保存されるため、末尾からpriorityを採番します。
 ModScope viewはFoundationからUnknownへ表示し、他のreadable MODからtarget XMLとして参照されるMODをbase roleの静的証拠としてFoundation / Inferredへ投影します。
@@ -462,10 +462,34 @@ Runtime comparisonの実行導線はDebugへ残します。
 通常MOD rowはMOD名、version、enable状態のlampだけを表示します。
 role、assessment、profile state、priority、verified Website状態はhover、keyboard focus、Inspectorで表示します。
 disabled MODは灰色系で表示し、Website導線とInspector導線を維持します。
-`ModScope view`と`MO2 order`の並び順は変更しません。
+`ModScope view`の固定順序とpriority順を維持します。
 
 Browser chromeとMO2 read-only境界は維持します。
 Phase6.6はQuery層、Bridge contract、Desktop host、Browser engineを変更しません。
+
+### Phase 6.7：起動表示・Chrome風Toolbar・MOD URL導線整理（完了）
+
+Desktop hostはclient area全体へ`LOADING PROFILE` overlayを表示します。
+WebView2初期化、source discovery、source load、foregroundのprofile switchを表示対象にします。
+background profile preloadは表示対象にしません。
+overlayはprofile名、operation phase、completed / totalまたはindeterminate progressを表示し、loading中のclient area操作を無効にします。
+成功後は自動で閉じ、失敗時は既存diagnosticを表示します。
+
+Toolbarは96pxのChrome型2段構成にします。
+上段はtab strip、active tab、tab close、new tabです。
+下段はback、forward、reload、home、URL入力、Go、History、pane icon、shortcut hintです。
+History展開時は440pxへ拡張します。
+既存のWebView2、Browser command、`layout.setToolbarExpanded`を維持します。
+
+`MO2 order`切替を削除し、ModScope viewを固定します。
+表示順は`Foundation`、`Compatibility`、`Content`、`Unknown`です。
+同じ分類内ではMO2 priorityとMOD keyの決定的な順序を使います。
+
+MOD URLは有効なModInfo Websiteを`Verified`として最優先します。
+欠落または無効なWebsiteは、MOD名から7DTD Nexusのslug URLを`Inferred`として作ります。
+slugを作れない場合はNexus検索URLへfallbackします。
+URLを作れないMODは`No usable URL`としてクリック不可で表示します。
+推定URLはページの存在確認ではありません。
 
 ### Phase 7：Controlled write
 

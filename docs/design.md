@@ -1079,7 +1079,6 @@ ModListの標準表示は`ModScope view`です。
 `Foundation`は依存関係を意味しません。
 role assessmentは`Verified`、`Inferred`、`Unknown`で表示します。
 分類内の順序はMO2 priorityを維持し、同順位はMOD keyで決定します。
-`MO2 order`はactive profileのpriority順をそのまま表示します。
 根拠がないMODは`Unknown`へ置きます。
 MO2のpriorityはprofileの上から下へ`0→N`で保持します。`modlist.txt`の保存順はこの画面順と逆です。
 ModScope viewは`Foundation`、`Compatibility`、`Content`、`Unknown`の順で表示し、分類内だけpriority順を使います。
@@ -1134,7 +1133,7 @@ Runtime comparisonの実行導線はDebugへ残します。
 role、assessment、profile state、priority、verified Website状態はhover、keyboard focus、Inspectorで表示します。
 disabled MODは名前、背景、lampを灰色系で表示します。
 MOD名はellipsisで省略します。
-Website導線、Inspector導線、`ModScope view`、`MO2 order`、priority順は維持します。
+Website導線、Inspector導線、ModScopeの固定順序、priority順は維持します。
 
 ### 25.3 Phase6.6 表示状態と境界
 
@@ -1144,6 +1143,32 @@ raw diagnosticはDebugだけに表示します。
 InspectorはContext WebView内で完結し、中央BrowserとBrowser chromeを覆いません。
 通常Contextの背景と境界は低コントラストにし、中央Web pageを主役として維持します。
 MO2 write、AI、MCP、独自Browser engineは追加しません。
+
+### 25.4 Phase6.7 起動表示、Chrome型Toolbar、MOD URL導線
+
+Desktop hostはWPF client area全体へ`LOADING PROFILE` overlayを表示します。
+WebView2初期化、source discovery、source load、foregroundのprofile switchをoverlay対象にします。
+background profile preloadはoverlay対象にしません。
+overlayは対象profile、operation phase、取得できるcompleted / totalを表示し、値がないphaseはindeterminate progressを表示します。
+loading中はclient areaの操作を無効にし、成功後は閉じます。失敗時は閉じて既存diagnosticを表示します。
+operation stateは既存`OperationStateChanged`を使い、UiStateとbridge contractへ項目を追加しません。
+
+通常Toolbarは96pxのChrome型2段構成です。
+上段へtab strip、active tab、tab close、new tabを置きます。
+下段へback、forward、reload、home、URL入力、Go、History、pane icon、shortcut hintを置きます。
+History展開時のToolbar高さは440pxです。
+`layout.setToolbarExpanded`を再利用し、Browser engineとWebView2構成は変更しません。
+
+ModListはModScope viewの固定順序だけを表示します。
+順序は`Foundation`、`Compatibility`、`Content`、`Unknown`です。
+分類内はMO2 priority、同順位はMOD keyで決定します。
+`MO2 order`切替と設定項目は持ちません。
+
+MOD Websiteは`Verified`、`Inferred`、`No usable URL`へ分類します。
+有効な既存Websiteはそのまま開き、無効または欠落する場合はdisplay name、directory name、MOD keyから7DTD Nexusのslug URLを推定します。
+slugを作れない場合はNexus検索URLへfallbackします。
+`Inferred`はクリック可能ですが、ページの存在確認ではありません。
+`No usable URL`はbuttonにせず、既存のBrowser scheme検証を維持します。
 
 ### 24.3 読み込み性能とProfile投影
 
@@ -1244,6 +1269,8 @@ profile selectorはModListへ移し、profile名とPending、Loading、Ready、F
 active profileを先に表示し、他profileはactive表示後にbackground preloadします。
 全候補を常設一覧から削減するため、認識失敗時の検索drawerは補助導線として維持します。
 検索対象はdisplay name、directory name、MOD keyです。
-`ModInfo.xml`から得たabsolute http / https Websiteだけを、既存の`browser.navigate`で開きます。
-WebsiteがないMODのURLは推測しません。
+`ModInfo.xml`から得た有効なabsolute http / https Websiteを最優先します。
+Websiteが無効または欠落する場合は、MOD名から7DTD Nexusのslug URLを推定します。
+slugを作れない場合は、7DTD Nexus検索URLへfallbackします。
+推定URLはページの存在を証明せず、remote 404やnavigation failureはBrowser diagnosticとして扱います。
 認識失敗時のlocal MOD選択も、同じ検索結果から行います。

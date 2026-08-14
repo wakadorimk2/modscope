@@ -39,6 +39,8 @@ public sealed class DesktopSessionController
 
     internal event EventHandler? OperationStateChanged;
 
+    internal KnowledgeOperationUiState CurrentOperation => _operation;
+
     public DesktopSessionController()
         : this(LocalKnowledgeQueryService.CreateDefault())
     {
