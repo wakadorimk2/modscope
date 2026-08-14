@@ -9,7 +9,7 @@
         Height="900">
     <Grid Background="#0B1120">
         <Grid.RowDefinitions>
-            <RowDefinition x:Name="ToolbarRow" Height="72" />
+            <RowDefinition x:Name="ToolbarRow" Height="96" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -32,6 +32,42 @@
 
         <Border x:Name="ContextShell" Grid.Row="1" Grid.Column="2" Margin="0,8,8,8" CornerRadius="12" Background="#0B1120">
             <wv2:WebView2 x:Name="ContextWebView" />
+        </Border>
+
+        <Border x:Name="LoadingOverlay"
+                Grid.Row="0"
+                Grid.RowSpan="2"
+                Grid.Column="0"
+                Grid.ColumnSpan="3"
+                Panel.ZIndex="100"
+                Background="#E60B1120"
+                IsHitTestVisible="True"
+                Visibility="Visible"
+                AutomationProperties.Name="Loading local profile">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
+                <TextBlock Text="LOADING PROFILE"
+                           Foreground="#BAE6FD"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center" />
+                <TextBlock x:Name="LoadingOverlayTitle"
+                           Margin="0,12,0,0"
+                           Text="Loading local MO2 knowledge..."
+                           Foreground="#E2E8F0"
+                           FontSize="14"
+                           HorizontalAlignment="Center" />
+                <TextBlock x:Name="LoadingOverlayPhase"
+                           Margin="0,6,0,0"
+                           Foreground="#94A3B8"
+                           FontSize="12"
+                           HorizontalAlignment="Center" />
+                <ProgressBar x:Name="LoadingOverlayProgress"
+                             Margin="0,18,0,0"
+                             Height="6"
+                             Minimum="0"
+                             Maximum="100"
+                             IsIndeterminate="True" />
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

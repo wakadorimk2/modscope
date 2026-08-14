@@ -30,7 +30,6 @@
   let pageDetailsOpen = false;
   let developerToolsOpen = false;
   let contextMode: 'context' | 'settings' | 'debug' = 'context';
-  let modListView: 'modscope' | 'mo2' = 'modscope';
   let historyOpen = false;
   let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
@@ -65,12 +64,10 @@
   }
 
   $: profileCandidates = sortCandidates(
-    state.knowledge.candidates.filter((candidate) => candidate.profileState !== 'unlisted'),
-    modListView
+    state.knowledge.candidates.filter((candidate) => candidate.profileState !== 'unlisted')
   );
   $: unlistedProfileCandidates = sortCandidates(
-    state.knowledge.candidates.filter((candidate) => candidate.profileState === 'unlisted'),
-    modListView
+    state.knowledge.candidates.filter((candidate) => candidate.profileState === 'unlisted')
   );
   $: enabledProfileCandidates = profileCandidates.filter((candidate) => candidate.enabledState === 'enabled');
   $: disabledProfileCandidates = profileCandidates.filter((candidate) => candidate.enabledState === 'disabled');
@@ -404,33 +401,69 @@
     return candidate.role?.assessment || 'Unknown';
   }
 
-  function sortCandidates(
-    candidates: ModCandidateUiState[],
-    view: 'modscope' | 'mo2' = modListView
-  ): ModCandidateUiState[] {
+  function sortCandidates(candidates: ModCandidateUiState[]): ModCandidateUiState[] {
     return [...candidates].sort((left, right) => {
       const leftPriority = left.priority ?? Number.MAX_SAFE_INTEGER;
       const rightPriority = right.priority ?? Number.MAX_SAFE_INTEGER;
-      if (view === 'modscope') {
-        return roleRank(left) - roleRank(right)
-          || leftPriority - rightPriority
-          || left.modKey.localeCompare(right.modKey);
-      }
-      return leftPriority - rightPriority || left.modKey.localeCompare(right.modKey);
+      return roleRank(left) - roleRank(right)
+        || leftPriority - rightPriority
+        || left.modKey.localeCompare(right.modKey);
     });
   }
 
   function isWebsiteUrl(value: string | null | undefined): value is string {
-    if (!value) {
+    const trimmed = value?.trim();
+    if (!trimmed) {
       return false;
     }
 
     try {
-      const url = new URL(value);
+      const url = new URL(trimmed);
       return url.protocol === 'http:' || url.protocol === 'https:';
     } catch {
       return false;
     }
+  }
+
+  type ModWebsiteLink = {
+    url: string | null;
+    status: 'Verified' | 'Inferred' | 'No usable URL';
+  };
+
+  function slugifyModName(value: string): string {
+    return value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function resolveModWebsite(candidate: ModCandidateUiState): ModWebsiteLink {
+    if (isWebsiteUrl(candidate.website)) {
+      return { url: candidate.website.trim(), status: 'Verified' };
+    }
+
+    const name = [candidate.displayName, candidate.directoryName, candidate.modKey]
+      .map((value) => value?.trim() ?? '')
+      .find((value) => value.length > 0) ?? '';
+    if (!name) {
+      return { url: null, status: 'No usable URL' };
+    }
+
+    const slug = slugifyModName(name);
+    if (slug) {
+      return {
+        url: `https://www.nexusmods.com/7daystodie/mods/${slug}`,
+        status: 'Inferred'
+      };
+    }
+
+    return {
+      url: `https://www.nexusmods.com/7daystodie/search/?gsearch=${encodeURIComponent(name)}`,
+      status: 'Inferred'
+    };
   }
 
   function searchCandidates(candidates: ModCandidateUiState[], query: string): ModCandidateUiState[] {
@@ -449,12 +482,13 @@
   }
 
   function openModPage(candidate: ModCandidateUiState) {
-    if (!isWebsiteUrl(candidate.website)) {
+    const website = resolveModWebsite(candidate);
+    if (!website.url) {
       return;
     }
 
     closeModSearch();
-    send('browser.navigate', { url: candidate.website });
+    send('browser.navigate', { url: website.url });
   }
 
   function chooseModForRecognition(candidate: ModCandidateUiState) {
@@ -568,7 +602,10 @@
   }
 
   function modTooltip(candidate: ModCandidateUiState): string {
-    const website = isWebsiteUrl(candidate.website) ? 'Verified Website' : 'No verified page';
+    const websiteLink = resolveModWebsite(candidate);
+    const website = websiteLink.status === 'Verified'
+      ? 'Verified Website'
+      : websiteLink.status;
     return [
       `${roleLabel(candidate)} · ${roleAssessmentLabel(candidate)}`,
       `Priority ${candidate.priority ?? 'Unknown'}`,
@@ -698,21 +735,6 @@
       </div>
     {/if}
 
-    <div class="mod-list-view-switch" role="group" aria-label="MOD list order">
-      <button
-        type="button"
-        class:active={modListView === 'modscope'}
-        aria-pressed={modListView === 'modscope'}
-        onclick={() => (modListView = 'modscope')}
-      >ModScope view</button>
-      <button
-        type="button"
-        class:active={modListView === 'mo2'}
-        aria-pressed={modListView === 'mo2'}
-        onclick={() => (modListView = 'mo2')}
-      >MO2 order</button>
-    </div>
-
     {#if state.knowledge.session}
       <label class="mod-list-profile-picker">
         <span>Profile</span>
@@ -749,11 +771,11 @@
                 title={modTooltip(candidate)}
               >
                 <div class="mod-list-item-top">
-                  {#if isWebsiteUrl(candidate.website)}
+                  {#if resolveModWebsite(candidate).url}
                     <button
                       type="button"
                       class="mod-list-item-main"
-                      aria-label={`Open ${modDisplayName(candidate)} page`}
+                      aria-label={`Open ${modDisplayName(candidate)} page · ${resolveModWebsite(candidate).status}`}
                       onclick={() => openModPage(candidate)}
                     >
                       <strong>{modDisplayName(candidate)}</strong>
@@ -800,11 +822,11 @@
                   title={modTooltip(candidate)}
                 >
                   <div class="mod-list-item-top">
-                    {#if isWebsiteUrl(candidate.website)}
+                    {#if resolveModWebsite(candidate).url}
                       <button
                         type="button"
                         class="mod-list-item-main"
-                        aria-label={`Open ${modDisplayName(candidate)} page`}
+                        aria-label={`Open ${modDisplayName(candidate)} page · ${resolveModWebsite(candidate).status}`}
                         onclick={() => openModPage(candidate)}
                       >
                         <strong>{modDisplayName(candidate)}</strong>
@@ -849,24 +871,7 @@
   </main>
 {:else if surface === 'toolbar'}
   <main class="toolbar-surface">
-    <div class="toolbar-row">
-      <div class="toolbar-navigation" aria-label="Browser navigation">
-        <button class="icon-button" title="Back" aria-label="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
-        <button class="icon-button" title="Forward" aria-label="Forward" disabled={!state.browser.canGoForward} onclick={() => send('browser.forward')}>→</button>
-        <button class="icon-button" title="Reload" aria-label="Reload" onclick={() => send('browser.reload')}>↻</button>
-      </div>
-
-      <button class="icon-button" title="Home" aria-label="Open Browse Home" onclick={openHome}>⌂</button>
-
-      <input
-        class="toolbar-address"
-        aria-label="Browser URL"
-        placeholder="https://example.com"
-        bind:value={address}
-        onkeydown={(event) => event.key === 'Enter' && navigate()}
-      />
-      <button class="secondary-button toolbar-go-button" type="button" onclick={navigate}>Go</button>
-
+    <div class="toolbar-tabs-row toolbar-row">
       <div class="browser-tabs" aria-label="Browser tabs">
         {#each state.browser.tabs as tab (tab.tabId)}
           <div
@@ -885,7 +890,28 @@
             >×</button>
           </div>
         {/each}
-        <button type="button" class="icon-button compact-icon-button" title="New tab" aria-label="New tab" onclick={openNewTab}>+</button>
+      </div>
+      <button type="button" class="icon-button compact-icon-button" title="New tab" aria-label="New tab" onclick={openNewTab}>+</button>
+    </div>
+
+    <div class="toolbar-controls-row toolbar-row">
+      <div class="toolbar-navigation" aria-label="Browser navigation">
+        <button class="icon-button" title="Back" aria-label="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
+        <button class="icon-button" title="Forward" aria-label="Forward" disabled={!state.browser.canGoForward} onclick={() => send('browser.forward')}>→</button>
+        <button class="icon-button" title="Reload" aria-label="Reload" onclick={() => send('browser.reload')}>↻</button>
+      </div>
+
+      <button class="icon-button" title="Home" aria-label="Open Browse Home" onclick={openHome}>⌂</button>
+
+      <div class="toolbar-omnibox" aria-label="Browser address controls">
+        <input
+          class="toolbar-address"
+          aria-label="Browser URL"
+          placeholder="https://example.com"
+          bind:value={address}
+          onkeydown={(event) => event.key === 'Enter' && navigate()}
+        />
+        <button class="secondary-button toolbar-go-button" type="button" onclick={navigate}>Go</button>
       </div>
 
       <details
@@ -1487,7 +1513,7 @@
         </div>
 
         <p class="subtle mod-search-description">
-          Search by display name, directory name, or MOD key. Website links use only verified ModInfo.xml values.
+          Search by display name, directory name, or MOD key. Website links use verified values or inferred Nexus destinations.
         </p>
 
         <label class="mod-search-field">
@@ -1508,11 +1534,11 @@
             <p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>
             {#each modSearchResults as candidate (candidate.modKey)}
               <article class="mod-search-card">
-                {#if isWebsiteUrl(candidate.website)}
+                {#if resolveModWebsite(candidate).url}
                   <button
                     type="button"
                     class="mod-card-main"
-                    aria-label={`Open ${modDisplayName(candidate)} page`}
+                    aria-label={`Open ${modDisplayName(candidate)} page · ${resolveModWebsite(candidate).status}`}
                     onclick={() => openModPage(candidate)}
                   >
                     <strong>{modDisplayName(candidate)}</strong>
@@ -1529,10 +1555,10 @@
                   <span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span>
                   <span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span>
                   <span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span>
-                  {#if isWebsiteUrl(candidate.website)}
-                    <span class="mod-link-hint">Open page</span>
+                  {#if resolveModWebsite(candidate).url}
+                    <span class="mod-link-hint">Open page · {resolveModWebsite(candidate).status}</span>
                   {:else}
-                    <span class="mod-link-hint">No verified page</span>
+                    <span class="mod-link-hint">No usable URL</span>
                   {/if}
                 </div>
 

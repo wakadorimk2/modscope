@@ -9,7 +9,7 @@ namespace ModScope.Desktop;
 
 public partial class MainWindow : Window
 {
-    private const double ToolbarCollapsedHeight = 72;
+    private const double ToolbarCollapsedHeight = 96;
     private const double ToolbarExpandedHeight = 440;
 
     private const string AppHostName = "appassets.modscope";
@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private bool _modListReady;
     private bool _contextReady;
     private bool _sourceDiscoveryStarted;
+    private bool _startupLoading = true;
     private readonly BrowserStateStore _browserStateStore = BrowserStateStore.CreateDefault();
     private readonly Dictionary<string, BrowserTabHostState> _browserTabs = new(StringComparer.Ordinal);
     private IReadOnlyList<BrowserHistoryEntryUiState> _browserHistory = Array.Empty<BrowserHistoryEntryUiState>();
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        UpdateLoadingOverlay();
         _controller.OperationStateChanged += Controller_OperationStateChanged;
         Loaded += MainWindow_Loaded;
     }
@@ -78,11 +80,15 @@ public partial class MainWindow : Window
                 SendState();
             }
 
+            _startupLoading = false;
+            UpdateLoadingOverlay();
             await RestoreBrowserTabsAsync();
             SendState();
         }
         catch (Exception exception)
         {
+            _startupLoading = false;
+            LoadingOverlay.Visibility = Visibility.Collapsed;
             _controller.SetStatus("WebView2 initialization failed.");
             if (ToolbarShell.CoreWebView2 is not null
                 || ModListWebView.CoreWebView2 is not null
@@ -853,11 +859,47 @@ public partial class MainWindow : Window
     {
         if (Dispatcher.CheckAccess())
         {
+            UpdateLoadingOverlay();
             SendState();
             return;
         }
 
-        _ = Dispatcher.InvokeAsync(() => SendState());
+        _ = Dispatcher.InvokeAsync(() =>
+        {
+            UpdateLoadingOverlay();
+            SendState();
+        });
+    }
+
+    private void UpdateLoadingOverlay()
+    {
+        var operation = _controller.CurrentOperation;
+        var showOverlay = _startupLoading || (operation.IsBusy && !operation.IsBackground);
+        LoadingOverlay.Visibility = showOverlay ? Visibility.Visible : Visibility.Collapsed;
+        if (!showOverlay)
+        {
+            return;
+        }
+
+        LoadingOverlayTitle.Text = string.IsNullOrWhiteSpace(operation.TargetProfileName)
+            ? "Loading local MO2 knowledge..."
+            : $"Loading profile {operation.TargetProfileName}...";
+        LoadingOverlayPhase.Text = string.IsNullOrWhiteSpace(operation.Phase) || operation.Phase == "idle"
+            ? "Preparing local profile..."
+            : operation.Phase.Replace('-', ' ');
+
+        if (operation.Completed is int completed
+            && operation.Total is int total
+            && total > 0)
+        {
+            LoadingOverlayProgress.IsIndeterminate = false;
+            LoadingOverlayProgress.Maximum = total;
+            LoadingOverlayProgress.Value = Math.Clamp(completed, 0, total);
+        }
+        else
+        {
+            LoadingOverlayProgress.IsIndeterminate = true;
+        }
     }
 
     private static string? ChooseMo2Root()
