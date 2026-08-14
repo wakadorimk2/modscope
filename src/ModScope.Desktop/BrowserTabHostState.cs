@@ -20,9 +20,14 @@ internal sealed class BrowserTabHostState
 
     public string? InternalPage { get; set; }
 
-    public void Navigate(Uri uri)
+    public string? PendingNexusSearchName { get; set; }
+
+    public void Navigate(Uri uri, string? nexusSearchName = null)
     {
         InternalPage = null;
+        PendingNexusSearchName = string.IsNullOrWhiteSpace(nexusSearchName)
+            ? null
+            : nexusSearchName.Trim();
         WebView.Source = uri;
     }
 }

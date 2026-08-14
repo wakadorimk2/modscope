@@ -1,5 +1,7 @@
-using System.Text.Json;
+using System.Globalization;
 using System.IO;
+using System.Text;
+using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using ModScope.Desktop.Contracts;
@@ -233,6 +235,7 @@ public partial class MainWindow : Window
     private void NavigateHome(BrowserTabHostState tab)
     {
         tab.InternalPage = "home";
+        tab.PendingNexusSearchName = null;
         tab.Url = "about:blank";
         tab.Title = "ModScope Home";
         tab.WebView.NavigateToString(HomeHtml);
@@ -242,6 +245,7 @@ public partial class MainWindow : Window
     private void NavigateHistory(BrowserTabHostState tab)
     {
         tab.InternalPage = "history";
+        tab.PendingNexusSearchName = null;
         tab.Url = "about:history";
         tab.Title = "History";
         tab.WebView.NavigateToString(RenderHistoryHtml());
@@ -354,6 +358,145 @@ public partial class MainWindow : Window
     {
         return Uri.TryCreate(value, UriKind.Absolute, out var uri)
             && string.Equals(uri.AbsoluteUri, "about:history", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsNexusSearchUri(Uri uri)
+    {
+        return uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
+            && uri.Host.Equals("www.nexusmods.com", StringComparison.OrdinalIgnoreCase)
+            && uri.AbsolutePath.TrimEnd('/').Equals(
+                "/7daystodie/search",
+                StringComparison.OrdinalIgnoreCase)
+            && uri.Query.Contains("gsearch=", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<bool> TryResolveNexusSearchAsync(BrowserTabHostState tab)
+    {
+        var targetName = tab.PendingNexusSearchName;
+        tab.PendingNexusSearchName = null;
+        if (string.IsNullOrWhiteSpace(targetName)
+            || tab.WebView.CoreWebView2 is null
+            || tab.WebView.Source is not { } source
+            || !IsNexusSearchUri(source))
+        {
+            return false;
+        }
+
+        var normalizedTargetName = NormalizeNexusName(targetName);
+        if (normalizedTargetName.Length == 0)
+        {
+            _controller.SetStatus("Nexus search needs a usable MOD name.");
+            return false;
+        }
+
+        try
+        {
+            var serializedLinks = await tab.WebView.ExecuteScriptAsync(
+                "JSON.stringify(Array.from(document.querySelectorAll('a[href]')).map(anchor => ({ href: anchor.href, text: (anchor.innerText || anchor.textContent || '').trim() })))");
+            var linksJson = JsonSerializer.Deserialize<string>(serializedLinks);
+            if (string.IsNullOrWhiteSpace(linksJson))
+            {
+                _controller.SetStatus("Nexus search results could not be inspected.");
+                return false;
+            }
+
+            using var document = JsonDocument.Parse(linksJson);
+            var matches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var link in document.RootElement.EnumerateArray())
+            {
+                if (link.ValueKind is not JsonValueKind.Object
+                    || !link.TryGetProperty("href", out var hrefElement)
+                    || hrefElement.ValueKind is not JsonValueKind.String
+                    || !link.TryGetProperty("text", out var textElement)
+                    || textElement.ValueKind is not JsonValueKind.String)
+                {
+                    continue;
+                }
+
+                var linkText = textElement.GetString();
+                if (NormalizeNexusName(linkText ?? string.Empty) != normalizedTargetName)
+                {
+                    continue;
+                }
+
+                if (TryGetNexusModUrl(hrefElement.GetString(), out var modUri))
+                {
+                    matches.Add(modUri.ToString());
+                }
+            }
+
+            if (matches.Count == 1)
+            {
+                var resolvedUri = new Uri(matches.Single(), UriKind.Absolute);
+                tab.Navigate(resolvedUri);
+                _controller.SetStatus($"Resolved Nexus MOD page for {targetName}.");
+                return true;
+            }
+
+            _controller.SetStatus(matches.Count == 0
+                ? "Nexus search found no exact MOD page."
+                : "Nexus search found multiple exact MOD pages.");
+        }
+        catch (JsonException)
+        {
+            _controller.SetStatus("Nexus search results could not be inspected.");
+        }
+        catch (Exception)
+        {
+            _controller.SetStatus("Nexus search results could not be inspected.");
+        }
+
+        return false;
+    }
+
+    private static bool TryGetNexusModUrl(string? value, out Uri canonicalUri)
+    {
+        canonicalUri = null!;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || !uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
+            || !uri.Host.Equals("www.nexusmods.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length != 3
+            || !segments[0].Equals("7daystodie", StringComparison.OrdinalIgnoreCase)
+            || !segments[1].Equals("mods", StringComparison.OrdinalIgnoreCase)
+            || !long.TryParse(
+                segments[2],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var modId)
+            || modId <= 0)
+        {
+            return false;
+        }
+
+        canonicalUri = new Uri(
+            $"https://www.nexusmods.com/7daystodie/mods/{modId}",
+            UriKind.Absolute);
+        return true;
+    }
+
+    private static string NormalizeNexusName(string value)
+    {
+        var decomposed = value.Normalize(NormalizationForm.FormKD);
+        var normalized = new StringBuilder(decomposed.Length);
+        foreach (var character in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            if (char.IsLetterOrDigit(character))
+            {
+                normalized.Append(char.ToLowerInvariant(character));
+            }
+        }
+
+        return normalized.ToString();
     }
 
     private static void ConfigureFrontend(
@@ -549,7 +692,9 @@ public partial class MainWindow : Window
                     break;
                 }
                 activeTab.Url = uri.ToString();
-                activeTab.Navigate(uri);
+                activeTab.Navigate(
+                    uri,
+                    IsNexusSearchUri(uri) ? payload.NexusSearchName : null);
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
@@ -881,6 +1026,7 @@ public partial class MainWindow : Window
             : documentTitle;
         if (!e.IsSuccess)
         {
+            tab.PendingNexusSearchName = null;
             if (!ReferenceEquals(tab, ActiveBrowserTab))
             {
                 SaveBrowserState();
@@ -905,6 +1051,11 @@ public partial class MainWindow : Window
                         e.WebErrorStatus.ToString())
                 }));
             SendState();
+            return;
+        }
+
+        if (await TryResolveNexusSearchAsync(tab))
+        {
             return;
         }
 

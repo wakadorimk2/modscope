@@ -183,7 +183,7 @@ public sealed record BridgeMessageEnvelope(
     string? RequestId,
     object Payload);
 
-public sealed record NavigatePayload(string Url);
+public sealed record NavigatePayload(string Url, string? NexusSearchName = null);
 
 public sealed record BrowserTabPayload(string TabId);
 
