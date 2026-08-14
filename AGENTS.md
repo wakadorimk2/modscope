@@ -76,6 +76,22 @@ Nexus Mods専用にしません。未知のサイトではURL、title、基本pa
 
 Codex専用仕様へ密結合しません。CLI、structured files、local API、MCP、その他のagent-friendly interfaceは、共通のread modelへ接続する候補として比較します。
 
+## Prior Art First
+
+Before designing or implementing mod-management functionality, first investigate how established tools such as **Mod Organizer 2, Wabbajack, and Vortex** already solve the same problem.
+
+For features involving installation, updates, versioning, dependencies, compatibility, load order, profiles, or mod-list distribution:
+
+1. Check the existing behavior and data model of MO2, Wabbajack, and Vortex where relevant.
+2. Identify what they already solve well.
+3. Identify the remaining user pain or missing capability.
+4. Prefer interoperability, reuse, or a complementary layer over reimplementing mature functionality.
+5. Only implement overlapping functionality when ModScope has a clear reason to do it differently.
+
+Before starting implementation, be able to answer:
+
+> **How do MO2, Wabbajack, and Vortex already solve this, and what specifically remains unsolved for ModScope?**
+
 ## MO2の安全境界
 
 - MO2のmods、profiles、downloads、MO2本体をsource of truthとして扱います。
