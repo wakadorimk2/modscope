@@ -389,14 +389,22 @@ ModScopeLabのinventoryで、archive、MO2 package、Modlet、Nexus Mod、Nexus 
 packageから複数のModletが生成される関係を保持します。
 `ModInfo.Name`、package名、archive名だけでstable identityを確定しません。
 
+利用可能な場合、MO2 packageの`meta.ini`をprimary local provenance anchorとして扱います。
+概念上の関係は、`SourceArtifact → MO2Package → Modlet(s)`です。
+Nexus file identityはpackageまたはartifactのidentityとして保持し、bundle内の各Modletへ固有file identityを推測しません。
+明示的なprovenance metadataを、名前の類似によるfuzzy matchingより優先します。
+
 version comparisonは、local Modletと対象Nexus Fileのidentityを解決した後だけ実行します。
 identityまたはversionが欠落、曖昧、比較不能の場合は`Unknown`または`not-comparable`として返します。
 比較不能をversion matchとして扱いません。
+identityがresolvedでも、version observationが一致するとは限りません。
+`ModInfo.xml` versionとMO2 package `meta.ini` versionは別の値として保持します。
 
 MO2 separator textはcurator-authored evidenceとしてraw保持します。
 separator textからenable、dependency、compatibilityを断定しません。
 
-詳細な観測値と判断理由は、[Identity and version provenance ADR](adr/identity-and-version-provenance.md)に記録します。
+詳細な観測値は、[Smorgasbord local inventory follow-up](research/smorgasbord-local-inventory-2026-08-14.md)に記録します。
+判断理由は、[Identity and version provenance ADR](adr/identity-and-version-provenance.md)に記録します。
 
 ## 8. Adapter boundaries
 
