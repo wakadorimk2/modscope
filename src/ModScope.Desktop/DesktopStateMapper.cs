@@ -1,4 +1,6 @@
+using ModScope.Deployment;
 using ModScope.Desktop.Contracts;
+using ModScope.LocalKnowledge;
 using ModScope.Query;
 
 namespace ModScope.Desktop;
@@ -20,7 +22,12 @@ internal static class DesktopStateMapper
         LayoutUiState layout,
         string statusMessage,
         KnowledgeOperationUiState operation,
-        IReadOnlyDictionary<string, string>? profileLoadStates = null)
+        IReadOnlyDictionary<string, string>? profileLoadStates = null,
+        IReadOnlyList<ProfileEditEntryReadModel>? profileEditEntries = null,
+        DeploymentPlan? deploymentPlan = null,
+        string deploymentStatus = "idle",
+        bool canLaunch = false,
+        IReadOnlyList<DeploymentDiagnostic>? deploymentDiagnostics = null)
     {
         return new UiState(
             browser,
@@ -40,6 +47,13 @@ internal static class DesktopStateMapper
             localContext is null ? null : LocalContext(localContext),
             inspector is null ? null : Inspector(inspector),
             analysis,
+            Deployment(
+                session?.ProfileName ?? string.Empty,
+                profileEditEntries ?? Array.Empty<ProfileEditEntryReadModel>(),
+                deploymentPlan,
+                deploymentStatus,
+                canLaunch,
+                deploymentDiagnostics ?? Array.Empty<DeploymentDiagnostic>()),
             layout,
             statusMessage,
             session is null ? Array.Empty<DiagnosticUiState>() : Diagnostics(session.Diagnostics));
@@ -79,8 +93,83 @@ internal static class DesktopStateMapper
             value.ProfileName,
             value.Readiness,
             value.IsReady,
+            value.GameTargetReady,
             value.Evidence,
             Diagnostics(value.Diagnostics));
+    }
+
+    private static DeploymentUiState Deployment(
+        string profileName,
+        IReadOnlyList<ProfileEditEntryReadModel> profileEntries,
+        DeploymentPlan? plan,
+        string status,
+        bool canLaunch,
+        IReadOnlyList<DeploymentDiagnostic> extraDiagnostics)
+    {
+        var entries = profileEntries
+            .Select(entry => new DeploymentEntryUiState(
+                entry.EntryId,
+                entry.ModKey,
+                string.Equals(entry.EnabledState, nameof(ModEnabledState.Enabled), StringComparison.OrdinalIgnoreCase),
+                entry.Priority,
+                entry.IsSeparator,
+                !entry.IsSeparator))
+            .ToList()
+            .AsReadOnly();
+        var diagnostics = extraDiagnostics
+            .Select(ToDeploymentDiagnostic)
+            .ToList();
+        if (plan is null)
+        {
+            return new DeploymentUiState(
+                status,
+                profileName,
+                entries,
+                null,
+                false,
+                canLaunch,
+                Array.Empty<DeploymentModChangeUiState>(),
+                Array.Empty<DeploymentJunctionChangeUiState>(),
+                diagnostics.AsReadOnly());
+        }
+
+        diagnostics.AddRange(plan.Diagnostics.Select(ToDeploymentDiagnostic));
+        var mappedStatus = status is "idle" or "preview-ready" or "blocked"
+            ? (plan.CanApply ? "preview-ready" : "blocked")
+            : status;
+        return new DeploymentUiState(
+            mappedStatus,
+            profileName,
+            entries,
+            plan.PlanId,
+            plan.CanApply,
+            canLaunch,
+            plan.ModChanges
+                .Select(change => new DeploymentModChangeUiState(
+                    change.ModKey,
+                    change.BeforeEnabled,
+                    change.AfterEnabled,
+                    change.BeforeOrder,
+                    change.AfterOrder))
+                .ToList()
+                .AsReadOnly(),
+            plan.JunctionChanges
+                .Select(change => new DeploymentJunctionChangeUiState(
+                    change.Action,
+                    change.TargetName))
+                .ToList()
+                .AsReadOnly(),
+            diagnostics.AsReadOnly());
+    }
+
+    private static DiagnosticUiState ToDeploymentDiagnostic(DeploymentDiagnostic diagnostic)
+    {
+        return new DiagnosticUiState(
+            diagnostic.Code,
+            diagnostic.IsBlocking ? "error" : "warning",
+            diagnostic.Message,
+            null,
+            diagnostic.TargetName);
     }
 
     private static PageObservationUiState PageObservation(PageObservation value)

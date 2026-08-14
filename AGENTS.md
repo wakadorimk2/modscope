@@ -16,7 +16,7 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 
 ## 現在のフェーズ
 
-明示的な実装依頼により、現在はLocal Knowledge基盤とWeb UI縦切りの実装フェーズです。
+明示的な実装依頼により、現在はLocal Knowledge基盤、Web UI縦切り、Controlled profile edit、junction deploy、Steam起動の実装フェーズです。
 
 今回の実装で変更できる範囲は、次のとおりです。
 
@@ -26,11 +26,13 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 - `global.json`
 - `ModScope.sln`
 - `src/ModScope.LocalKnowledge/`
+- `src/ModScope.Deployment/`
 - `src/ModScope.Query/`
 - `src/ModScope.Desktop/`
 - `src/ModScope.Desktop.Contracts/`
 - `src/ModScope.Web/`
 - `tests/ModScope.LocalKnowledge.Tests/`
+- `tests/ModScope.Deployment.Tests/`
 - `tests/ModScope.Query.Tests/`
 - `tests/ModScope.Desktop.Contracts.Tests/`
 - `tests/Fixtures/`
@@ -39,7 +41,6 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 今回の実装では、次の対象を作成しません。
 
 - CLI実装
-- MO2実環境への書き込み
 - 独自Browser engine実装
 - Site Adapter
 - 完全なsemantic conflict判定
@@ -48,7 +49,7 @@ C# / .NET 8のcore/query/contractsライブラリ、WPF / .NET 10のDesktop host
 匿名synthetic fixtureを検証の基準にします。
 
 Web frontendはpresentation layerです。
-Web frontendはMO2 integration、filesystem access、profile parsing、Local Mod Knowledge、XML解析を実装しません。
+Web frontendはMO2 integration、filesystem access、profile parsing、Local Mod Knowledge、XML解析、write transactionを実装しません。
 .NET / C#側がsource of truthです。
 Desktop hostはWebView2 host、native bridge、Query projectionだけを担当します。
 Browser WebView2へLocal context、MO2 path、LocalModSnapshotを注入しません。
@@ -78,13 +79,17 @@ Codex専用仕様へ密結合しません。CLI、structured files、local API�
 ## MO2の安全境界
 
 - MO2のmods、profiles、downloads、MO2本体をsource of truthとして扱います。
-- 初期実装はread-only firstとします。
-- MO2のファイルを削除、移動、改名、上書きしません。
+- 通常のLocal Knowledge読み取りはread-onlyとします。
+- Controlled Applyだけが、明示承認後に選択profileの`modlist.txt`を更新します。
+- MO2のMOD本体を削除、移動、改名しません。
+- `modlist.txt`はtimestamp付きbackup、temporary replacement、再読検証を使います。
 - 実データの検証には、まずfixtureまたはread-onlyの一時コピーを使います。
 - source pathは明示的に指定します。暗黙の探索範囲を広げません。
 - index、cache、解析結果、GUI read modelはMO2の正本ではありません。
-- 将来write操作を追加する場合も、read layerから独立したwrite layerに置きます。
-- write layerには、dry-run、変更差分、対象確認、明示的な承認、失敗時の復旧方針を要求します。
+- write planeはread planeから独立した`ModScope.Deployment`に置きます。
+- write planeには、preview、変更差分、対象確認、plan ID、明示的な承認、失敗時のrollbackを要求します。
+- MO2または7DTDが実行中の場合は、プロセスを停止せずApplyをblockします。
+- Steam起動はApply成功後だけ許可し、URIは`steam://rungameid/251570`に固定します。
 
 ## レイヤー境界
 
@@ -137,6 +142,8 @@ MO2、7DTD、ModInfo.xml、Config XML、XML patch semanticsについて、推測
 - 色だけに依存しません。
 - GUIはquery layerの派生データだけを読みます。
 - GUIからMO2へ直接書き込みません。
+- Web frontendはdraftとdeployment commandだけを扱います。
+- GamePathの絶対値、MO2 path、LocalModSnapshotはfrontendへ渡しません。
 
 ## 設計変更
 

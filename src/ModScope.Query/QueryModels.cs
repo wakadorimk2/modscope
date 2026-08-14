@@ -215,6 +215,8 @@ public sealed record Mo2SourceInput(
     string ModsPath)
 {
     public string? ProfilesPath { get; init; }
+
+    public string? GamePath { get; init; }
 }
 
 public sealed record Mo2SourceCandidateReadModel(
@@ -224,6 +226,7 @@ public sealed record Mo2SourceCandidateReadModel(
     string ProfileName,
     string Readiness,
     bool IsReady,
+    bool GameTargetReady,
     IReadOnlyList<string> Evidence,
     IReadOnlyList<DiagnosticReadModel> Diagnostics);
 
@@ -280,6 +283,14 @@ public sealed record KnowledgeSessionReadModel(
     IReadOnlyList<DiagnosticReadModel> Diagnostics);
 
 public sealed record ProfileSummaryReadModel(string ProfileName);
+
+public sealed record ProfileEditEntryReadModel(
+    string EntryId,
+    string ModKey,
+    string EnabledState,
+    int? Priority,
+    bool IsSeparator,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics);
 
 public sealed record ModCandidateSummary(
     string ModKey,

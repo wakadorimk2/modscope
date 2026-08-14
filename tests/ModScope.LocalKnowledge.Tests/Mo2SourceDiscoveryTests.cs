@@ -159,6 +159,29 @@ public sealed class Mo2SourceDiscoveryTests
     }
 
     [Fact]
+    public void ReadsConfiguredGamePathFromGeneralSection()
+    {
+        var container = Directory.CreateTempSubdirectory("modscope-gamepath-");
+        try
+        {
+            var instance = CreateInstance(container.FullName, "GamePath");
+            var gameRoot = Directory.CreateDirectory(Path.Combine(container.FullName, "steam", "7 Days To Die"));
+            var iniPath = Path.Combine(instance.RootPath, "ModOrganizer.ini");
+            var ini = File.ReadAllText(iniPath).Replace(
+                "gameName=7 Days to Die",
+                $"gameName=7 Days to Die\ngamePath=@ByteArray({gameRoot.FullName})",
+                StringComparison.Ordinal);
+            File.WriteAllText(iniPath, ini);
+
+            Assert.Equal(gameRoot.FullName, Mo2SourceDiscovery.ReadConfiguredGamePath(instance.RootPath));
+        }
+        finally
+        {
+            container.Delete(true);
+        }
+    }
+
+    [Fact]
     public void RejectsMalformedIniAndUnsupportedGamesWithoutReadyCandidates()
     {
         var container = Directory.CreateTempSubdirectory("modscope-discovery-invalid-");

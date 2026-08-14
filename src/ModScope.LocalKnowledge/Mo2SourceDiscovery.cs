@@ -23,6 +23,43 @@ public sealed class Mo2SourceDiscovery : IMo2SourceDiscovery
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
     }
 
+    public static string? ReadConfiguredGamePath(string instanceRootPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(instanceRootPath);
+
+        try
+        {
+            var rootPath = Path.GetFullPath(instanceRootPath);
+            var iniPath = Path.Combine(rootPath, "ModOrganizer.ini");
+            if (!File.Exists(iniPath))
+            {
+                return null;
+            }
+
+            var diagnostics = new List<Diagnostic>();
+            var ini = ParseIni(File.ReadAllText(iniPath), diagnostics);
+            var baseDirectory = ResolvePath(
+                ini.Get("Settings", "base_directory"),
+                rootPath,
+                rootPath,
+                diagnostics,
+                "base_directory") ?? rootPath;
+            return ResolvePath(
+                ini.Get("General", "gamePath"),
+                rootPath,
+                baseDirectory,
+                diagnostics,
+                "gamePath");
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
     public IReadOnlyList<Mo2SourceCandidate> Discover(
         Mo2SourceDiscoveryRequest request,
         CancellationToken cancellationToken = default)
@@ -332,6 +369,7 @@ public sealed class Mo2SourceDiscovery : IMo2SourceDiscovery
         var gameName = ini.Get("General", "gameName") ?? string.Empty;
         var selectedProfile = ini.Get("General", "selected_profile") ?? string.Empty;
         var baseDirectory = ResolvePath(ini.Get("Settings", "base_directory"), rootPath, rootPath, diagnostics, "base_directory");
+        var gamePath = ResolvePath(ini.Get("General", "gamePath"), rootPath, baseDirectory ?? rootPath, diagnostics, "gamePath");
         var modsPath = ResolvePath(ini.Get("Settings", "mod_directory"), rootPath, baseDirectory ?? rootPath, diagnostics, "mod_directory")
             ?? Path.Combine(rootPath, "mods");
         var profilesPath = ResolvePath(ini.Get("Settings", "profiles_directory"), rootPath, baseDirectory ?? rootPath, diagnostics, "profiles_directory")
@@ -479,14 +517,15 @@ public sealed class Mo2SourceDiscovery : IMo2SourceDiscovery
             .Select(profileName =>
             {
                 var profilePath = Path.Combine(profilesPath, profileName);
-                var source = new Mo2SourceDefinition(
+            var source = new Mo2SourceDefinition(
                     instanceName,
                     profileName,
                     rootPath,
                     profilePath,
                     modsPath)
                 {
-                    ProfilesPath = profilesPath
+                    ProfilesPath = profilesPath,
+                    GamePath = gamePath
                 };
                 return CreateCandidate(
                     rootPath,
@@ -638,9 +677,13 @@ public sealed class Mo2SourceDiscovery : IMo2SourceDiscovery
             diagnostics.Add(new Diagnostic(
                 "mo2.path.invalid",
                 DiagnosticSeverity.Error,
-                $"The configured MO2 {settingName} path is invalid: {exception.Message}",
+                string.Equals(settingName, "gamePath", StringComparison.Ordinal)
+                    ? "The configured MO2 game path is invalid."
+                    : $"The configured MO2 {settingName} path is invalid: {exception.Message}",
                 new SourceReference(SourceReferenceKind.InstanceFile, "ModOrganizer.ini"),
-                rawValue));
+                string.Equals(settingName, "gamePath", StringComparison.Ordinal)
+                    ? null
+                    : rawValue));
             return null;
         }
     }

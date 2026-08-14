@@ -140,6 +140,20 @@ function mockCandidatesForProfile(profileName: string): ModCandidateUiState[] {
   ];
 }
 
+function mockDeploymentEntriesForProfile(profileName: string) {
+  return mockCandidatesForProfile(profileName)
+    .filter((candidate) => candidate.profileState !== 'unlisted')
+    .sort((left, right) => (left.priority ?? Number.MAX_SAFE_INTEGER) - (right.priority ?? Number.MAX_SAFE_INTEGER))
+    .map((candidate, index) => ({
+      entryId: 'mock-line-' + String(index + 1),
+      modKey: candidate.modKey,
+      enabled: candidate.enabledState === 'enabled',
+      priority: candidate.priority,
+      isSeparator: false,
+      isEditable: true
+    }));
+}
+
 function mockAnalysisForFixture(): UiState['analysis'] {
   const source = (kind: string, relativePath: string, lineNumber?: number) => ({
     kind,
@@ -415,6 +429,17 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
         total: null
       }
     };
+    next.deployment = {
+      status: 'idle',
+      profileName: 'default',
+      entries: mockDeploymentEntriesForProfile('default'),
+      planId: null,
+      canApply: false,
+      canLaunch: false,
+      modChanges: [],
+      junctionChanges: [],
+      diagnostics: []
+    };
     next.analysis = initialState.analysis;
     next.statusMessage = 'Mock Local Knowledge loaded.';
   } else if (command === 'analysis.selectBaseData') {
@@ -509,8 +534,68 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
       next.localContext = null;
       next.inspector = null;
       next.analysis = initialState.analysis;
+      next.deployment = {
+        status: 'idle',
+        profileName,
+        entries: mockDeploymentEntriesForProfile(profileName),
+        planId: null,
+        canApply: false,
+        canLaunch: false,
+        modChanges: [],
+        junctionChanges: [],
+        diagnostics: []
+      };
       next.statusMessage = 'Mock profile switched.';
     }
+  } else if (command === 'deployment.preview' && typeof payload === 'object' && payload !== null) {
+    const preview = payload as {
+      profileName?: unknown;
+      entries?: unknown;
+    };
+    if (typeof preview.profileName === 'string' && Array.isArray(preview.entries)) {
+      const entries = preview.entries
+        .filter((entry): entry is { modKey: string; enabled: boolean; order: number } =>
+          typeof entry === 'object'
+          && entry !== null
+          && typeof (entry as { modKey?: unknown }).modKey === 'string'
+          && typeof (entry as { enabled?: unknown }).enabled === 'boolean'
+          && typeof (entry as { order?: unknown }).order === 'number')
+        .sort((left, right) => left.order - right.order);
+      next.deployment = {
+        ...next.deployment,
+        status: 'preview-ready',
+        profileName: preview.profileName,
+        planId: 'mock-deployment-plan',
+        canApply: true,
+        canLaunch: false,
+        entries: next.deployment.entries.map((entry) => {
+          const draft = entries.find((candidate) => candidate.modKey === entry.modKey);
+          return draft ? { ...entry, enabled: draft.enabled } : entry;
+        }),
+        modChanges: [],
+        junctionChanges: entries
+          .filter((entry) => entry.enabled)
+          .map((entry) => ({ action: 'keep', targetName: entry.modKey })),
+        diagnostics: []
+      };
+      next.statusMessage = 'Mock deployment preview is ready.';
+    }
+  } else if (command === 'deployment.apply' && typeof payload === 'object' && payload !== null) {
+    const approval = payload as { planId?: unknown; approved?: unknown };
+    if (approval.planId === next.deployment.planId && approval.approved === true) {
+      next.deployment = {
+        ...next.deployment,
+        status: 'applied',
+        planId: null,
+        canApply: false,
+        canLaunch: true
+      };
+      next.statusMessage = 'Mock deployment applied and verified.';
+    }
+  } else if (command === 'game.launch') {
+    next.statusMessage = next.deployment.canLaunch
+      ? 'Mock Steam launch requested.'
+      : 'Apply the deployment before launching the game.';
   } else if (command === 'layout.setContextVisible' && typeof payload === 'object' && payload !== null) {
     const visible = (payload as { visible?: unknown }).visible;
     if (typeof visible === 'boolean') {
@@ -608,7 +693,7 @@ export function createBridge(onMessage: (message: HostMessage) => void): Bridge 
       if (webview) {
         webview.addEventListener('message', handleMessage);
         webview.postMessage({
-          contractVersion: 1,
+          contractVersion: 2,
           requestId: 'web-' + String(++mockRequestId),
           command: 'frontend.ready',
           payload: {}
@@ -630,7 +715,7 @@ export function createBridge(onMessage: (message: HostMessage) => void): Bridge 
     send(command, payload = {}) {
       const requestId = 'web-' + String(++mockRequestId);
       const message = {
-        contractVersion: 1,
+        contractVersion: 2,
         requestId,
         command,
         payload

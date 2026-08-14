@@ -16,6 +16,8 @@ public sealed record Mo2SourceDefinition(
     string ModsPath)
 {
     public string? ProfilesPath { get; init; }
+
+    public string? GamePath { get; init; }
 }
 
 public enum Mo2SourceCandidateReadiness

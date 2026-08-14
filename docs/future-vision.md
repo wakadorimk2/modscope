@@ -83,9 +83,10 @@ browse、inspect、compare、local environmentの理解は、AIなしで成立�
 
 source、normalized value、static evidence、runtime evidence、inference、uncertainty、diagnosticを分離します。
 
-### Read-only first
+### Controlled write after read verification
 
-MO2を変更しません。writeは別planeとして扱います。
+通常のLocal Knowledgeはread-onlyです。controlled writeはread planeから分離します。
+Phase 7では、明示承認付きのprofile edit、junction deploy、Steam起動だけを扱います。
 
 ### Site-independent and game-aware
 
@@ -116,10 +117,12 @@ Runtime tool
   -> runtime evidence
   -> evidence comparison
 
-Optional future write plane
-  -> dry-run
+Controlled write plane
+  -> deployment.preview
   -> explicit approval
-  -> MO2 operation
+  -> deployment.apply
+  -> modlist backup / junction transaction / verification
+  -> optional Steam launch
 ```
 
 各レイヤーは、責務と根拠の種類を共有しません。
@@ -326,9 +329,11 @@ read modelへraw log本文、raw result、raw log reference、絶対pathを出�
 
 Read planeは、MO2 source、snapshot、Local Mod Knowledge、query、Inspector、analysisを扱います。
 
-Write planeは、必要性が確認できた場合だけ追加します。
+Phase 7のWrite planeは、次を対象にします。
 
-候補はenable / disable、reorder、profile変更です。
+- 選択中MO2 profileの`modlist.txt`のenabled状態と順序
+- MO2 `modsPath`の既知MOD rootを指す、Steam game rootの`Mods`配下junction
+- Apply成功後の固定Steam URI起動
 
 Write planeには、次を要求します。
 
@@ -339,6 +344,12 @@ Write planeには、次を要求します。
 - 明示承認
 - 失敗時の復旧方針
 - MO2の実仕様に基づく検証
+
+Game rootはMO2 `ModOrganizer.ini`の`General.gamePath`から読み取ります。Steam libraryの全探索は行いません。GamePathの絶対値はfrontendへ渡しません。
+
+Apply前にMO2または7DTDが実行中の場合、processを停止せずblockします。失敗時はjunctionとmodlist backupを使ってrollbackします。rollback失敗時は`recovery-required`を返します。
+
+既存junctionは、選択中MO2 `modsPath`の既知MOD rootへ解決できる場合だけModScope管理manifestへ採用します。foreign junction、実folder、重複MOD名、path衝突はApplyを止めます。
 
 Write planeが追加されても、ModScopeはMod Managerにはなりません。
 
@@ -432,7 +443,7 @@ Browserは既存WebView2のtabを追加し、Home、new tab、tab close、tab se
 historyとlast pageはURL、title、訪問時刻だけを保存します。
 page本文、raw observation、absolute path、cookie、認証情報は保存しません。
 
-Bridge contract versionは`1`のままです。
+Phase 6.5時点のBridge contract versionは`1`でした。Phase 7でversion `2`へ更新しました。
 新しいtab、history、role stateは既存stateへ追加しました。
 MO2 write、AI、MCP、独自Browser engine、browser syncはPhase6.5へ追加していません。
 
@@ -535,9 +546,21 @@ Desktop hostは同一Nexus hostの`/7daystodie/mods/{numericId}`リンクだけ�
 Verified Websiteの404はBrowser diagnosticとして保持します。
 検索結果解析用のnavigation intentはUiStateと永続データへ公開しません。
 
-### Phase 7：Controlled write
+### Phase 7：Controlled write（実装）
 
-必要性が確認できた場合に、dry-runと明示承認付きのMO2操作を追加します。
+Controlled profile edit、junction deploy、Steam起動のvertical sliceを実装します。
+
+- `DeploymentDraft`はprofile識別子、MOD key、enabled状態、順序だけを持ちます。
+- `DeploymentPlan`はplan ID、modlist差分、junction差分、source/profile/game fingerprint、blocking diagnosticを持ちます。
+- `deployment.preview`でhostが実ディスクを再読します。
+- `deployment.apply`はplan IDと明示承認を受け取ります。
+- Applyはtimestamp付きbackup、junction検証、temporary replacement、再読検証、rollbackを行います。
+- `modlist.txt`のcomment、空行、separator、未知行を保持します。
+- ModScope管理junctionだけを削除します。
+- `game.launch`はpayloadを持たず、Apply成功後だけ固定Steam URIを開きます。
+- bridge contractはversion 2です。
+
+実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施します。実行中processを停止しません。
 
 ### Phase 8：Game Adapter拡張
 
@@ -573,7 +596,7 @@ ModScopeは、次の状態を目指します。
 - 複数game対応
 - 完全なXML patch semantics
 - RuntimeOCDの再実装
-- MO2 write
+- controlled write plane外のMO2 write
 - installerとdistribution
 - storage engineの固定
 - 大規模cloud同期
@@ -587,7 +610,7 @@ ModScopeは、次の状態を目指します。
 - 既存ブラウザ、MO2、external agentの責務を不必要に奪っていないか
 - 今のvertical sliceで検証可能か
 - source of truthを曖昧にしないか
-- read-only境界を壊さないか
+- controlled write境界とread-only境界を壊さないか
 - evidenceとinferenceを混ぜないか
 - GUIの認知負荷を増やさないか
 - 将来のsemantic analysis、runtime comparison、Game Adapterを妨げないか
@@ -623,7 +646,7 @@ v0.1では、次を保留します。
 
 - frontend router、downloads
 - AI chat、MCP、Codex automation
-- MO2 write
+- controlled write plane外のMO2管理操作
 - browser syncとChromium bundling
 
 ## 17. Conclusion-first Web UI refinement

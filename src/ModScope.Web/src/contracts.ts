@@ -121,6 +121,7 @@ export type SourceCandidateUiState = {
   profileName: string;
   readiness: string;
   isReady: boolean;
+  gameTargetReady: boolean;
   evidence: string[];
   diagnostics: DiagnosticUiState[];
 };
@@ -359,6 +360,40 @@ export type AnalysisUiState = {
   diagnostics: DiagnosticUiState[];
 };
 
+export type DeploymentEntryUiState = {
+  entryId: string;
+  modKey: string;
+  enabled: boolean;
+  priority?: number | null;
+  isSeparator: boolean;
+  isEditable: boolean;
+};
+
+export type DeploymentModChangeUiState = {
+  modKey: string;
+  beforeEnabled: boolean;
+  afterEnabled: boolean;
+  beforeOrder: number;
+  afterOrder: number;
+};
+
+export type DeploymentJunctionChangeUiState = {
+  action: string;
+  targetName: string;
+};
+
+export type DeploymentUiState = {
+  status: string;
+  profileName: string;
+  entries: DeploymentEntryUiState[];
+  planId?: string | null;
+  canApply: boolean;
+  canLaunch: boolean;
+  modChanges: DeploymentModChangeUiState[];
+  junctionChanges: DeploymentJunctionChangeUiState[];
+  diagnostics: DiagnosticUiState[];
+};
+
 export type LayoutUiState = {
   contextVisible: boolean;
   modListVisible: boolean;
@@ -373,6 +408,7 @@ export type UiState = {
   localContext?: LocalContextUiState | null;
   inspector?: InspectorUiState | null;
   analysis: AnalysisUiState;
+  deployment: DeploymentUiState;
   layout: LayoutUiState;
   statusMessage: string;
   diagnostics: DiagnosticUiState[];
@@ -441,6 +477,17 @@ export const initialState: UiState = {
       kind: 'idle',
       isBusy: false
     },
+    diagnostics: []
+  },
+  deployment: {
+    status: 'idle',
+    profileName: '',
+    entries: [],
+    planId: null,
+    canApply: false,
+    canLaunch: false,
+    modChanges: [],
+    junctionChanges: [],
     diagnostics: []
   },
   layout: {
