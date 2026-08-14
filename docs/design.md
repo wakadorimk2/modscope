@@ -969,7 +969,7 @@ Browser WebView2へWPF panelを重ねません。
 WPFはwindow、WebView2 host、native bridgeに限定します。
 
 下段は、左からModList `280px`、Browser `3*`、Context `2*`です。
-Toolbarは全列にまたがります。通常は1行で表示します。History popupを開く間だけhost rowを拡張します。
+Toolbarは全列にまたがります。通常は96pxの2段構成で表示します。History pageを開いてもhost rowは拡張しません。
 ModListを閉じるとBrowser columnが広がります。
 ModListの見出しにprofile load stateとscanning progressを表示します。
 MOD一覧だけをスクロール可能にします。MOD rowはcompact表示にし、disabled rowは灰色系で表示します。
@@ -991,6 +991,12 @@ JSON propertyはcamelCaseです。
 frontendからhostへ送るcommandは次です。
 
 - browser.navigate
+- browser.newTab
+- browser.selectTab
+- browser.closeTab
+- browser.home
+- browser.history
+- browser.selectHistory
 - browser.back
 - browser.forward
 - browser.reload
@@ -1103,9 +1109,14 @@ URL直接入力は通常Toolbarに置きます。http、https、file、aboutのa
 
 Bridge contract versionは`1`を維持します。
 Browser tab、History、active tab、MOD roleのstateは既存stateへ追加します。
-`browser.newTab`、`browser.selectTab`、`browser.closeTab`、`browser.home`、`browser.selectHistory`はactive tabへ適用します。
+`browser.newTab`、`browser.selectTab`、`browser.closeTab`、`browser.home`、`browser.history`、`browser.selectHistory`はactive tabへ適用します。
 Desktop hostはbrowser persistenceをlocal metadataへ限定します。
-History popupの表示状態はDesktop sessionだけで保持します。Toolbar高さは永続化しません。
+Historyは新しいBrowser tabの`about:history`ページとして生成します。
+History pageはURL、title、訪問時刻だけをHTML encodeして表示します。
+History pageのentry linkは通常の`http` / `https` navigationとしてactive tabへ適用します。
+`about:history`はlast pageとして復元できます。
+page本文、raw observation、absolute path、cookie、認証情報はHistoryへ保存しません。
+`layout.setToolbarExpanded`は互換性のため残しますが、History操作は使用しません。
 MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません。
 
 ### 25.2 Phase6.6 情報減算UI
@@ -1156,8 +1167,10 @@ operation stateは既存`OperationStateChanged`を使い、UiStateとbridge cont
 通常Toolbarは96pxのChrome型2段構成です。
 上段へtab strip、active tab、tab close、new tabを置きます。
 下段へback、forward、reload、home、URL入力、Go、History、pane icon、shortcut hintを置きます。
-History展開時のToolbar高さは440pxです。
-`layout.setToolbarExpanded`を再利用し、Browser engineとWebView2構成は変更しません。
+Toolbarは通常96pxで固定します。
+History pageを開いてもToolbar高さは変更しません。
+`layout.setToolbarExpanded`は互換性のため残しますが、通常History操作からは呼び出しません。
+Browser engineとWebView2構成は変更しません。
 
 ToolbarはChrome darkのtabstripとnavigation rowへ分離します。
 active tabは明るいsurfaceと丸い上端で表示し、inactive tabは透明背景と控えめなhoverで表示します。
@@ -1175,6 +1188,25 @@ MOD Websiteは`Verified`、`Inferred`、`No usable URL`へ分類します。
 slugを作れない場合はNexus検索URLへfallbackします。
 `Inferred`はクリック可能ですが、ページの存在確認ではありません。
 `No usable URL`はbuttonにせず、既存のBrowser scheme検証を維持します。
+
+### 25.5 Phase6.8 ロード遮断、Chrome palette、History page
+
+Desktop hostはWPF client areaのWebView2子windowを含めて入力を遮断します。
+foregroundのloading中はToolbar、ModList、Context、Browser tabの`IsEnabled`と`IsHitTestVisible`を無効にします。
+薄いグレーのloading panelはclient areaだけを覆います。
+OSタイトルバーはloading中も操作できます。
+background profile preloadではloading panelを表示しません。
+loading完了または失敗後はclient UIを再有効化します。
+
+ModScopeが所有するsurfaceはChrome dark paletteを使います。
+baseは`#202124`、navigationは`#292a2d`、panelは`#303134`、borderは`#3c4043`です。
+primary textは`#e8eaed`、muted textは`#9aa0a6`です。
+外部Web pageの色は変更しません。
+
+History buttonはpopupを開かず、新しいBrowser tabを開きます。
+新しいtabのtitleは`History`で、内部URLは`about:history`です。
+History pageはDesktop hostが生成し、URL、title、訪問時刻だけを表示します。
+History metadataはbounded local dataとして保存し、page本文、raw observation、absolute path、cookie、認証情報は保存しません。
 
 ### 24.3 読み込み性能とProfile投影
 

@@ -27,6 +27,7 @@ public static class BridgeProtocol
         "browser.selectTab",
         "browser.closeTab",
         "browser.home",
+        "browser.history",
         "browser.selectHistory",
         "browser.back",
         "browser.forward",
