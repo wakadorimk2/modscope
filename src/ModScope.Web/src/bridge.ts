@@ -517,6 +517,11 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
     if (typeof visible === 'boolean') {
       next.layout = { ...next.layout, modListVisible: visible };
     }
+  } else if (command === 'layout.setToolbarExpanded' && typeof payload === 'object' && payload !== null) {
+    const expanded = (payload as { expanded?: unknown }).expanded;
+    if (typeof expanded === 'boolean') {
+      next.statusMessage = expanded ? 'History opened.' : 'History closed.';
+    }
   }
   return next;
 }

@@ -9,7 +9,7 @@
         Height="900">
     <Grid Background="#0B1120">
         <Grid.RowDefinitions>
-            <RowDefinition Height="72" />
+            <RowDefinition x:Name="ToolbarRow" Height="72" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>

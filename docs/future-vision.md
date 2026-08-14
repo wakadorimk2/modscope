@@ -425,16 +425,18 @@ MO2 priorityはprofileの上から下へ`0→N`で保持します。`modlist.txt
 ModScope viewはFoundationからUnknownへ表示し、他のreadable MODからtarget XMLとして参照されるMODをbase roleの静的証拠としてFoundation / Inferredへ投影します。
 
 Contextは`RECOGNIZE`、Local awareness、Analysis summary、Inspect導線の順に表示します。
-SettingsはMO2 sourceを管理し、DebugはPage details、Developer tools、advanced navigation、raw diagnosticsを管理します。
+SettingsはMO2 sourceを管理し、DebugはPage details、Developer tools、raw diagnosticsを管理します。URL入力は通常Toolbarへ置きます。
 MO2 source未選択時だけOnboardingを表示します。
 
-Browserは既存WebView2のtabを追加し、Home、new tab、tab close、tab selection、bounded history、last page restoreを提供します。
+Browserは既存WebView2のtabを追加し、Home、new tab、tab close、tab selection、bounded history、last page restoreを提供します。HistoryはToolbar rowを一時拡張してrich popupを表示します。
 historyとlast pageはURL、title、訪問時刻だけを保存します。
 page本文、raw observation、absolute path、cookie、認証情報は保存しません。
 
 Bridge contract versionは`1`のままです。
 新しいtab、history、role stateは既存stateへ追加しました。
 MO2 write、AI、MCP、独自Browser engine、browser syncはPhase6.5へ追加していません。
+
+Phase6.5後のUI細部整理では、通常ToolbarへURL入力を追加し、History popupのclipを解消しました。ModListはcompact rowへ整理し、disabled MODを灰色系で表示します。ContextのANALYSISには、Base Data/Config選択と静的解析を状態連動CTAとして表示します。未解析状態は`Not assessed`とし、競合なしとは推測表示しません。
 
 ### Phase 7：Controlled write
 
@@ -505,7 +507,7 @@ ModScopeは、次の状態を目指します。
 
 現在のUIは、固定したGlobal Browser chromeを上段に置き、ModList、Browser Content、Contextを下段に分ける3列構成です。
 
-- Toolbar WebView2はnavigation、Home、tabs、history、pane iconを表示します。
+- Toolbar WebView2はnavigation、Home、URL入力、tabs、history、pane iconを表示します。
 - ModList WebView2はactive profileのMOD一覧とprofile selectorを表示します。
 - Browser WebView2は外部Web pageだけを表示します。
 - Context WebView2はLocal context、例外確認、Developer tools、Inspectorを表示します。
@@ -515,7 +517,7 @@ Desktop hostは各App WebViewへ同じstate、error、ready messageをbroadcast�
 ModListの幅は約280pxです。
 MOD一覧だけをスクロール可能にします。
 ToolbarはBrowser操作とtab metadataを表示します。
-URL直接入力はDebug modeのAdvanced navigationへ移します。
+URL直接入力は通常Toolbarで行います。History popupを開く間だけToolbar host rowを拡張します。
 ModListとContextは独立して折りたためます。
 この構成は情報設計の検証用です。
 将来はContextをdrawerまたはoverlayへ折り畳みます。

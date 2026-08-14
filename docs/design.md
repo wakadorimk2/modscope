@@ -969,10 +969,10 @@ Browser WebView2へWPF panelを重ねません。
 WPFはwindow、WebView2 host、native bridgeに限定します。
 
 下段は、左からModList `280px`、Browser `3*`、Context `2*`です。
-Toolbarは全列にまたがり、固定1行で表示します。
+Toolbarは全列にまたがります。通常は1行で表示します。History popupを開く間だけhost rowを拡張します。
 ModListを閉じるとBrowser columnが広がります。
 ModListの見出しにprofile load stateとscanning progressを表示します。
-MOD一覧だけをスクロール可能にします。
+MOD一覧だけをスクロール可能にします。MOD rowはcompact表示にし、disabled rowは灰色系で表示します。
 Context columnは、ToolbarのContext buttonまたはCtrl/Cmd+Iで非表示にできます。
 非表示中もContext WebView2のstateとInspector stateを破棄しません。
 ModList columnはToolbarのMOD list buttonまたは`layout.setModListVisible`で非表示にできます。
@@ -1010,6 +1010,7 @@ frontendからhostへ送るcommandは次です。
 - analysis.useFixture
 - layout.setContextVisible
 - layout.setModListVisible
+- layout.setToolbarExpanded
 
 hostからfrontendへ送るmessageは、state、error、readyです。
 Toolbar、ModList、Contextの各App WebViewへ同じmessageをbroadcastします。
@@ -1099,12 +1100,13 @@ tabのURL、title、navigation、scroll、form stateは実行中のWebView2が�
 保存がない場合はローカルBrowse Homeを開きます。
 Historyはbounded metadataとしてURL、title、訪問時刻だけを保存します。
 page本文、raw observation、absolute path、cookie、認証情報は保存しません。
-URL直接入力はDebugのAdvanced navigationだけに置きます。
+URL直接入力は通常Toolbarに置きます。http、https、file、aboutのabsolute URLだけを受け付けます。
 
 Bridge contract versionは`1`を維持します。
 Browser tab、History、active tab、MOD roleのstateは既存stateへ追加します。
 `browser.newTab`、`browser.selectTab`、`browser.closeTab`、`browser.home`、`browser.selectHistory`はactive tabへ適用します。
 Desktop hostはbrowser persistenceをlocal metadataへ限定します。
+History popupの表示状態はDesktop sessionだけで保持します。Toolbar高さは永続化しません。
 MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません。
 
 ### 24.3 読み込み性能とProfile投影
