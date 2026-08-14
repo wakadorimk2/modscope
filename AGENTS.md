@@ -92,6 +92,18 @@ Before starting implementation, be able to answer:
 
 > **How do MO2, Wabbajack, and Vortex already solve this, and what specifically remains unsolved for ModScope?**
 
+関連する製品だけを調査します。毎回3製品を形式的に調査しません。
+
+mature managerを明確な理由なく再実装しません。
+
+Evidence rules:
+
+- Unknownは有効な結果です。evidence不足時に推測で確定しません。
+- provenanceとobserved timeを保持します。
+- source claimはruntime verificationではありません。
+- dependencyはcompatibilityではありません。
+- manifest/list co-presenceはdependency、compatibility、runtime evidenceではありません。
+
 ## MO2の安全境界
 
 - MO2のmods、profiles、downloads、MO2本体をsource of truthとして扱います。
@@ -136,6 +148,12 @@ Agent browserは、人間向けBrowsing Layerとは別の境界です。Kitesurf
 
 MO2、7DTD、ModInfo.xml、Config XML、XML patch semanticsについて、推測を実装の根拠にしません。
 
+Unknown is a valid result.を設計原則として扱います。
+Version、Requirements、Compatibilityは、根拠が不足する場合に推測せず、UnresolvedまたはUnknownとして保持します。
+file overlapはruntime conflictと同じ意味ではありません。
+confirmedは保存したsource claimが確認済みであることを示します。
+confirmedは7DTDの全runtime環境での動作保証を示しません。
+
 作業では次を分けて記録します。
 
 - verified：実データ、公式資料、または再現可能な検証で確認した事実
@@ -144,6 +162,13 @@ MO2、7DTD、ModInfo.xml、Config XML、XML patch semanticsについて、推測
 - diagnostic：解析できなかった入力と理由
 
 入力に未知のXML patch operation、未知の属性、未知のサイト構造がある場合は、破棄せずraw情報とdiagnosticを保持します。
+
+Requirements / Dependenciesでは、次の境界を維持します。
+
+- `Requirement Observation`と`Dependency Edge`を同じ結果へ圧縮しません。
+- `not_observable`は、依存関係の不在を意味しません。`unresolved`は、観測済みだがidentityまたは意味を確定できない状態です。
+- list co-presenceや名前の類似だけをdependency evidenceにしません。
+- target identityを名前だけで自動確定しません。raw targetとsource referenceを保持します。
 
 ## GUIとInspectorの原則
 

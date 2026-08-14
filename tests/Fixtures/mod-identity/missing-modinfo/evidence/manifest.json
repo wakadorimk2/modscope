@@ -1,0 +1,37 @@
+{
+  "scenario": "missing-modinfo",
+  "entities": [
+    {
+      "kind": "archive",
+      "id": "archive-1",
+      "name": "synthetic-missing-modinfo.zip"
+    },
+    {
+      "kind": "package",
+      "id": "package-1",
+      "name": "synthetic-missing-modinfo-package",
+      "relativePath": "mods/synthetic-missing-modinfo-package",
+      "modInfoPresent": false
+    }
+  ],
+  "relations": [
+    {
+      "from": "archive-1",
+      "type": "contains",
+      "to": "package-1"
+    }
+  ],
+  "observations": [
+    {
+      "type": "missing-modinfo",
+      "target": "package-1"
+    }
+  ],
+  "expected": {
+    "identityStatus": "unresolved",
+    "versionStatus": "not-comparable",
+    "notes": [
+      "Keep the package diagnostic even when no Modlet record is created."
+    ]
+  }
+}

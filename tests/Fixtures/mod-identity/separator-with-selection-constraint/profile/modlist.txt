@@ -1,0 +1,8 @@
+# Synthetic separator evidence fixture
++choice-cat
+-choice-steelshot
+-choice-agf
++sep-backpack_separator
++sep-hard-requirements_separator
++sep-hud-choice_separator
++sep-save-safety_separator

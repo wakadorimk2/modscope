@@ -1,0 +1,16 @@
+{
+  "comparison_count": 296,
+  "local_counts": {
+    "download_meta_count": 204,
+    "modinfo_count": 105,
+    "package_count": 98,
+    "package_meta_count": 87
+  },
+  "manifest_status": "zip_modlist",
+  "mo2_root": "existing_mo2_root",
+  "nexus_live_fetch_status": "blocked_cloudflare",
+  "observed_at_utc": "2026-08-14T10:01:09Z",
+  "research_root": "analysis/version-research",
+  "row_count": 566,
+  "wj_record_count": 476
+}

@@ -1,0 +1,41 @@
+{
+  "fixture_id": "unknown-co-presence",
+  "source_assertions": [
+    "A053"
+  ],
+  "subject": "Oakraven Ammo Press",
+  "object": "IZY Classic for 7 Days To Die 3.0",
+  "statement_type": "compatibility_observation",
+  "relation": "unknown",
+  "status": "unknown",
+  "condition": {
+    "kind": "manifest_co_presence",
+    "text": "Both names occur in the selected manifest records, but co-presence does not prove that IZY Classic is the IZY-All target of the external ammo patch."
+  },
+  "version_scope": {
+    "list": "3.1.1.39",
+    "subject": "1.2.0.1",
+    "object": "3.0.6.0.0 observed in manifest"
+  },
+  "patch": null,
+  "evidence": [
+    {
+      "source_ref": "src_smorg_manifest",
+      "url": "https://raw.githubusercontent.com/Fluffernuttersandwich/Smorgasbord/main/modlists.json",
+      "quote": "State.Name=(V1) Oakraven Ammo Press; State.Name=IZY Classic for 7 Days To Die 3.0",
+      "locator": "manifest.Archives archive State.Name records"
+    },
+    {
+      "source_ref": "src_ammo_patch",
+      "url": "https://www.nexusmods.com/7daystodie/mods/6993",
+      "quote": "Adds support to IZY-All in One Gun Pack",
+      "locator": "Ammo Press Add-On Patch Nexus description"
+    }
+  ],
+  "confidence": "high",
+  "verification": {
+    "kind": "static_observation",
+    "runtime_verified": false
+  },
+  "unresolved_reason": "Exact package identity, enabled state, and runtime behavior were not observed."
+}

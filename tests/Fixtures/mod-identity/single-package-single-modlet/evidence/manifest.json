@@ -1,0 +1,69 @@
+{
+  "scenario": "single-package-single-modlet",
+  "entities": [
+    {
+      "kind": "archive",
+      "id": "archive-1",
+      "name": "synthetic-single.zip"
+    },
+    {
+      "kind": "package",
+      "id": "package-1",
+      "name": "synthetic-single-package",
+      "relativePath": "mods/synthetic-single-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-1",
+      "name": "Synthetic Single Modlet",
+      "version": "1.0.0",
+      "relativePath": "mods/synthetic-single-package/ModInfo.xml"
+    },
+    {
+      "kind": "nexus-mod",
+      "id": "nexus-mod-1",
+      "modId": "synthetic-mod-1001"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-1",
+      "fileId": "synthetic-file-2001",
+      "version": "1.0.0"
+    }
+  ],
+  "relations": [
+    {
+      "from": "archive-1",
+      "type": "contains",
+      "to": "package-1"
+    },
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-1"
+    },
+    {
+      "from": "modlet-1",
+      "type": "candidate-source",
+      "to": "nexus-file-1"
+    },
+    {
+      "from": "nexus-file-1",
+      "type": "belongs-to",
+      "to": "nexus-mod-1"
+    }
+  ],
+  "observations": [
+    {
+      "type": "single-package-single-modlet",
+      "target": "package-1"
+    }
+  ],
+  "expected": {
+    "identityStatus": "resolved",
+    "versionStatus": "comparable",
+    "notes": [
+      "Baseline case with one local Modlet and one selected Nexus File."
+    ]
+  }
+}

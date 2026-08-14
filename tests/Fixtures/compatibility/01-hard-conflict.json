@@ -1,0 +1,34 @@
+{
+  "fixture_id": "hard-conflict",
+  "source_assertions": [
+    "A022"
+  ],
+  "subject": "Quest Revamp-Gears Edition",
+  "object": "SMX UI Suite",
+  "statement_type": "compatibility",
+  "relation": "same_feature_conflict",
+  "status": "confirmed_incompatible",
+  "condition": {
+    "kind": "UI_feature_scope",
+    "text": "The Quest Revamp author says UI mods, especially SMX, break the mod."
+  },
+  "version_scope": {
+    "subject": "2.6.1.2 observed on Nexus",
+    "text": "author description snapshot"
+  },
+  "patch": null,
+  "evidence": [
+    {
+      "source_ref": "src_quest_revamp",
+      "url": "https://www.nexusmods.com/7daystodie/mods/7210?tab=description",
+      "quote": "All UI mods, especially SMX, will completely break this mod",
+      "locator": "Quest Revamp Nexus description, compatibility warning"
+    }
+  ],
+  "confidence": "high",
+  "verification": {
+    "kind": "source_claim",
+    "runtime_verified": false
+  },
+  "unresolved_reason": null
+}

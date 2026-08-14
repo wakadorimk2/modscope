@@ -86,6 +86,22 @@ browse、inspect、compare、local environmentの理解は、AIなしで成立�
 
 source、normalized value、static evidence、runtime evidence、inference、uncertainty、diagnosticを分離します。
 
+情報不足の場合は推測で確定しません。
+
+`Unknown`、`Unresolved`、`Not assessed`は正常な結果です。
+
+### Prior Art First
+
+関連する成熟製品が既に解決している機能を確認してから、重複機能を設計します。
+
+MO2、Wabbajack、Vortexを置き換えず、interoperability、reuse、complementary layerを優先します。
+
+source claimはruntime verificationではありません。
+
+dependencyはcompatibilityではありません。
+
+manifest co-presenceはruntime evidenceではありません。
+
 ### Controlled write after read verification
 
 通常のLocal Knowledgeはread-onlyです。controlled writeはread planeから分離します。
@@ -572,7 +588,33 @@ Controlled profile edit、junction deploy、Steam起動のvertical sliceを実�
 - `game.launch`はpayloadを持たず、Apply成功後だけ固定Steam URIを開きます。
 - bridge contractはversion 2です。
 
-実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施します。実行中processを停止しません。
+実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施しました。実行中processを停止しません。
+
+2026-08-14に、ユーザーが実ゲームへ既存worldをロードしてowner Playcheckを完了しました。
+
+owner Playcheckは、automated test、build、GUI evidenceとは別の証拠クラスです。
+
+### Phase 7.1：Installed version vs Web observed version（planned）
+
+Phase 7後の次のread-only vertical sliceは、Installed versionとWeb observed versionの比較です。
+
+入力は、local mod identity、raw local version、local source / provenance、Web URL、title、raw observed version、Web source、observed timeです。
+
+出力は、local version、observed Web version、`same`、`web_newer`、`local_newer`、`unknown`、provenance、observed time、diagnosticsです。
+
+比較不能なversion formatは`unknown`とします。
+
+semverを推測しません。
+
+raw versionを保持します。
+
+共通freshness TTLは定義しません。
+
+このvertical sliceでは、auto update、MO2 write、deployment、Steam launch、requirements auto resolution、compatibility boolean、CLI、multi-game generalization、AI integrationを行いません。
+
+次の優先順位は、requirements evidenceの分類です。
+
+その後に、dependency、load-order rule、file overlap、semantic / runtime evidenceを横断表示します。
 
 ### Phase 8：Game Adapter拡張
 
