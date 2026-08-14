@@ -292,6 +292,7 @@ public sealed class DesktopSessionController
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-discovery", null);
         var progress = CreateProgressReporter(operationToken);
+        var loaded = false;
         try
         {
             try
@@ -306,7 +307,8 @@ public sealed class DesktopSessionController
                 if (readyCandidates.Count == 1)
                 {
                     SetOperationPhase(operationToken, "reading-profile", readyCandidates[0].ProfileName);
-                    if (await LoadSourceCandidateCoreAsync(readyCandidates[0].CandidateId, progress))
+                    loaded = await LoadSourceCandidateCoreAsync(readyCandidates[0].CandidateId, progress);
+                    if (loaded)
                     {
                         _statusMessage = $"Detected MO2 source {readyCandidates[0].InstanceName} / {readyCandidates[0].ProfileName}.";
                     }
@@ -329,6 +331,11 @@ public sealed class DesktopSessionController
         {
             EndOperation(operationToken);
             _operationGate.Release();
+        }
+
+        if (loaded)
+        {
+            await AnalyzeInferredBaseDataAsync();
         }
     }
 

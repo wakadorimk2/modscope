@@ -574,7 +574,7 @@
     }
 
     return {
-      url: `https://www.nexusmods.com/7daystodie/search/?gsearch=${encodeURIComponent(name)}`,
+      url: `https://www.nexusmods.com/games/7daystodie/mods?keyword=${encodeURIComponent(name)}`,
       status: 'Inferred',
       nexusSearchName: name
     };

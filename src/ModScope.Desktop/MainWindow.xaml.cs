@@ -362,12 +362,17 @@ public partial class MainWindow : Window
 
     private static bool IsNexusSearchUri(Uri uri)
     {
-        return uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
-            && uri.Host.Equals("www.nexusmods.com", StringComparison.OrdinalIgnoreCase)
-            && uri.AbsolutePath.TrimEnd('/').Equals(
-                "/7daystodie/search",
-                StringComparison.OrdinalIgnoreCase)
-            && uri.Query.Contains("gsearch=", StringComparison.OrdinalIgnoreCase);
+        if (!uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
+            || !uri.Host.Equals("www.nexusmods.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var path = uri.AbsolutePath.TrimEnd('/');
+        return (path.Equals("/7daystodie/search", StringComparison.OrdinalIgnoreCase)
+                && uri.Query.Contains("gsearch=", StringComparison.OrdinalIgnoreCase))
+            || (path.Equals("/games/7daystodie/mods", StringComparison.OrdinalIgnoreCase)
+                && uri.Query.Contains("keyword=", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<bool> TryResolveNexusSearchAsync(BrowserTabHostState tab)
@@ -460,11 +465,20 @@ public partial class MainWindow : Window
         }
 
         var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length != 3
-            || !segments[0].Equals("7daystodie", StringComparison.OrdinalIgnoreCase)
-            || !segments[1].Equals("mods", StringComparison.OrdinalIgnoreCase)
-            || !long.TryParse(
-                segments[2],
+        var idSegment = segments switch
+        {
+            [var game, var mods, var id]
+                when game.Equals("7daystodie", StringComparison.OrdinalIgnoreCase)
+                    && mods.Equals("mods", StringComparison.OrdinalIgnoreCase) => id,
+            [var games, var game, var mods, var id]
+                when games.Equals("games", StringComparison.OrdinalIgnoreCase)
+                    && game.Equals("7daystodie", StringComparison.OrdinalIgnoreCase)
+                    && mods.Equals("mods", StringComparison.OrdinalIgnoreCase) => id,
+            _ => null
+        };
+
+        if (!long.TryParse(
+                idSegment,
                 NumberStyles.None,
                 CultureInfo.InvariantCulture,
                 out var modId)
