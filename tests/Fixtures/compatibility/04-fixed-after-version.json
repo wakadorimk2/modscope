@@ -1,0 +1,40 @@
+{
+  "fixture_id": "fixed-after-version",
+  "source_assertions": [
+    "A045"
+  ],
+  "subject": "WitosRoot",
+  "object": "Witos Root Osprey v2",
+  "statement_type": "compatibility",
+  "relation": "version_specific",
+  "status": "conditional",
+  "condition": {
+    "kind": "version_transition",
+    "text": "An older pair of releases defined the same loot list name. The maintainer reports that a later Witos/Osprey and Smorgasbord update fixed the issue."
+  },
+  "version_scope": {
+    "list": "3.1.1.39",
+    "text": "Old issue reported in Nexus posts; current manifest contains both named archives"
+  },
+  "patch": null,
+  "evidence": [
+    {
+      "source_ref": "src_smorg_posts",
+      "url": "https://www.nexusmods.com/7daystodie/mods/6764?tab=posts",
+      "quote": "This has been fixed in the most recent Smorgasbord update",
+      "locator": "Smorgasbord Nexus posts, Witos Root Osprey duplicate loot-list thread"
+    },
+    {
+      "source_ref": "src_smorg_manifest",
+      "url": "https://raw.githubusercontent.com/ANONYMIZED_AUTHOR/Smorgasbord/main/modlists.json",
+      "quote": "State.Name=WitosRoot; State.Name=Witos Root Osprey v2",
+      "locator": "manifest.Archives archive State.Name records"
+    }
+  ],
+  "confidence": "medium",
+  "verification": {
+    "kind": "mixed_source_claims",
+    "runtime_verified": false
+  },
+  "unresolved_reason": "The exact old and new archive versions were not fully normalized from the post."
+}

@@ -136,6 +136,15 @@ Agent browserは、人間向けBrowsing Layerとは別の境界です。Kitesurf
 
 MO2、7DTD、ModInfo.xml、Config XML、XML patch semanticsについて、推測を実装の根拠にしません。
 
+Unknown is a valid result.を設計原則として扱います。
+Version、Requirements、Compatibilityは、根拠が不足する場合に推測せず、UnresolvedまたはUnknownとして保持します。
+source claimはruntime verifiedと同じ意味ではありません。
+dependencyはcompatibilityと同じ意味ではありません。
+co-presenceはcompatibilityと同じ意味ではありません。
+file overlapはruntime conflictと同じ意味ではありません。
+confirmedは保存したsource claimが確認済みであることを示します。
+confirmedは7DTDの全runtime環境での動作保証を示しません。
+
 作業では次を分けて記録します。
 
 - verified：実データ、公式資料、または再現可能な検証で確認した事実

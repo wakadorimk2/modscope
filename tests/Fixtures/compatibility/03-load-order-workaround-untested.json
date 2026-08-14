@@ -1,0 +1,33 @@
+{
+  "fixture_id": "load-order-workaround-untested",
+  "source_assertions": [
+    "A023"
+  ],
+  "subject": "Quest Revamp-Gears Edition",
+  "object": "SMX UI Suite",
+  "statement_type": "compatibility",
+  "relation": "load_order_sensitive",
+  "status": "conditional",
+  "condition": {
+    "kind": "load_order",
+    "text": "Loading Quest Revamp last might fix the UI conflict, but the author marks this as untested."
+  },
+  "version_scope": {
+    "subject": "2.6.1.2 observed on Nexus"
+  },
+  "patch": null,
+  "evidence": [
+    {
+      "source_ref": "src_quest_revamp",
+      "url": "https://www.nexusmods.com/7daystodie/mods/7210?tab=description",
+      "quote": "Loading this mod last might fix that but is untested",
+      "locator": "Quest Revamp Nexus description, SMX warning"
+    }
+  ],
+  "confidence": "high",
+  "verification": {
+    "kind": "source_claim",
+    "runtime_verified": false
+  },
+  "unresolved_reason": "No load-order runtime test was performed."
+}

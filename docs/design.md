@@ -26,6 +26,8 @@ ModScopeは、MODをWeb上で探し、吟味し、比較する作業を、ユー
 
 ModScopeは、AIを使わなくてもbrowse、inspect、compare、local environmentの理解が成立することを目指します。AI agentは、同じLocal Mod Knowledgeへ効率よくアクセスできます。
 
+ModScope reports what is known, why it is believed, and what remains unknown.
+
 ## 3. Core problem
 
 現在のMOD調査では、Web上の候補MODと、MO2が管理する現在環境を別々に確認します。
