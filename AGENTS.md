@@ -145,6 +145,13 @@ MO2、7DTD、ModInfo.xml、Config XML、XML patch semanticsについて、推測
 
 入力に未知のXML patch operation、未知の属性、未知のサイト構造がある場合は、破棄せずraw情報とdiagnosticを保持します。
 
+Requirements / Dependenciesでは、次の境界を維持します。
+
+- `Requirement Observation`と`Dependency Edge`を同じ結果へ圧縮しません。
+- `not_observable`は、依存関係の不在を意味しません。`unresolved`は、観測済みだがidentityまたは意味を確定できない状態です。
+- list co-presenceや名前の類似だけをdependency evidenceにしません。
+- target identityを名前だけで自動確定しません。raw targetとsource referenceを保持します。
+
 ## GUIとInspectorの原則
 
 画面の主役は現在のWeb pageです。Local contextはprogressive disclosureで表示します。
