@@ -120,7 +120,23 @@ internal static class DesktopStateMapper
             value.Priority,
             Source(value.Source),
             value.PriorityEvidence is null ? null : Evidence(value.PriorityEvidence),
-            Diagnostics(value.Diagnostics));
+            Diagnostics(value.Diagnostics),
+            Role(value.Role));
+    }
+
+    private static ModRoleUiState Role(ModRoleReadModel value)
+    {
+        return new ModRoleUiState(
+            EnumText(value.Role),
+            EnumText(value.Assessment),
+            value.Reason,
+            value.Evidence
+                .Select(evidence => new ModRoleEvidenceUiState(
+                    EnumText(evidence.Kind),
+                    evidence.Detail,
+                    Source(evidence.Source)))
+                .ToList()
+                .AsReadOnly());
     }
 
     private static ProfileUiState Profile(

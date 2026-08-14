@@ -48,6 +48,21 @@ public enum QueryEvidenceKind
     Diagnostic
 }
 
+public enum QueryModRole
+{
+    Foundation,
+    Compatibility,
+    Content,
+    Unknown
+}
+
+public enum QueryModRoleAssessment
+{
+    Verified,
+    Inferred,
+    Unknown
+}
+
 public enum QuerySourceReferenceKind
 {
     ProfileFile,
@@ -232,6 +247,11 @@ public sealed record EvidenceReferenceReadModel(
     QueryEvidenceKind Kind,
     SourceReferenceReadModel Source);
 
+public sealed record ModRoleEvidenceReadModel(
+    QueryEvidenceKind Kind,
+    string Detail,
+    SourceReferenceReadModel Source);
+
 public sealed record PageObservation(
     Uri Url,
     string Title,
@@ -272,7 +292,14 @@ public sealed record ModCandidateSummary(
     int? Priority,
     SourceReferenceReadModel Source,
     EvidenceReferenceReadModel? PriorityEvidence,
+    ModRoleReadModel Role,
     IReadOnlyList<DiagnosticReadModel> Diagnostics);
+
+public sealed record ModRoleReadModel(
+    QueryModRole Role,
+    QueryModRoleAssessment Assessment,
+    string Reason,
+    IReadOnlyList<ModRoleEvidenceReadModel> Evidence);
 
 public sealed record IdentityConfirmation(
     PageObservation Page,

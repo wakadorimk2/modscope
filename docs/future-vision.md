@@ -415,6 +415,27 @@ analysis未実行時は未確認と表示し、空resultから競合なしと推
 Inspectorはreadable MOD全体を対象にし、patch operation detailを折りたたみ表示します。
 MO2はread-onlyのまま維持します。
 
+### Phase 6.5：Browse-first UI情報設計の整理（完了）
+
+Phase6.5では、Phase6の機能を維持したままWorkspaceの表示責務を整理しました。
+ModListの標準表示を`ModScope view`にし、`Foundation`、`Compatibility`、`Content`、`Unknown`をQueryのstatic evidenceから表示します。
+`MO2 order`ではactive profileのpriority順を確認できます。
+role assessmentは`Verified`、`Inferred`、`Unknown`を保持し、Foundationは依存関係として断定しません。
+MO2 priorityはprofileの上から下へ`0→N`で保持します。
+ModScope viewはFoundationからUnknownへ表示し、他のreadable MODからtarget XMLとして参照されるMODをbase roleの静的証拠としてFoundation / Inferredへ投影します。
+
+Contextは`RECOGNIZE`、Local awareness、Analysis summary、Inspect導線の順に表示します。
+SettingsはMO2 sourceを管理し、DebugはPage details、Developer tools、advanced navigation、raw diagnosticsを管理します。
+MO2 source未選択時だけOnboardingを表示します。
+
+Browserは既存WebView2のtabを追加し、Home、new tab、tab close、tab selection、bounded history、last page restoreを提供します。
+historyとlast pageはURL、title、訪問時刻だけを保存します。
+page本文、raw observation、absolute path、cookie、認証情報は保存しません。
+
+Bridge contract versionは`1`のままです。
+新しいtab、history、role stateは既存stateへ追加しました。
+MO2 write、AI、MCP、独自Browser engine、browser syncはPhase6.5へ追加していません。
+
 ### Phase 7：Controlled write
 
 必要性が確認できた場合に、dry-runと明示承認付きのMO2操作を追加します。
@@ -484,7 +505,7 @@ ModScopeは、次の状態を目指します。
 
 現在のUIは、固定したGlobal Browser chromeを上段に置き、ModList、Browser Content、Contextを下段に分ける3列構成です。
 
-- Toolbar WebView2はURL、navigation、MOD list toggle、Context toggleを表示します。
+- Toolbar WebView2はnavigation、Home、tabs、history、pane iconを表示します。
 - ModList WebView2はactive profileのMOD一覧とprofile selectorを表示します。
 - Browser WebView2は外部Web pageだけを表示します。
 - Context WebView2はLocal context、例外確認、Developer tools、Inspectorを表示します。
@@ -493,15 +514,15 @@ Toolbar、ModList、Contextは、同じSvelte bundleを別surfaceとして読み
 Desktop hostは各App WebViewへ同じstate、error、ready messageをbroadcastします。
 ModListの幅は約280pxです。
 MOD一覧だけをスクロール可能にします。
-ToolbarはBrowser操作とURLだけを1行で固定します。
+ToolbarはBrowser操作とtab metadataを表示します。
+URL直接入力はDebug modeのAdvanced navigationへ移します。
 ModListとContextは独立して折りたためます。
 この構成は情報設計の検証用です。
 将来はContextをdrawerまたはoverlayへ折り畳みます。
 
 v0.1では、次を保留します。
 
-- frontend routerとadvanced tab management
-- Compare、Settings、downloads
+- frontend router、downloads
 - AI chat、MCP、Codex automation
 - MO2 write
 - browser syncとChromium bundling

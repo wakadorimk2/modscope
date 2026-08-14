@@ -7,6 +7,85 @@ namespace ModScope.Query.Tests;
 public sealed class LocalKnowledgeQueryTests
 {
     [Fact]
+    public void ProjectsVerifiedInferredAndUnknownModRolesInModScopeOrder()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-role-");
+        try
+        {
+            var profilePath = Directory.CreateDirectory(Path.Combine(root.FullName, "profile"));
+            var modsPath = Directory.CreateDirectory(Path.Combine(root.FullName, "mods"));
+            File.WriteAllText(
+                Path.Combine(profilePath.FullName, "modlist.txt"),
+                "+Shared Data\n+Compatibility Patch\n+Content Mod\n+No Evidence");
+
+            var foundationPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Shared Data"));
+            File.WriteAllText(
+                Path.Combine(foundationPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Shared Data\" /></xml>");
+            var foundationConfig = Directory.CreateDirectory(Path.Combine(foundationPath.FullName, "Config"));
+            File.WriteAllText(Path.Combine(foundationConfig.FullName, "framework.xml"), "<root />");
+
+            var compatibilityPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Compatibility Patch"));
+            File.WriteAllText(
+                Path.Combine(compatibilityPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Compatibility Patch\" /></xml>");
+            var compatibilityConfig = Directory.CreateDirectory(Path.Combine(compatibilityPath.FullName, "Config"));
+            File.WriteAllText(
+                Path.Combine(compatibilityConfig.FullName, "changes.xml"),
+                "<configs><set targetXml=\"Config/framework.xml\" xpath=\"/root\" /></configs>");
+
+            var contentPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "Content Mod"));
+            File.WriteAllText(
+                Path.Combine(contentPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"Content Mod\" /></xml>");
+            var contentConfig = Directory.CreateDirectory(Path.Combine(contentPath.FullName, "Config"));
+            File.WriteAllText(
+                Path.Combine(contentConfig.FullName, "content.xml"),
+                "<configs><set xpath=\"/root\" targetXml=\"items.xml\" entity=\"item\" property=\"value\" attribute=\"value\">content</set></configs>");
+
+            var unknownPath = Directory.CreateDirectory(Path.Combine(modsPath.FullName, "No Evidence"));
+            File.WriteAllText(
+                Path.Combine(unknownPath.FullName, "ModInfo.xml"),
+                "<xml><Name value=\"No Evidence\" /></xml>");
+
+            var snapshot = new Mo2SnapshotReader().Read(new Mo2SourceDefinition(
+                "synthetic-instance",
+                "default",
+                root.FullName,
+                profilePath.FullName,
+                modsPath.FullName));
+            var roles = ModRoleClassifier.Classify(snapshot);
+
+            Assert.Equal(QueryModRole.Foundation, roles["Shared Data"].Role);
+            Assert.Equal(QueryModRoleAssessment.Inferred, roles["Shared Data"].Assessment);
+            Assert.Equal(QueryModRole.Compatibility, roles["Compatibility Patch"].Role);
+            Assert.Equal(QueryModRoleAssessment.Verified, roles["Compatibility Patch"].Assessment);
+            Assert.Equal(QueryModRole.Content, roles["Content Mod"].Role);
+            Assert.Equal(QueryModRoleAssessment.Inferred, roles["Content Mod"].Assessment);
+            Assert.Equal(QueryModRole.Unknown, roles["No Evidence"].Role);
+            Assert.Equal(QueryModRoleAssessment.Unknown, roles["No Evidence"].Assessment);
+            Assert.Contains("dependency", roles["Shared Data"].Reason, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("targets this MOD XML", roles["Shared Data"].Evidence[0].Detail, StringComparison.OrdinalIgnoreCase);
+            Assert.NotEmpty(roles["Compatibility Patch"].Evidence);
+
+            var query = new LocalKnowledgeQueryService(new Mo2SnapshotReader());
+            query.Load(new Mo2SourceInput(
+                "synthetic-instance",
+                "default",
+                root.FullName,
+                profilePath.FullName,
+                modsPath.FullName));
+            Assert.Equal(
+                new[] { "Shared Data", "Compatibility Patch", "Content Mod", "No Evidence" },
+                query.GetModCandidates().Select(candidate => candidate.DirectoryName));
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
+    [Fact]
     public void LoadsSessionAndProjectsCandidateSummaries()
     {
         var query = CreateQuery();

@@ -1,8 +1,27 @@
+export type BrowserTabUiState = {
+  tabId: string;
+  title: string;
+  url: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  isActive: boolean;
+};
+
+export type BrowserHistoryEntryUiState = {
+  entryId: string;
+  title: string;
+  url: string;
+  visitedAtUtc: string;
+};
+
 export type BrowserUiState = {
   url: string;
   title: string;
   canGoBack: boolean;
   canGoForward: boolean;
+  tabs: BrowserTabUiState[];
+  activeTabId: string;
+  history: BrowserHistoryEntryUiState[];
 };
 
 export type SourceReferenceUiState = {
@@ -45,6 +64,19 @@ export type KnowledgeSessionUiState = {
   diagnostics: DiagnosticUiState[];
 };
 
+export type ModRoleEvidenceUiState = {
+  kind: string;
+  detail: string;
+  source: SourceReferenceUiState;
+};
+
+export type ModRoleUiState = {
+  role: string;
+  assessment: string;
+  reason: string;
+  evidence: ModRoleEvidenceUiState[];
+};
+
 export type ModCandidateUiState = {
   modKey: string;
   directoryName: string;
@@ -57,6 +89,7 @@ export type ModCandidateUiState = {
   source: SourceReferenceUiState;
   priorityEvidence?: EvidenceReferenceUiState | null;
   diagnostics: DiagnosticUiState[];
+  role?: ModRoleUiState | null;
 };
 
 export type ProfileUiState = {
@@ -360,7 +393,17 @@ export const initialState: UiState = {
     url: 'about:blank',
     title: '',
     canGoBack: false,
-    canGoForward: false
+    canGoForward: false,
+    tabs: [{
+      tabId: 'initial',
+      title: 'New tab',
+      url: 'about:blank',
+      canGoBack: false,
+      canGoForward: false,
+      isActive: true
+    }],
+    activeTabId: 'initial',
+    history: []
   },
   observation: null,
   knowledge: {

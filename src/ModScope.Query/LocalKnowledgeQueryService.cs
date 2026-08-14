@@ -160,16 +160,30 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
     public IReadOnlyList<ModCandidateSummary> GetModCandidates()
     {
         var snapshot = RequireSnapshot();
+        var roles = ModRoleClassifier.Classify(snapshot);
 
         return snapshot.Mods
-            .OrderBy(mod => mod.Priority ?? int.MaxValue)
+            .OrderBy(mod => ModRoleRank(roles[mod.ModKey].Role))
+            .ThenBy(mod => mod.Priority ?? int.MaxValue)
             .ThenBy(mod => mod.DirectoryName, StringComparer.OrdinalIgnoreCase)
             .Select(mod => QueryProjection.ModCandidate(
                 mod,
                 snapshot.ProfileEntries.FirstOrDefault(entry =>
-                    string.Equals(entry.NormalizedModName, mod.DirectoryName, StringComparison.OrdinalIgnoreCase))))
+                    string.Equals(entry.NormalizedModName, mod.DirectoryName, StringComparison.OrdinalIgnoreCase)),
+                roles[mod.ModKey]))
             .ToList()
             .AsReadOnly();
+    }
+
+    private static int ModRoleRank(QueryModRole role)
+    {
+        return role switch
+        {
+            QueryModRole.Foundation => 0,
+            QueryModRole.Compatibility => 1,
+            QueryModRole.Content => 2,
+            _ => 3
+        };
     }
 
     public IReadOnlyList<ProfileSummaryReadModel> GetProfiles()
@@ -1135,7 +1149,24 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
 
 internal static class QueryProjection
 {
-    public static ModCandidateSummary ModCandidate(LocalModRecord record, ProfileModEntry? profileEntry)
+    public static ModCandidateSummary ModCandidate(
+        LocalModRecord record,
+        ProfileModEntry? profileEntry)
+    {
+        return ModCandidate(
+            record,
+            profileEntry,
+            new ModRoleReadModel(
+                QueryModRole.Unknown,
+                QueryModRoleAssessment.Unknown,
+                "Role projection is not available in this reference context.",
+                Array.Empty<ModRoleEvidenceReadModel>()));
+    }
+
+    public static ModCandidateSummary ModCandidate(
+        LocalModRecord record,
+        ProfileModEntry? profileEntry,
+        ModRoleReadModel role)
     {
         return new ModCandidateSummary(
             record.ModKey,
@@ -1150,6 +1181,7 @@ internal static class QueryProjection
             profileEntry is null
                 ? null
                 : new EvidenceReferenceReadModel(QueryEvidenceKind.Source, Source(profileEntry.Source)),
+            role,
             Diagnostics(record.Diagnostics));
     }
 

@@ -27,7 +27,7 @@
         </Border>
 
         <Border Grid.Row="1" Grid.Column="1" Margin="8" CornerRadius="12" Background="#111827">
-            <wv2:WebView2 x:Name="Browser" />
+            <Grid x:Name="BrowserHost" />
         </Border>
 
         <Border x:Name="ContextShell" Grid.Row="1" Grid.Column="2" Margin="0,8,8,8" CornerRadius="12" Background="#0B1120">

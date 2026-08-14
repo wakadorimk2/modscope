@@ -1,6 +1,7 @@
 import {
   initialState,
   type DiagnosticUiState,
+  type BrowserHistoryEntryUiState,
   type HostMessage,
   type ModCandidateUiState,
   type UiState
@@ -42,7 +43,13 @@ function mockCandidatesForProfile(profileName: string): ModCandidateUiState[] {
         priority: 0,
         source: { kind: 'modDirectory', relativePath: 'mods/Gamma Mod' },
         priorityEvidence: null,
-        diagnostics: []
+        diagnostics: [],
+        role: {
+          role: 'Foundation',
+          assessment: 'Inferred',
+          reason: 'Static metadata suggests a broad support role. Dependency is not asserted.',
+          evidence: [{ kind: 'modInfo', detail: 'ModInfo name contains a foundation marker.', source: { kind: 'modInfo', relativePath: 'mods/Gamma Mod/ModInfo.xml' } }]
+        }
       }
     ];
   }
@@ -59,7 +66,13 @@ function mockCandidatesForProfile(profileName: string): ModCandidateUiState[] {
       priority: 0,
       source: { kind: 'modDirectory', relativePath: 'mods/Alpha Mod' },
       priorityEvidence: null,
-      diagnostics: []
+      diagnostics: [],
+      role: {
+        role: 'Foundation',
+        assessment: 'Inferred',
+        reason: 'Static metadata suggests a broad support role. Dependency is not asserted.',
+        evidence: [{ kind: 'modInfo', detail: 'ModInfo name contains a foundation marker.', source: { kind: 'modInfo', relativePath: 'mods/Alpha Mod/ModInfo.xml' } }]
+      }
     },
     {
       modKey: 'Beta Mod',
@@ -72,7 +85,13 @@ function mockCandidatesForProfile(profileName: string): ModCandidateUiState[] {
       priority: 1,
       source: { kind: 'modDirectory', relativePath: 'mods/Beta Mod' },
       priorityEvidence: null,
-      diagnostics: []
+      diagnostics: [],
+      role: {
+        role: 'Content',
+        assessment: 'Inferred',
+        reason: 'Static XML patch evidence indicates content changes.',
+        evidence: [{ kind: 'xmlPatchOperation', detail: 'Config/changes.xml contains a patch operation.', source: { kind: 'modXml', relativePath: 'mods/Beta Mod/Config/changes.xml' } }]
+      }
     },
     {
       modKey: 'Missing Mod',
@@ -91,7 +110,13 @@ function mockCandidatesForProfile(profileName: string): ModCandidateUiState[] {
         message: 'The profile entry has no matching MOD directory.',
         source: { kind: 'profileFile', relativePath: 'profile/modlist.txt' },
         rawValue: 'Missing Mod'
-      }]
+      }],
+      role: {
+        role: 'Unknown',
+        assessment: 'Unknown',
+        reason: 'No readable MOD evidence is available.',
+        evidence: []
+      }
     },
     {
       modKey: 'Unlisted Mod',
@@ -104,7 +129,13 @@ function mockCandidatesForProfile(profileName: string): ModCandidateUiState[] {
       priority: null,
       source: { kind: 'modDirectory', relativePath: 'mods/Unlisted Mod' },
       priorityEvidence: null,
-      diagnostics: []
+      diagnostics: [],
+      role: {
+        role: 'Unknown',
+        assessment: 'Unknown',
+        reason: 'No static role evidence is available.',
+        evidence: []
+      }
     }
   ];
 }
@@ -229,12 +260,118 @@ function mockAnalysisForFixture(): UiState['analysis'] {
   };
 }
 
+function isMockHistoryUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function updateMockBrowserTab(next: UiState, url: string, title: string): void {
+  const activeTabId = next.browser.activeTabId || next.browser.tabs.find((tab) => tab.isActive)?.tabId;
+  if (!activeTabId) {
+    return;
+  }
+
+  const tabs = next.browser.tabs.map((tab) => tab.tabId === activeTabId
+    ? { ...tab, url, title, isActive: true }
+    : { ...tab, isActive: false });
+  const historyEntry: BrowserHistoryEntryUiState | null = isMockHistoryUrl(url)
+    ? {
+        entryId: `mock-history-${Date.now()}`,
+        title: title || url,
+        url,
+        visitedAtUtc: new Date().toISOString()
+      }
+    : null;
+  next.browser = {
+    ...next.browser,
+    url,
+    title,
+    tabs,
+    activeTabId,
+    history: historyEntry
+      ? [historyEntry, ...next.browser.history.filter((entry) => entry.url !== url)].slice(0, 100)
+      : next.browser.history
+  };
+}
+
+function createMockBrowserTab(next: UiState): void {
+  let sequence = next.browser.tabs.length + 1;
+  let tabId = `mock-tab-${sequence}`;
+  while (next.browser.tabs.some((tab) => tab.tabId === tabId)) {
+    sequence += 1;
+    tabId = `mock-tab-${sequence}`;
+  }
+
+  next.browser = {
+    ...next.browser,
+    tabs: next.browser.tabs.map((tab) => ({ ...tab, isActive: false })).concat({
+      tabId,
+      title: 'New tab',
+      url: 'about:blank',
+      canGoBack: false,
+      canGoForward: false,
+      isActive: true
+    }),
+    activeTabId: tabId,
+    url: 'about:blank',
+    title: 'New tab',
+    canGoBack: false,
+    canGoForward: false
+  };
+}
+
 function mockStateForCommand(state: UiState, command: string, payload: unknown): UiState {
   let next = cloneState(state);
-  if (command === 'browser.navigate' && typeof payload === 'object' && payload !== null) {
+  if (command === 'browser.newTab') {
+    createMockBrowserTab(next);
+    next.statusMessage = 'New tab opened.';
+  } else if (command === 'browser.selectTab' && typeof payload === 'object' && payload !== null) {
+    const tabId = (payload as { tabId?: unknown }).tabId;
+    if (typeof tabId === 'string' && next.browser.tabs.some((tab) => tab.tabId === tabId)) {
+      const selected = next.browser.tabs.find((tab) => tab.tabId === tabId)!;
+      next.browser = {
+        ...next.browser,
+        tabs: next.browser.tabs.map((tab) => ({ ...tab, isActive: tab.tabId === tabId })),
+        activeTabId: tabId,
+        url: selected.url,
+        title: selected.title,
+        canGoBack: selected.canGoBack,
+        canGoForward: selected.canGoForward
+      };
+    }
+  } else if (command === 'browser.closeTab' && typeof payload === 'object' && payload !== null) {
+    const tabId = (payload as { tabId?: unknown }).tabId;
+    if (typeof tabId === 'string' && next.browser.tabs.length > 1) {
+      const remaining = next.browser.tabs.filter((tab) => tab.tabId !== tabId);
+      const selected = remaining.find((tab) => tab.isActive) ?? remaining[0];
+      next.browser = {
+        ...next.browser,
+        tabs: remaining.map((tab) => ({ ...tab, isActive: tab.tabId === selected.tabId })),
+        activeTabId: selected.tabId,
+        url: selected.url,
+        title: selected.title,
+        canGoBack: selected.canGoBack,
+        canGoForward: selected.canGoForward
+      };
+    }
+  } else if (command === 'browser.home') {
+    updateMockBrowserTab(next, 'about:blank', 'ModScope Home');
+  } else if (command === 'browser.selectHistory' && typeof payload === 'object' && payload !== null) {
+    const entryId = (payload as { entryId?: unknown }).entryId;
+    const entry = typeof entryId === 'string'
+      ? next.browser.history.find((historyEntry) => historyEntry.entryId === entryId)
+      : undefined;
+    if (entry) {
+      updateMockBrowserTab(next, entry.url, entry.title);
+    }
+  } else if (command === 'browser.navigate' && typeof payload === 'object' && payload !== null) {
     const url = (payload as { url?: unknown }).url;
     if (typeof url === 'string' && url.length > 0) {
-      next.browser = { ...next.browser, url, title: 'Mock page' };
+      updateMockBrowserTab(next, url, 'Mock page');
       next.statusMessage = 'Mock navigation completed.';
     }
   } else if (command === 'browser.observe') {
