@@ -24,6 +24,21 @@ ModScopeは、MODをWeb上で探し、吟味し、比較する作業を、ユー
 - Local context：確認したMOD identityと、現在のMO2 profileを照合した派生結果
 - Inspector：Local contextの根拠と詳細へ段階的に進むための画面またはread model
 
+### 2.1 Mod Library vocabulary
+
+この設計では、MODの収録単位、状態、表示用の集合を混同しません。
+
+| 出典 | 目的 | 具体対象 | 役割 | 前後関係 | 候補語 | 初出定義 |
+|---|---|---|---|---|---|---|
+| この節 | 現在のinstanceにあるMODを検索対象にするため | stableなlocal Modlet recordと、active profileだけに残るprofile entry | Queryが返す母集合 | packageやarchiveのrecordとは別に保持する | Mod Library | 現在のMO2 instanceを対象にした、再生成可能なMOD read modelの集合 |
+| この節 | Libraryの1行を決めるため | 1つのstable local Modlet、または対応directoryがないprofile entry | 一覧とViewの対象 | packageから複数のModletが生成される場合も1行ずつ保持する | Library record | Libraryへ表示できる1件のlocal record |
+| この節 | 母集合から対象を切り出すため | 条件とsortを組み合わせたQuery | 表示対象と順序を決める | current snapshotへ再評価する | View | Mod Libraryへ適用する動的な条件とsort |
+| この節 | 製品が提供する固定条件を示すため | All、Enabled、Disabled、Review、Identity unresolved、Profile unresolved | 初期導線を提供する | すべてcurrent snapshotのevidenceから再計算する | System View | ModScopeが定義する動的View |
+| この節 | source identityの人間確認対象を示すため | identity resolutionが`HumanReview`のrecord | Review対象を表示する | diagnosticやrole unknownとは別に保持する | Review | source-backedな人間確認状態 |
+| この節 | source identityを安全に確定できない状態を示すため | missing、ambiguous、または未解決のsource identity | identityの不確実性を表示する | profile directory不一致とは別に保持する | Identity unresolved | SourceArtifact、MO2Package、Modletなどの対応を確定できない状態 |
+| この節 | profileとMOD directoryの不一致を示すため | `modlist.txt`にあるが対応MOD directoryがないprofile entry | profile状態を表示する | source identityの未解決とは別に保持する | Profile unresolved | active profile entryに対応するlocal MOD directoryを解決できない状態 |
+| この節 | 条件を再利用するため | ユーザーが名前を付けたView定義 | アプリmetadataへ保存する | MO2とLocal Mod Knowledgeを変更せず、snapshot更新後に再評価する | Saved View | アプリ内metadataに保存した動的View |
+
 ModScopeは、AIを使わなくてもbrowse、inspect、compare、local environmentの理解が成立することを目指します。AI agentは、同じLocal Mod Knowledgeへ効率よくアクセスできます。
 
 ModScope reports what is known, why it is believed, and what remains unknown.
@@ -38,6 +53,7 @@ ModScope reports what is known, why it is believed, and what remains unknown.
 - active profile、enabled状態、priorityをその場で確認しにくい
 - 類似MOD、dependencies、known overlapを同じ文脈で確認しにくい
 - MO2の多数のMODとXMLを毎回全文探索する必要がある
+- 数百件のMODを常設一覧で全件スクロールすると、確認対象の切り出しに認知負荷がかかる
 - file overlapとsemantic XML conflictを区別しにくい
 - AI agentへ大量のraw XMLや巨大なJSONを渡すとcontext効率が低下する
 - MO2のsource of truthとModScopeの派生データが混ざりやすい
@@ -74,6 +90,16 @@ ModScopeは、確認したMOD identityを、現在のprofileと照合します�
 
 情報が不足する場合は、推測で埋めません。unknownとして表示します。
 
+### Library
+
+Mod Libraryは、現在のWeb pageに代わる主画面ではありません。ユーザーが必要なMOD集合を切り出すためのsecondary surfaceです。
+
+Libraryの1行はstable local Modlet recordを基本単位にします。MO2 package、archive、Nexus Mod、Nexus Fileの件数をLibrary row数へ変換しません。active profileだけに残る対応directoryなしのentryは、`Profile unresolved` recordとして別状態で保持します。
+
+System Viewは`All`、`Enabled`、`Disabled`、`Review`、`Identity unresolved`、`Profile unresolved`です。Viewの件数はcurrent snapshotから再計算します。Search結果とView全体の件数は分けて表示します。
+
+Library rowを選択しても、現在のWeb pageのidentityは自動で変わりません。選択したrecordのLocal contextまたはInspectorを開き、Web page、version evidence、requirements、compatibilityを既存のprogressive disclosureで確認します。
+
 ### Inspect
 
 ユーザーは、必要なときだけInspectorを開きます。
@@ -108,7 +134,7 @@ MO2操作は、read layerから独立したwrite layerに置きます。Phase 7�
 
 MODの発見と評価は、MOD一覧から始まるとは限りません。ランキング、compatibility guide、issue、Wiki、作者説明、GitHubなどのWeb contentから始まります。
 
-したがって、最初に表示する対象はMOD一覧ではなく現在のWeb pageです。Local contextは、pageを理解するための補助情報としてprogressive disclosureします。
+したがって、最初に表示する対象はMOD一覧ではなく現在のWeb pageです。Mod Libraryは、Web pageの探索を補助するsecondary surfaceです。Local contextは、pageを理解するための補助情報としてprogressive disclosureします。
 
 ### 5.3 Goals
 
@@ -132,6 +158,7 @@ MODの発見と評価は、MOD一覧から始まるとは限りません。ラ�
 - RuntimeOCDの再実装
 - 特定AI製品への密結合
 - 初期画面の高密度Mod一覧
+- 手動membershipを正本とするCollection、Favorites、user tag
 - v0.1での完全なsemantic conflict判定
 - v0.1でのRuntimeOCD連携
 - 任意のMO2管理操作と、未承認のMO2 write
@@ -150,6 +177,10 @@ ModScopeは、これらの成熟機能を置き換えません。
 
 ModScopeは、local stateとWeb observationをprovenance付きで比較・理解する補完層です。
 
+VS Codeの状態filter、GitHub IssuesのSaved View、Steam LibraryのDynamic Collectionは、集合を検索・絞り込みするUIパターンの参考にします。これらのUIパターンを採用しても、MO2のprofile管理、Wabbajackのdistribution、Vortexのdeploymentを再実装しません。
+
+参考資料は、[VS Code Extension Marketplace](https://code.visualstudio.com/docs/configure/extensions/extension-marketplace)、[GitHub Issues views](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/viewing-all-of-your-issues-and-pull-requests)、[Steam Library](https://store.steampowered.com/libraryupdate?l=english)です。
+
 Prior-artの詳細、公式source、調査対象版、未確認事項は、research noteへ記録します。
 
 ## 6. Conceptual architecture
@@ -161,7 +192,7 @@ MO2 source
   -> 7DTD Adapter
   -> Local Mod Knowledge
   -> Search / reverse index / read model
-  -> Local context / Inspector / Compare / Diagnosis
+  -> Mod Library / Views / Local context / Inspector / Compare / Diagnosis
 
 Human browser
   -> Browsing Layer
@@ -279,6 +310,10 @@ rootを解決できないouterはMOD recordを生成しません。
 stable MOD keyは`mods/`からのnormalizedな`outer`または`outer/inner` pathです。
 `ModInfo.Name`はmetadataであり、stable MOD keyに使いません。
 
+Mod Libraryのlocal rowは、resolved inner rootを持つstable local Modlet recordを基本単位にします。MO2 outer directory、MO2 package、SourceArtifactは、Modletと別のsourceまたはprovenance recordです。1つのpackageから複数のModletが生成される場合は、各Modletを別のLibrary recordとして保持します。
+
+profile entryに対応するMOD directoryがない場合は、Modlet recordを推測で生成しません。raw profile entryと`Profile unresolved` stateを保持します。
+
 #### MO2 source candidate
 
 - instance name
@@ -341,6 +376,8 @@ source path、page URL、取得時刻、parser version、snapshot idなど、再
 
 local version、Nexus mod version、Nexus file version、Wabbajack list version、game versionは別の値として扱います。
 
+Library表示では、profile stateとsource identity resolution stateを別のfieldとして扱います。`HumanReview`は`Review` Viewへ、source identityの`Unresolved`は`Identity unresolved` Viewへ投影します。`QueryProfileState.Unresolved`は`Profile unresolved` Viewへ投影します。これらを同じ`Unresolved`件数へ圧縮しません。
+
 dependency、compatibility、load-order rule、file overlap、semantic conflict、runtime observationは別の関係として扱います。
 
 ### 7.4 Requirementsとcompatibilityの意味
@@ -395,7 +432,8 @@ Nexus file identityはpackageまたはartifactのidentityとして保持し、bu
 明示的なprovenance metadataを、名前の類似によるfuzzy matchingより優先します。
 
 version comparisonは、local Modletと対象Nexus Fileのidentityを解決した後だけ実行します。
-identityまたはversionが欠落、曖昧、比較不能の場合は`Unknown`または`not-comparable`として返します。
+comparison stateは`equal`、`mismatch`、`incomparable`を別状態として保持します。
+identity未解決時は`Not assessed`です。version observationが欠落、曖昧、または比較不能な場合は`incomparable`です。
 比較不能をversion matchとして扱いません。
 identityがresolvedでも、version observationが一致するとは限りません。
 `ModInfo.xml` versionとMO2 package `meta.ini` versionは別の値として保持します。
@@ -405,6 +443,8 @@ separator textからenable、dependency、compatibilityを断定しません。
 
 詳細な観測値は、[Smorgasbord local inventory follow-up](research/smorgasbord-local-inventory-2026-08-14.md)に記録します。
 判断理由は、[Identity and version provenance ADR](adr/identity-and-version-provenance.md)に記録します。
+
+Mod Libraryのrow countはstable local Modlet countです。MO2 package count、archive count、Nexus identity countをrow countとして表示しません。package provenanceは、共有関係とsource referenceとしてInspectorへ表示します。bundle内の各Modletへ固有のNexus File identityを推測しません。
 
 ## 8. Adapter boundaries
 
@@ -582,6 +622,37 @@ Reverse indexは、次のqueryを低コストで提供します。
 
 Query resultは、巨大なindexを返しません。結論、対象、enabled状態、priority、source reference、evidence type、uncertainty、diagnosticを含む小さな説明単位にします。
 
+### 11.4 Mod LibraryとViews
+
+Mod Libraryは、current MO2 instanceのstable local Modlet recordと、active profileの`Profile unresolved` recordを含むQuery read modelです。separatorはMOD recordとして含めません。
+
+Library recordは、MO2 packageまたはarchiveの代替ではありません。packageから複数のModletが生成される場合、LibraryはModletごとに1 recordを返します。package、SourceArtifact、Nexus Mod、Nexus Fileは、必要なprovenance relationとして別に返します。
+
+初期System Viewの条件は次のとおりです。
+
+- `All`：current Library record全件
+- `Enabled`：active profileでlistedかつenabledのrecord
+- `Disabled`：active profileでlistedかつdisabledのrecord
+- `Review`：source identity resolutionが`HumanReview`のrecord
+- `Identity unresolved`：source identity resolutionがmissing、ambiguous、または`Unresolved`のrecord
+- `Profile unresolved`：active profile entryに対応MOD directoryがないrecord
+
+`PartiallyResolved`は、`Review`や`Identity unresolved`へ自動圧縮しません。resolution stateのfilterとInspector detailで保持します。generic warning、unknown role、diagnosticの有無だけで`Review`を生成しません。
+
+`Updates`は、identity resolution後のversion comparison evidenceから生成する将来Viewです。`ModInfo.xml` versionとMO2 package `meta.ini` versionは別observationとして保持します。comparison stateは`equal`、`mismatch`、`incomparable`を別状態として保持します。identityが未解決なら`Not assessed`です。versionが比較不能なら`incomparable`です。比較不能を`equal`や`mismatch`へ変換しません。
+
+View countは、current snapshotにView条件を適用した件数です。free-text Searchは選択中Viewへ追加で適用し、`検索結果件数 / View件数`を表示します。View countはSearch文字列で他Viewまで変動させません。
+
+Searchはdisplay name、directory name、MOD keyを対象にします。既存の名前正規化規則を使い、caseとUnicodeの差だけで候補を失いません。
+
+Default sortはNameです。State、Version、MO2 priorityをsort候補にします。欠落値は最後に置き、同じ値はstable MOD keyで決定します。Libraryのflat result tableはName、State、Versionを初期列にし、role、resolution state、priority、provenanceはdetailまたはInspectorへprogressive disclosureします。
+
+Saved Viewは、View条件とsortをアプリ内metadataへ保存します。保存metadataはinstance/profile fingerprintへ紐づけます。MO2、Local Mod Knowledge、`modlist.txt`、page本文、cookie、absolute pathは保存しません。snapshot再読、profile切替、source更新後に条件を再評価します。scopeが一致しない場合は`Unavailable`を表示し、`All`へfallbackしません。
+
+Library selectionは一時的なUI stateです。selectionはpage identity confirmation、Local context、Inspector resultを自動変更しません。Websiteを開く操作とInspectorを開く操作は明示操作です。
+
+QueryがView membership、View count、resolution state、version state、provenanceを決めます。Web frontendはMOD recordの母集合、View predicate、件数を独自計算しません。
+
 ## 12. Incremental indexing
 
 入力manifestには、少なくとも次を保持します。
@@ -745,6 +816,9 @@ ModScopeが管理したjunctionだけを削除します。既存junctionは、�
 - installed、not installed、active profile、known versionなどのLocal context
 - Inspectorによるlocal metadata、files、XML reference、diagnosticの確認
 - unknown、unresolved、not assessedの明示
+- Mod Library、System View、Saved Viewの情報設計境界
+- Modlet、MO2 package、SourceArtifact、Nexus identityの分離
+- Review、Identity unresolved、Profile unresolvedの状態分離
 - Query layerが提供するneutral read model
 - page observation、自動または手動のMOD identity confirmation、Local context、Inspectorの縦切り
 
@@ -760,6 +834,7 @@ ModScopeが管理したjunctionだけを削除します。既存junctionは、�
 - 特定AI製品への専用統合
 - agent Web backendの固定
 - Browser engineの自作
+- ModScope独自のdependency resolver、version resolver、source identity resolver
 
 ## 16. Browser engine options to investigate
 
@@ -814,6 +889,12 @@ Agent backendの選定は、Local Mod Knowledgeのschemaと分離します。
 - Human browserとagent browserを分離する
 - Site Adapter、Game Adapter、MO2 Adapterの責務を分離する
 - Codex、Kitesurf、SQLite、JSONL、MCPなどを必須の実装選択にしない
+- Mod Libraryのrow単位は、stable local Modletとactive profileのProfile unresolved recordに限定する
+- package、archive、Nexus Mod、Nexus FileのidentityとModletのrowを分離する
+- System ViewとSaved Viewのmembership、count、resolution state、version state、provenanceはQuery projectionから提供する
+- System ViewはAll、Enabled、Disabled、Review、Identity unresolved、Profile unresolvedを初期集合とする
+- Saved Viewはapp-local metadataへ保存し、instance/profile fingerprintへ紐づけて再評価する
+- 製品上の名称はMod Libraryとし、既存の内部`surface=mod-list`とBridge contract v2は互換性のため維持する
 
 storage engine、CLI framework、GUI framework、transport、installer、MO2 write APIは後回しにします。
 
@@ -1016,6 +1097,23 @@ Compareは確認済みcandidate MODに絞り、Diagnosisはactive profile全体�
 Phase4 synthetic fixtureとPhase6 RuntimeOCD logをDesktop outputへpackし、Developer toolsから再現できます。
 MO2 write、AI chat、MCP、browser engine変更、browser syncは実装しません。
 
+### Phase 6.10：Mod Library情報設計（設計固定）
+
+Mod Libraryは、Web browsing workflowを補助するsecondary surfaceです。
+この設計更新では、コードAPI、Bridge contract、frontend実装を変更しません。
+
+将来の実装は、次のread model境界へ従います。
+
+- Query projectionはstable local Modlet単位のrecordと、active profileにだけ存在するProfile unresolved recordを返します。
+- Query projectionはView membership、View count、Search後のresult countを返します。
+- Query projectionはresolution state、version comparison state、package provenance、source referenceを返します。
+- Desktop contractは、Query projectionの情報をfrontend表示用DTOへ変換します。
+- frontendはView membership、count、resolution state、version state、provenanceを計算しません。
+- Saved Viewはアプリ内metadataとして保存し、snapshot再読、profile切替、source更新後に再評価します。
+
+表示規則は、flat table、Name default sort、欠落値の末尾配置、stable MOD keyによる同値解決を使います。
+Library selectionはWeb page identity、Local context、Inspector selectionから分離します。
+
 ### Phase 7：controlled write（実装）
 
 Phase 7は、Controlled profile edit、junction deploy、Steam起動のvertical sliceです。
@@ -1050,9 +1148,9 @@ Phase 7後の次のread-only vertical sliceは、Installed versionとWeb observe
 
 入力は、local mod identity、raw local version、local source / provenance、Web URL、title、raw observed version、Web source、observed timeです。
 
-出力は、local version、observed Web version、`same`、`web_newer`、`local_newer`、`unknown`、provenance、observed time、diagnosticsです。
+出力は、local version、observed Web version、identity resolution、`equal`、`mismatch`、`incomparable`、`Not assessed`、provenance、observed time、diagnosticsです。
 
-比較不能なversion formatは`unknown`とします。
+identity未解決時は`Not assessed`とします。比較不能なversion formatは`incomparable`とします。
 
 semverを推測しません。
 
@@ -1093,6 +1191,17 @@ raw versionを保持します。
 - GamePathの絶対値をfrontendへ渡さない
 - Codex、特定Site Adapter、特定agent backendへ依存しない
 
+### v0.1設計受入基準
+
+- Mod Libraryのrow数はpackage数、archive数、Nexus Mod数、Nexus File数と混同しない
+- 1 packageから複数Modletが生成される場合、各Modletを別Library rowとして保持する
+- Review、Identity unresolved、Profile unresolved、Partially resolvedを別stateとして保持する
+- Reviewはidentity resolutionの`HumanReview`だけから計算し、generic warning、unknown role、diagnosticを合算しない
+- identity未解決またはversion比較不能の場合、Updatesを`Not assessed`または`incomparable`として表示し、`equal`や`mismatch`を推測しない
+- ModInfo.xml versionとMO2 package `meta.ini` versionを別observationとして保持する
+- `491`、`341`、`131`、`28`、`6`などの件数をUIへ固定値として埋め込まず、observed evidenceとして扱う
+- Saved ViewはMO2 source、Local Mod Knowledge、`modlist.txt`、page stateを変更しない
+
 ### v0.1以降
 
 - Phase 3で達成済み：target XML、XPath、entity、property、attributeからMODへreverse queryできる
@@ -1119,31 +1228,34 @@ raw versionを保持します。
 
 ### 24.2 WebView2 surfaces
 
-Desktopは4つのWebView2を、Global Browser chrome + MOD list + Content / Contextとして配置します。
+Desktopは4つのWebView2を、Global Browser chrome + Mod Library + Content / Contextとして配置します。
 
 - Toolbar WebView2：全幅のnavigation、Home、tabs、history、pane icon
-- ModList WebView2：active profileのMOD一覧、profile selector、profile preload state
+- Mod Library WebView2：active profileのMod Library、profile selector、profile preload state
 - Browser WebView2：ユーザーが閲覧する外部Web page、または内部Deployment preview tab
 - Context WebView2：Local context、例外確認、Developer tools、Inspector
 
-Toolbar、ModList、Contextは、同じfrontend bundleをsurface query付きで読み込みます。
+Toolbar、Mod Library、Contextは、同じfrontend bundleをsurface query付きで読み込みます。
 Toolbarは`?surface=toolbar`を使用します。
-ModListは`?surface=mod-list`を使用します。
+Mod Libraryは`?surface=mod-list`を使用します。
 Contextは`?surface=context`を使用します。
 Deployment preview tabは`?surface=deployment-preview`を使用します。
+
+製品上の名称は`Mod Library`です。
+`surface=mod-list`、`layout.setModListVisible`、既存のBridge contract v2は互換性のため維持します。
 
 任意サイトをfrontendのiframeへ移しません。
 Browser WebView2へWPF panelを重ねません。
 WPFはwindow、WebView2 host、native bridgeに限定します。
 
-下段は、左からModList `280px`、Browser `3*`、Context `2*`です。
+下段は、左からMod Library (`mod-list`) `280px`、Browser `3*`、Context `2*`です。
 Toolbarは全列にまたがります。通常は96pxの2段構成で表示します。History pageを開いてもhost rowは拡張しません。
-ModListを閉じるとBrowser columnが広がります。
-ModListの見出しにprofile load stateとscanning progressを表示します。
-MOD一覧だけをスクロール可能にします。MOD rowはcompact表示にし、disabled rowは灰色系で表示します。
+Mod Libraryを閉じるとBrowser columnが広がります。
+Mod Libraryの見出しにprofile load stateとscanning progressを表示します。
+Mod Libraryのresult tableだけをスクロール可能にします。Library rowはcompact表示にし、disabled rowは灰色系で表示します。
 Context columnは、ToolbarのContext buttonまたはCtrl/Cmd+Iで非表示にできます。
 非表示中もContext WebView2のstateとInspector stateを破棄しません。
-ModList columnはToolbarのMOD list buttonまたは`layout.setModListVisible`で非表示にできます。
+Mod Library columnはToolbarのMod Library buttonまたは`layout.setModListVisible`で非表示にできます。
 active profileを先に表示し、他profileはbackground preloadします。
 profile selectorはpending、loading、ready、failedを表示します。
 将来はContextをdrawerまたはoverlayへ折り畳める構造へ進めます。
@@ -1190,7 +1302,7 @@ frontendからhostへ送るcommandは次です。
 - layout.setToolbarExpanded
 
 hostからfrontendへ送るmessageは、state、error、readyです。
-Toolbar、ModList、Context、Deployment previewの各App WebViewへ同じmessageをbroadcastします。
+Toolbar、Mod Library、Context、Deployment previewの各App WebViewへ同じmessageをbroadcastします。
 stateはUI stateの完全なsnapshotです。
 
 Hostは次を検証します。
@@ -1268,17 +1380,21 @@ Toolbarは、左ペインと右ペインをアイコンで切り替えます。
 アイコンにはtooltipとaria-labelを付けます。
 Ctrl/Cmd+IのContext shortcutは維持します。
 
-ModListの標準表示は`ModScope view`です。
-`Foundation`、`Compatibility`、`Content`、`Unknown`の順に分類します。
-分類はQuery layerのstatic evidenceだけを使います。
-`Foundation`は依存関係を意味しません。
-role assessmentは`Verified`、`Inferred`、`Unknown`で表示します。
-分類内の順序はMO2 priorityを維持し、同順位はMOD keyで決定します。
-根拠がないMODは`Unknown`へ置きます。
-MO2のpriorityはprofileの上から下へ`0→N`で保持します。`modlist.txt`の保存順はこの画面順と逆です。
-ModScope viewは`Foundation`、`Compatibility`、`Content`、`Unknown`の順で表示し、分類内だけpriority順を使います。
-他のreadable MODからtarget XMLとして参照されるMODは、base roleの静的証拠として`Foundation / Inferred`へ投影します。
-これは依存関係やゲーム内のwinner方向を断定しません。
+製品上の左ペインは`Mod Library`です。
+既存実装の内部surface名`mod-list`は互換性のため保持します。
+Mod Libraryの標準表示は`All`です。
+初期System Viewは`All`、`Enabled`、`Disabled`、`Review`、`Identity unresolved`、`Profile unresolved`です。
+`Review`はidentity resolutionの`HumanReview`だけを表示します。
+`Identity unresolved`はsource identityを安全に解決できないrecordを表示します。
+`Profile unresolved`はactive profile entryに対応するMOD directoryがないrecordを表示します。
+`Partially resolved`はこれらのViewへ自動合算せず、rowのresolution stateとして表示します。
+generic warning、unknown role、diagnosticは`Review`のmembershipを生成しません。
+結果はflat tableで表示します。
+Searchはdisplay name、directory name、MOD keyを対象にします。
+Default sortはNameです。State、Version、MO2 priorityをsort候補にします。
+欠落値は最後に置き、同値はstable MOD keyで決定します。
+role assessmentはrow detailまたはInspectorへ段階表示します。
+role assessmentをSystem Viewのmembershipへ変換しません。
 
 Contextの表示順は`RECOGNIZE`、Local awareness、Analysis summary、Inspect導線です。
 通常Contextは対応可能なdiagnostic要約と件数だけを表示します。
@@ -1370,11 +1486,10 @@ ToolbarはChrome darkのtabstripとnavigation rowへ分離します。
 active tabは明るいsurfaceと丸い上端で表示し、inactive tabは透明背景と控えめなhoverで表示します。
 new tab buttonはtab listの末尾へ置き、tabと一緒に横スクロールします。
 navigation rowのURL入力はomniboxとして表示し、Goはcompactな`↵` iconで表示します。
-History、MOD list、Context、shortcut hintは右側のaction groupへまとめます。
+History、Mod Library、Context、shortcut hintは右側のaction groupへまとめます。
 
-ModListはModScope viewの固定順序だけを表示します。
-順序は`Foundation`、`Compatibility`、`Content`、`Unknown`です。
-分類内はMO2 priority、同順位はMOD keyで決定します。
+Mod Libraryは選択したViewの結果だけを表示します。
+View countとSearch後のresult countを分けて表示します。
 `MO2 order`切替と設定項目は持ちません。
 
 MOD Websiteは`Verified`、`Inferred`、`No usable URL`へ分類します。
@@ -1393,7 +1508,7 @@ Verified Websiteの404はBrowser diagnosticとして扱い、自動検索へ変�
 ### 25.5 Phase6.8 ロード遮断、Chrome palette、History page
 
 Desktop hostはWPF client areaのWebView2子windowを含めて入力を遮断します。
-foregroundのloading中はToolbar、ModList、Context、Browser tabの`IsEnabled`と`IsHitTestVisible`を無効にします。
+foregroundのloading中はToolbar、Mod Library、Context、Browser tabの`IsEnabled`と`IsHitTestVisible`を無効にします。
 薄いグレーのloading panelはclient areaだけを覆います。
 OSタイトルバーはloading中も操作できます。
 background profile preloadではloading panelを表示しません。
@@ -1462,7 +1577,7 @@ index構築とProfile projectionは不定形phaseとして表示します。
 
 Desktop hostはoperation tokenでstale callbackを破棄します。
 progress通知は最大20回/秒へ間引きます。
-Web UIは150msを超えたoperationだけ、ModListのprofile見出しへprogress railを表示します。
+Web UIは150msを超えたoperationだけ、Mod Libraryのprofile見出しへprogress railを表示します。
 短時間のcache hitでは、progress railを表示しません。
 
 progress railは現在のBrowser pageとLocal contextを隠しません。
@@ -1506,17 +1621,17 @@ ready候補が1件なら自動読込します。
 ready候補が複数件ならsource cardで選択します。
 candidateがない場合は再探索とnative folder pickerを表示します。
 unsupported candidateとload failureはsource cardへ要約表示します。
-ModListのProfile selectorは、解決済みsource内のread-only profile switchだけを実行します。
+Mod LibraryのProfile selectorは、解決済みsource内のread-only profile switchだけを実行します。
 高信頼page identity自動認識を追加しました。overlap判定は追加しません。
 既存のQuery modelとread-only境界を維持し、profile catalogとlayout stateを明示的なread modelへ追加します。
 
-Profile-first Browser UI整理では、左のModListにactive profileの全MODをpriority順で表示します。
-profileに存在するがMOD directoryがないMODはunresolvedとして表示します。
-MOD directoryに存在するがprofileに存在しないMODは、折りたたみ式の`Profile外`欄へ分離します。
-enabled、disabled、unresolved、priority不明の状態を同じ一覧で表示します。
-profile selectorはModListへ移し、profile名とPending、Loading、Ready、Failedを表示します。
+Mod Libraryはactive profileのModlet rowとProfile unresolved recordを、選択Viewの結果として表示します。
+profileに存在するがMOD directoryがないrecordは`Profile unresolved`として表示します。
+MOD directoryに存在するがprofileに存在しないModletは、System Viewの`All`へ含めます。
+enabled、disabled、Review、Identity unresolved、Profile unresolvedを別Viewで扱います。
+profile selectorはMod Libraryへ移し、profile名とPending、Loading、Ready、Failedを表示します。
 active profileを先に表示し、他profileはactive表示後にbackground preloadします。
-全候補を常設一覧から削減するため、認識失敗時の検索drawerは補助導線として維持します。
+検索drawerはMod LibraryのViewと別の補助導線として維持します。
 検索対象はdisplay name、directory name、MOD keyです。
 `ModInfo.xml`から得た有効なabsolute http / https Websiteを最優先します。
 Websiteが無効または欠落する場合は、MOD名から7DTD Nexus検索URLを作ります。
