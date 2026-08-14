@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ModScope.Desktop.Contracts\ModScope.Desktop.Contracts.csproj" />
+    <ProjectReference Include="..\ModScope.Deployment\ModScope.Deployment.csproj" />
     <ProjectReference Include="..\ModScope.Query\ModScope.Query.csproj" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
   </ItemGroup>

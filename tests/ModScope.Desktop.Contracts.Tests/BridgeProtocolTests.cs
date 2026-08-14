@@ -12,7 +12,7 @@ public sealed class BridgeProtocolTests
         var envelope = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "request-1",
               "command": "browser.navigate",
               "payload": {
@@ -24,7 +24,7 @@ public sealed class BridgeProtocolTests
 
         var payload = BridgeProtocol.ReadPayload<NavigatePayload>(envelope.Payload);
 
-        Assert.Equal(1, envelope.ContractVersion);
+        Assert.Equal(2, envelope.ContractVersion);
         Assert.Equal("request-1", envelope.RequestId);
         Assert.Equal("browser.navigate", envelope.Command);
         Assert.Equal("https://www.nexusmods.com/7daystodie/search/?gsearch=Alpha", payload.Url);
@@ -37,7 +37,7 @@ public sealed class BridgeProtocolTests
         var envelope = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "request-legacy",
               "command": "browser.navigate",
               "payload": {
@@ -69,7 +69,7 @@ public sealed class BridgeProtocolTests
             BridgeProtocol.ParseCommand(
                 """
                 {
-                  "contractVersion": 1,
+                  "contractVersion": 2,
                   "requestId": "request-1",
                   "command": "local.write",
                   "payload": {}
@@ -86,7 +86,7 @@ public sealed class BridgeProtocolTests
             BridgeProtocol.ParseCommand(
                 """
                 {
-                  "contractVersion": 2,
+                  "contractVersion": 3,
                   "requestId": "request-1",
                   "command": "browser.reload",
                   "payload": {}
@@ -114,7 +114,7 @@ public sealed class BridgeProtocolTests
             "request-2");
         using var document = JsonDocument.Parse(json);
 
-        Assert.Equal(1, document.RootElement.GetProperty("contractVersion").GetInt32());
+        Assert.Equal(2, document.RootElement.GetProperty("contractVersion").GetInt32());
         Assert.Equal("error", document.RootElement.GetProperty("kind").GetString());
         Assert.Equal("request-2", document.RootElement.GetProperty("requestId").GetString());
         Assert.Equal(
@@ -157,7 +157,7 @@ public sealed class BridgeProtocolTests
         var profileEnvelope = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "profile-1",
               "command": "knowledge.switchProfile",
               "payload": { "profileName": "Alternate" }
@@ -168,7 +168,7 @@ public sealed class BridgeProtocolTests
         var layoutEnvelope = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "layout-1",
               "command": "layout.setContextVisible",
               "payload": { "visible": false }
@@ -179,7 +179,7 @@ public sealed class BridgeProtocolTests
         var modListEnvelope = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "mod-list-layout-1",
               "command": "layout.setModListVisible",
               "payload": { "visible": false }
@@ -190,7 +190,7 @@ public sealed class BridgeProtocolTests
         var toolbarEnvelope = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "toolbar-layout-1",
               "command": "layout.setToolbarExpanded",
               "payload": { "expanded": true }
@@ -220,7 +220,7 @@ public sealed class BridgeProtocolTests
         var envelope = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "frontend-1",
               "command": "frontend.ready",
               "payload": {}
@@ -237,7 +237,7 @@ public sealed class BridgeProtocolTests
         var discover = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "discover-1",
               "command": "knowledge.discoverSources",
               "payload": { "selectedRoots": ["C:\\MO2"] }
@@ -246,7 +246,7 @@ public sealed class BridgeProtocolTests
         var select = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "select-1",
               "command": "knowledge.selectSource",
               "payload": { "candidateId": "mo2-candidate" }
@@ -255,7 +255,7 @@ public sealed class BridgeProtocolTests
         var root = BridgeProtocol.ParseCommand(
             """
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "root-1",
               "command": "knowledge.selectRoot",
               "payload": {}
@@ -337,7 +337,7 @@ public sealed class BridgeProtocolTests
     {
         var envelope = BridgeProtocol.ParseCommand("""
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "analysis-1",
               "command": "COMMAND",
               "payload": {}
@@ -352,7 +352,7 @@ public sealed class BridgeProtocolTests
     {
         var envelope = BridgeProtocol.ParseCommand("""
             {
-              "contractVersion": 1,
+              "contractVersion": 2,
               "requestId": "runtime-1",
               "command": "analysis.compareRuntimeEvidence",
               "payload": { "toolVersion": "1.0", "gameVersion": "7DTD-test" }
@@ -419,6 +419,16 @@ public sealed class BridgeProtocolTests
                 null,
                 runtimeComparison,
                 AnalysisOperationUiState.Idle,
+                Array.Empty<DiagnosticUiState>()),
+            new DeploymentUiState(
+                "idle",
+                "",
+                Array.Empty<DeploymentEntryUiState>(),
+                null,
+                false,
+                false,
+                Array.Empty<DeploymentModChangeUiState>(),
+                Array.Empty<DeploymentJunctionChangeUiState>(),
                 Array.Empty<DiagnosticUiState>()),
             new LayoutUiState(true, true),
             "analysis",
@@ -487,7 +497,7 @@ public sealed class BridgeProtocolTests
             };
             var envelope = BridgeProtocol.ParseCommand($$"""
                 {
-                  "contractVersion": 1,
+                  "contractVersion": 2,
                   "requestId": "request-1",
                   "command": "{{command}}",
                   "payload": {{payload}}

@@ -1,4 +1,5 @@
 using System.IO;
+using ModScope.Deployment;
 using ModScope.Desktop.Contracts;
 using ModScope.LocalKnowledge;
 using ModScope.Query;
@@ -8,6 +9,8 @@ namespace ModScope.Desktop;
 public sealed class DesktopSessionController
 {
     private readonly ILocalKnowledgeQuery _query;
+    private readonly IModDeploymentService _deployment;
+    private readonly IGameLauncher _gameLauncher;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly SemaphoreSlim _analysisGate = new(1, 1);
     private KnowledgeSessionReadModel? _session;
@@ -36,19 +39,39 @@ public sealed class DesktopSessionController
     private RuntimeEvidenceComparisonReadModel? _runtimeComparison;
     private AnalysisOperationUiState _analysisOperation = AnalysisOperationUiState.Idle;
     private IReadOnlyList<DiagnosticUiState> _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
+    private IReadOnlyList<ProfileEditEntryReadModel> _profileEditEntries =
+        Array.Empty<ProfileEditEntryReadModel>();
+    private DeploymentPlan? _deploymentPlan;
+    private string _deploymentStatus = "idle";
+    private bool _canLaunchGame;
+    private IReadOnlyList<DeploymentDiagnostic> _deploymentDiagnostics =
+        Array.Empty<DeploymentDiagnostic>();
 
     internal event EventHandler? OperationStateChanged;
 
     internal KnowledgeOperationUiState CurrentOperation => _operation;
 
     public DesktopSessionController()
-        : this(LocalKnowledgeQueryService.CreateDefault())
+        : this(
+            LocalKnowledgeQueryService.CreateDefault(),
+            new ModDeploymentService(),
+            new SteamGameLauncher())
     {
     }
 
     internal DesktopSessionController(ILocalKnowledgeQuery query)
+        : this(query, new ModDeploymentService(), new SteamGameLauncher())
+    {
+    }
+
+    internal DesktopSessionController(
+        ILocalKnowledgeQuery query,
+        IModDeploymentService deployment,
+        IGameLauncher gameLauncher)
     {
         _query = query ?? throw new ArgumentNullException(nameof(query));
+        _deployment = deployment ?? throw new ArgumentNullException(nameof(deployment));
+        _gameLauncher = gameLauncher ?? throw new ArgumentNullException(nameof(gameLauncher));
     }
 
     public void UseFixture()
@@ -381,6 +404,7 @@ public sealed class DesktopSessionController
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
+        ResetDeploymentState();
         _sourceDiscovery = null;
         _selectedSourceCandidateId = null;
         ClearAnalysis();
@@ -400,6 +424,7 @@ public sealed class DesktopSessionController
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
+        ResetDeploymentState();
         _selectedSourceCandidateId = null;
         ClearAnalysis();
         _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
@@ -432,6 +457,152 @@ public sealed class DesktopSessionController
         {
             EndOperation(operationToken);
             _operationGate.Release();
+        }
+    }
+
+    public async Task<bool> PreviewDeploymentAsync(DeploymentDraft draft)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        ThrowIfAnalysisBusy();
+        await StopBackgroundProfilePreloadAsync();
+        await _operationGate.WaitAsync();
+        try
+        {
+            var source = _query.GetCurrentSource()
+                ?? throw new InvalidOperationException("Load an explicit MO2 source before previewing deployment.");
+            var definition = ToDefinition(source);
+            var plan = await Task.Run(() => _deployment.Preview(definition, draft));
+            _deploymentPlan = plan;
+            _deploymentStatus = plan.CanApply ? "preview-ready" : "blocked";
+            _deploymentDiagnostics = plan.Diagnostics;
+            _canLaunchGame = false;
+            _statusMessage = plan.CanApply
+                ? "Deployment preview is ready for explicit approval."
+                : "Deployment preview is blocked by diagnostics.";
+            return plan.CanApply;
+        }
+        catch (Exception)
+        {
+            _deploymentPlan = null;
+            _deploymentStatus = "blocked";
+            _deploymentDiagnostics = new[]
+            {
+                new DeploymentDiagnostic(
+                    "deployment.preview.failed",
+                    "Deployment preview failed. Review the blocking diagnostics.",
+                    true)
+            };
+            _canLaunchGame = false;
+            _statusMessage = "Deployment preview failed.";
+            return false;
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
+    public async Task<bool> ApplyDeploymentAsync(string planId, bool approved)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(planId);
+        if (!approved)
+        {
+            _deploymentStatus = "blocked";
+            _statusMessage = "Deployment approval was not provided.";
+            return false;
+        }
+
+        ThrowIfAnalysisBusy();
+        await StopBackgroundProfilePreloadAsync();
+        await _operationGate.WaitAsync();
+        try
+        {
+            if (_deploymentPlan is null
+                || !string.Equals(_deploymentPlan.PlanId, planId.Trim(), StringComparison.Ordinal))
+            {
+                _deploymentStatus = "blocked";
+                _statusMessage = "The deployment plan was not found. Preview the current state again.";
+                return false;
+            }
+
+            var plan = _deploymentPlan;
+            var source = _query.GetCurrentSource()
+                ?? throw new InvalidOperationException("Load an explicit MO2 source before applying deployment.");
+            var result = await Task.Run(() => _deployment.Apply(plan));
+            _deploymentDiagnostics = result.Diagnostics;
+            _deploymentStatus = result.Status switch
+            {
+                DeploymentResultStatus.Applied => "applied",
+                DeploymentResultStatus.RecoveryRequired => "recovery-required",
+                _ => "blocked"
+            };
+            _statusMessage = result.Message;
+
+            if (result.Status == DeploymentResultStatus.Applied)
+            {
+                var session = await Task.Run(() => _query.Load(source));
+                ApplyLoadedSession(session, _selectedSourceCandidateId);
+                _deploymentStatus = "applied";
+                _deploymentDiagnostics = result.Diagnostics;
+                _canLaunchGame = true;
+                _deploymentPlan = null;
+                _profileEditEntries = _query.GetCurrentProfileEntries();
+                _statusMessage = result.Message;
+                return true;
+            }
+
+            _deploymentPlan = plan with
+            {
+                Diagnostics = result.Diagnostics
+            };
+            _canLaunchGame = false;
+            return false;
+        }
+        catch (Exception)
+        {
+            _deploymentStatus = "recovery-required";
+            _deploymentDiagnostics = new[]
+            {
+                new DeploymentDiagnostic(
+                    "deployment.apply.failed",
+                    "Deployment apply failed. Review the recovery diagnostics.",
+                    true)
+            };
+            _canLaunchGame = false;
+            _statusMessage = "Deployment apply failed.";
+            return false;
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
+    public bool LaunchGame()
+    {
+        if (!_canLaunchGame)
+        {
+            _statusMessage = "Apply and verify the deployment before launching 7 Days to Die.";
+            return false;
+        }
+
+        try
+        {
+            _gameLauncher.Launch();
+            _statusMessage = "Steam launch requested for 7 Days to Die.";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _deploymentDiagnostics = new[]
+            {
+                new DeploymentDiagnostic(
+                    "game.launch.failed",
+                    $"Steam launch failed: {exception.Message}.",
+                    true)
+            };
+            _statusMessage = "Steam launch failed.";
+            return false;
         }
     }
 
@@ -513,7 +684,12 @@ public sealed class DesktopSessionController
             new LayoutUiState(_contextVisible, _modListVisible),
             _statusMessage,
             _operation,
-            _profileLoadStates);
+            _profileLoadStates,
+            _profileEditEntries,
+            _deploymentPlan,
+            _deploymentStatus,
+            _canLaunchGame,
+            _deploymentDiagnostics);
     }
 
     private async Task<bool> LoadSourceCandidateCoreAsync(
@@ -860,6 +1036,29 @@ public sealed class DesktopSessionController
         }
     }
 
+    private static Mo2SourceDefinition ToDefinition(Mo2SourceInput source)
+    {
+        return new Mo2SourceDefinition(
+            source.InstanceName,
+            source.ProfileName,
+            source.InstanceRootPath,
+            source.ProfilePath,
+            source.ModsPath)
+        {
+            ProfilesPath = source.ProfilesPath,
+            GamePath = source.GamePath
+        };
+    }
+
+    private void ResetDeploymentState()
+    {
+        _profileEditEntries = _query.GetCurrentProfileEntries();
+        _deploymentPlan = null;
+        _deploymentStatus = "idle";
+        _canLaunchGame = false;
+        _deploymentDiagnostics = Array.Empty<DeploymentDiagnostic>();
+    }
+
     private void ApplyProfileSession(KnowledgeSessionReadModel session)
     {
         _session = session;
@@ -870,6 +1069,7 @@ public sealed class DesktopSessionController
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
+        ResetDeploymentState();
         _selectedSourceCandidateId = null;
         ClearAnalysis();
         _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
@@ -917,6 +1117,7 @@ public sealed class DesktopSessionController
         _localContext = null;
         _inspector = null;
         _selectedSourceCandidateId = candidateId;
+        ResetDeploymentState();
         ClearAnalysis();
         _statusMessage = $"Loaded {_candidates.Count} MOD records. Confirm the page identity.";
         _startProfilePreloadAfterOperation = true;

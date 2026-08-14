@@ -5,6 +5,7 @@
     initialState,
     type BridgeErrorPayload,
     type DiagnosticUiState,
+    type DeploymentEntryUiState,
     type HostMessage,
     type ModCandidateUiState,
     type UiState
@@ -30,6 +31,10 @@
   let pageDetailsOpen = false;
   let developerToolsOpen = false;
   let contextMode: 'context' | 'settings' | 'debug' = 'context';
+  let deploymentEditMode = false;
+  let deploymentDraftEntries: DeploymentEntryUiState[] = initialState.deployment.entries;
+  let draggedDeploymentEntryId: string | null = null;
+  let deploymentDragOverEntryId: string | null = null;
   let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
   let operationRailTimer: number | undefined;
@@ -92,6 +97,9 @@
     : null;
   $: operationBlocksInteraction = analysisBusy
     || (state.knowledge.operation.isBusy && !state.knowledge.operation.isBackground);
+  $: if (!deploymentEditMode) {
+    deploymentDraftEntries = state.deployment.entries;
+  }
 
   type DiagnosticGroup = {
     diagnostic: DiagnosticUiState;
@@ -143,6 +151,9 @@
       const addressIsBeingEdited = document.activeElement instanceof HTMLInputElement
         && document.activeElement.classList.contains('toolbar-address');
       state = message.payload;
+      if (state.deployment.status === 'applied') {
+        deploymentEditMode = false;
+      }
       if (!addressIsBeingEdited) {
         address = state.browser.url;
       }
@@ -195,6 +206,9 @@
       'knowledge.selectSource',
       'knowledge.switchProfile',
       'knowledge.useFixture',
+      'deployment.preview',
+      'deployment.apply',
+      'game.launch',
       'analysis.selectBaseData',
       'analysis.selectRuntimeLogs',
       'analysis.useFixture'
@@ -211,7 +225,128 @@
   function switchProfile(event: Event) {
     const profileName = (event.currentTarget as HTMLSelectElement).value;
     if (profileName.length > 0) {
+      deploymentEditMode = false;
       send('knowledge.switchProfile', { profileName });
+    }
+  }
+
+  function startDeploymentEdit() {
+    if (!state.knowledge.session || operationBlocksInteraction) {
+      return;
+    }
+
+    deploymentDraftEntries = state.deployment.entries.map((entry) => ({ ...entry }));
+    deploymentEditMode = true;
+    lastError = null;
+  }
+
+  function cancelDeploymentEdit() {
+    deploymentEditMode = false;
+    deploymentDraftEntries = state.deployment.entries;
+    draggedDeploymentEntryId = null;
+    deploymentDragOverEntryId = null;
+  }
+
+  function toggleDeploymentEntry(entryId: string) {
+    deploymentDraftEntries = deploymentDraftEntries.map((entry) => (
+      entry.entryId === entryId && entry.isEditable
+        ? { ...entry, enabled: !entry.enabled }
+        : entry
+    ));
+  }
+
+  function startDeploymentDrag(event: DragEvent, entry: DeploymentEntryUiState) {
+    if (!entry.isEditable) {
+      event.preventDefault();
+      return;
+    }
+
+    draggedDeploymentEntryId = entry.entryId;
+    deploymentDragOverEntryId = null;
+    event.dataTransfer?.setData('text/plain', entry.entryId);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+    }
+  }
+
+  function allowDeploymentDrop(event: DragEvent, entry: DeploymentEntryUiState) {
+    if (!draggedDeploymentEntryId || !entry.isEditable || entry.entryId === draggedDeploymentEntryId) {
+      return;
+    }
+
+    event.preventDefault();
+    deploymentDragOverEntryId = entry.entryId;
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+  }
+
+  function dropDeploymentEntry(event: DragEvent, targetEntry: DeploymentEntryUiState) {
+    event.preventDefault();
+    const draggedEntryId = draggedDeploymentEntryId;
+    draggedDeploymentEntryId = null;
+    deploymentDragOverEntryId = null;
+
+    if (!draggedEntryId || !targetEntry.isEditable || draggedEntryId === targetEntry.entryId) {
+      return;
+    }
+
+    const editableEntries = deploymentDraftEntries.filter((entry) => entry.isEditable);
+    const draggedIndex = editableEntries.findIndex((entry) => entry.entryId === draggedEntryId);
+    const targetIndex = editableEntries.findIndex((entry) => entry.entryId === targetEntry.entryId);
+    if (draggedIndex < 0 || targetIndex < 0) {
+      return;
+    }
+
+    const [draggedEntry] = editableEntries.splice(draggedIndex, 1);
+    const nextTargetIndex = editableEntries.findIndex((entry) => entry.entryId === targetEntry.entryId);
+    editableEntries.splice(Math.max(0, nextTargetIndex), 0, draggedEntry);
+
+    let editableIndex = 0;
+    deploymentDraftEntries = deploymentDraftEntries.map((entry) => (
+      entry.isEditable ? editableEntries[editableIndex++] : entry
+    ));
+  }
+
+  function endDeploymentDrag() {
+    draggedDeploymentEntryId = null;
+    deploymentDragOverEntryId = null;
+  }
+
+  function previewDeployment() {
+    const profileName = state.knowledge.session?.profileName || state.deployment.profileName;
+    if (!profileName || deploymentDraftEntries.length === 0) {
+      return;
+    }
+
+    send('deployment.preview', {
+      profileName,
+      entries: deploymentDraftEntries
+        .filter((entry) => entry.isEditable)
+        .map((entry, order) => ({
+          modKey: entry.modKey,
+          enabled: entry.enabled,
+          order
+        }))
+    });
+  }
+
+  function applyDeployment() {
+    if (!state.deployment.planId || !state.deployment.canApply) {
+      return;
+    }
+
+    const approved = window.confirm(
+      'Apply the profile and junction changes? ModScope will back up modlist.txt first.'
+    );
+    if (approved) {
+      send('deployment.apply', { planId: state.deployment.planId, approved: true });
+    }
+  }
+
+  function launchGame() {
+    if (state.deployment.canLaunch) {
+      send('game.launch');
     }
   }
 
@@ -710,6 +845,32 @@
     {/if}
 
     {#if state.knowledge.session}
+      <div class="deployment-toolbar" aria-label="Profile deployment controls">
+        {#if deploymentEditMode}
+          <span class="deployment-mode-label">Edit profile</span>
+          <button class="secondary-button" type="button" onclick={cancelDeploymentEdit}>Cancel</button>
+          <button
+            class="secondary-button"
+            type="button"
+            disabled={operationBlocksInteraction}
+            onclick={previewDeployment}
+          >Preview deployment</button>
+        {:else}
+          <button
+            class="secondary-button"
+            type="button"
+            disabled={operationBlocksInteraction}
+            onclick={startDeploymentEdit}
+          >Edit profile</button>
+        {/if}
+        {#if state.deployment.canApply && state.deployment.planId}
+          <button class="primary-button" type="button" onclick={applyDeployment}>Apply</button>
+        {/if}
+        {#if state.deployment.canLaunch}
+          <button class="secondary-button" type="button" onclick={launchGame}>Launch 7DTD</button>
+        {/if}
+      </div>
+
       <label class="mod-list-profile-picker">
         <span>Profile</span>
         <select
@@ -733,6 +894,77 @@
         <span>Unresolved <strong>{unresolvedProfileCandidates.length}</strong></span>
       </div>
 
+      {#if deploymentEditMode}
+        <div class="mod-list-scroll" aria-label="Edit active profile MOD list">
+          <div class="mod-list-section-label">EDIT PROFILE ORDER · {deploymentDraftEntries.length}</div>
+          <p class="subtle deployment-help">
+            Use + to enable a MOD. Use − to disable a MOD. Drag MOD rows to change priority.
+          </p>
+          <div class="mod-list-items deployment-edit-list">
+            {#each deploymentDraftEntries as entry (entry.entryId)}
+              {#if entry.isSeparator}
+                <div class="deployment-separator" aria-label="Profile separator">{entry.modKey}</div>
+              {:else}
+                <article
+                  class="mod-list-item deployment-edit-item"
+                  class:mod-list-item-disabled={!entry.enabled}
+                  class:deployment-drag-over={deploymentDragOverEntryId === entry.entryId}
+                  draggable={entry.isEditable}
+                  ondragstart={(event) => startDeploymentDrag(event, entry)}
+                  ondragover={(event) => allowDeploymentDrop(event, entry)}
+                  ondrop={(event) => dropDeploymentEntry(event, entry)}
+                  ondragend={endDeploymentDrag}
+                >
+                  <span class="deployment-drag-handle" aria-hidden="true">☷</span>
+                  <div class="deployment-edit-main">
+                    <strong>{entry.modKey}</strong>
+                    {#if entry.priority !== null && entry.priority !== undefined}
+                      <span>priority {entry.priority}</span>
+                    {/if}
+                  </div>
+                  <button
+                    class="deployment-toggle-button"
+                    type="button"
+                    aria-label={entry.enabled ? `Disable ${entry.modKey}` : `Enable ${entry.modKey}`}
+                    disabled={!entry.isEditable}
+                    onclick={() => toggleDeploymentEntry(entry.entryId)}
+                  >{entry.enabled ? '−' : '+'}</button>
+                </article>
+              {/if}
+            {/each}
+          </div>
+
+          {#if deploymentDraftEntries.length === 0}
+            <p class="empty-state">No editable MOD entry is available in this profile.</p>
+          {/if}
+
+          {#if state.deployment.status !== 'idle' || state.deployment.diagnostics.length > 0}
+            <section class="deployment-status-card" aria-live="polite">
+              <div class="deployment-status-heading">
+                <strong>Deployment {formatLabel(state.deployment.status)}</strong>
+                {#if state.deployment.planId}<span>{state.deployment.planId.slice(0, 8)}</span>{/if}
+              </div>
+              {#if state.deployment.modChanges.length > 0}
+                <div class="deployment-change-summary">
+                  {#each state.deployment.modChanges as change}
+                    <span>{change.modKey}: {change.beforeEnabled ? '+' : '−'} → {change.afterEnabled ? '+' : '−'}</span>
+                  {/each}
+                </div>
+              {/if}
+              {#if state.deployment.junctionChanges.length > 0}
+                <div class="deployment-change-summary">
+                  {#each state.deployment.junctionChanges as change}
+                    <span>{formatLabel(change.action)}: {change.targetName}</span>
+                  {/each}
+                </div>
+              {/if}
+              {#each state.deployment.diagnostics as diagnostic}
+                <p class="deployment-diagnostic">{diagnostic.code}: {diagnostic.message}</p>
+              {/each}
+            </section>
+          {/if}
+        </div>
+      {:else}
       <div class="mod-list-scroll" aria-label="Active profile MOD list">
         {#if profileCandidates.length > 0}
           <div class="mod-list-section-label">PROFILE MODLIST · {profileCandidates.length}</div>
@@ -836,6 +1068,7 @@
           {/if}
         </details>
       </div>
+      {/if}
     {:else}
       <div class="mod-list-empty-state">
         <span class="eyebrow">LOCAL MODS</span>

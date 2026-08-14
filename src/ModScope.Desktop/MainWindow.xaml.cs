@@ -910,6 +910,37 @@ public partial class MainWindow : Window
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
+            case "deployment.preview":
+            {
+                var payload = BridgeProtocol.ReadPayload<DeploymentPreviewPayload>(command.Payload);
+                var draft = new ModScope.Deployment.DeploymentDraft(
+                    payload.ProfileName,
+                    payload.Entries
+                        .Select(entry => new ModScope.Deployment.DeploymentEntryDraft(
+                            entry.ModKey,
+                            entry.Enabled,
+                            entry.Order))
+                        .ToList()
+                        .AsReadOnly());
+                var previewTask = _controller.PreviewDeploymentAsync(draft);
+                SendState(targetWebView: sourceWebView);
+                await previewTask;
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "deployment.apply":
+            {
+                var payload = BridgeProtocol.ReadPayload<DeploymentApplyPayload>(command.Payload);
+                var applyTask = _controller.ApplyDeploymentAsync(payload.PlanId, payload.Approved);
+                SendState(targetWebView: sourceWebView);
+                await applyTask;
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "game.launch":
+                _controller.LaunchGame();
+                SendState(command.RequestId, sourceWebView);
+                break;
             default:
                 throw new BridgeProtocolException($"Unhandled bridge command: {command.Command}.");
         }

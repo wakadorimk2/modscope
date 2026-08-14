@@ -17,7 +17,7 @@ public sealed class BridgeProtocolException : Exception
 
 public static class BridgeProtocol
 {
-    public const int ContractVersion = 1;
+    public const int ContractVersion = 2;
     public const string AppHostOrigin = "https://appassets.modscope";
 
     private static readonly HashSet<string> KnownCommands = new(StringComparer.Ordinal)
@@ -42,6 +42,9 @@ public static class BridgeProtocol
         "knowledge.switchProfile",
         "identity.confirm",
         "inspector.open",
+        "deployment.preview",
+        "deployment.apply",
+        "game.launch",
         "analysis.selectBaseData",
         "analysis.selectRuntimeLogs",
         "analysis.analyzeConflicts",
@@ -212,6 +215,19 @@ public sealed record CompareRuntimeEvidencePayload(
 
 public sealed record SwitchProfilePayload(string ProfileName);
 
+public sealed record DeploymentEntryPayload(
+    string ModKey,
+    bool Enabled,
+    int Order);
+
+public sealed record DeploymentPreviewPayload(
+    string ProfileName,
+    IReadOnlyList<DeploymentEntryPayload> Entries);
+
+public sealed record DeploymentApplyPayload(
+    string PlanId,
+    bool Approved);
+
 public sealed record SetContextVisiblePayload(bool Visible);
 
 public sealed record SetModListVisiblePayload(bool Visible);
@@ -337,6 +353,7 @@ public sealed record SourceCandidateUiState(
     string ProfileName,
     string Readiness,
     bool IsReady,
+    bool GameTargetReady,
     IReadOnlyList<string> Evidence,
     IReadOnlyList<DiagnosticUiState> Diagnostics);
 
@@ -549,6 +566,36 @@ public sealed record AnalysisUiState(
     AnalysisOperationUiState Operation,
     IReadOnlyList<DiagnosticUiState> Diagnostics);
 
+public sealed record DeploymentEntryUiState(
+    string EntryId,
+    string ModKey,
+    bool Enabled,
+    int? Priority,
+    bool IsSeparator,
+    bool IsEditable);
+
+public sealed record DeploymentModChangeUiState(
+    string ModKey,
+    bool BeforeEnabled,
+    bool AfterEnabled,
+    int BeforeOrder,
+    int AfterOrder);
+
+public sealed record DeploymentJunctionChangeUiState(
+    string Action,
+    string TargetName);
+
+public sealed record DeploymentUiState(
+    string Status,
+    string ProfileName,
+    IReadOnlyList<DeploymentEntryUiState> Entries,
+    string? PlanId,
+    bool CanApply,
+    bool CanLaunch,
+    IReadOnlyList<DeploymentModChangeUiState> ModChanges,
+    IReadOnlyList<DeploymentJunctionChangeUiState> JunctionChanges,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
 public sealed record LayoutUiState(bool ContextVisible, bool ModListVisible);
 
 public sealed record UiState(
@@ -560,6 +607,7 @@ public sealed record UiState(
     LocalContextUiState? LocalContext,
     InspectorUiState? Inspector,
     AnalysisUiState Analysis,
+    DeploymentUiState Deployment,
     LayoutUiState Layout,
     string StatusMessage,
     IReadOnlyList<DiagnosticUiState> Diagnostics);

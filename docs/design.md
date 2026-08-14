@@ -7,7 +7,7 @@
 現在のリポジトリはLocal Knowledge基盤とGUI縦切りの実装フェーズです。
 Local KnowledgeとQueryはC# / .NET 8で実装します。
 DesktopはWPF / .NET 10で実装します。
-独自Browser engine、CLI、MO2 writeは実装しません。
+独自Browser engine、CLI、任意のMO2管理操作は実装しません。Phase 7では、controlled write planeだけを実装します。
 
 v0.1は、AI用index単体ではありません。7DTD + MO2のLocal Mod Knowledgeと、最小のBrowse → Recognize → Local awareness → Inspectを検証するvertical sliceです。
 
@@ -97,7 +97,7 @@ MO2は、installation、enable / disable、priority、profile、virtual filesyst
 
 ModScopeは、MO2を置き換えません。初期段階ではMO2をread-onlyで読み取ります。
 
-将来のMO2操作は、read layerから独立したwrite layerに置きます。write layerを追加する場合も、Mod Manager全体を作りません。
+MO2操作は、read layerから独立したwrite layerに置きます。Phase 7のwrite planeはprofileの`modlist.txt`と、7DTD game rootの管理junctionだけを対象にします。Mod Manager全体は作りません。
 
 ### 5.2 Browsingがprimary surfaceである理由
 
@@ -129,7 +129,7 @@ MODの発見と評価は、MOD一覧から始まるとは限りません。ラ�
 - 初期画面の高密度Mod一覧
 - v0.1での完全なsemantic conflict判定
 - v0.1でのRuntimeOCD連携
-- v0.1でのMO2 write
+- 任意のMO2管理操作と、未承認のMO2 write
 - MO2設定にない外部profile pathの探索
 - v0.1での複数Site Adapter
 
@@ -160,9 +160,12 @@ Runtime evidence
   -> separate runtime evidence
   -> comparison layer
 
-Optional future write plane
+Controlled write plane
+  -> deployment.preview
   -> explicit approval
-  -> MO2 operation
+  -> deployment.apply
+  -> modlist backup / junction transaction / verification
+  -> optional Steam launch
 ```
 
 各矢印は責務境界を示します。
@@ -598,11 +601,13 @@ Read planeはMO2 sourceを変更しません。
 
 ### Write plane
 
-Write planeは、将来必要性が確認できた場合だけ追加します。
+Phase 7のwrite planeは、次の限定された操作だけを扱います。
 
-候補はenable / disable、reorder、profile変更です。
+- 選択profileの`modlist.txt`のenabled状態と順序
+- MO2 `modsPath`の実MOD rootを指す、Steam game rootの`Mods`配下のjunction
+- Apply成功後のSteam URI起動
 
-実装する場合は、次を必須にします。
+実装には、次を必須にします。
 
 - read planeからの独立
 - dry-run
@@ -611,6 +616,14 @@ Write planeは、将来必要性が確認できた場合だけ追加します。
 - ユーザーの明示承認
 - 失敗時の復旧方針
 - MO2の実仕様に基づく検証
+
+`General.gamePath`はMO2の`ModOrganizer.ini`から読み取ります。Steam libraryの全探索は行いません。絶対GamePathはfrontendへ渡しません。
+
+Apply前にMO2または7DTDの実行中processを確認します。実行中の場合は停止せずblockします。
+
+Applyは、profile、MO2 source、game `Mods`の再読、timestamp付き`modlist.txt` backup、junction差分、target検証、一時ファイル置換、再読検証、rollbackを行います。rollbackが失敗した場合は`recovery-required`を返します。
+
+ModScopeが管理したjunctionだけを削除します。既存junctionは、選択中MO2 `modsPath`の既知MOD rootへ解決できる場合だけmanifestへ採用します。実folder、foreign junction、重複MOD名、path衝突はblockします。
 
 ## 15. v0.1 scope
 
@@ -638,7 +651,8 @@ Write planeは、将来必要性が確認できた場合だけ追加します。
 - 複数game対応
 - 完全なsemantic conflict判定
 - RuntimeOCD連携
-- MO2へのwrite
+- 任意のMO2管理操作
+- controlled write plane外のMO2へのwrite
 - MO2管理操作を持つ高密度Mod Manager UI
 - 特定AI製品への専用統合
 - agent Web backendの固定
@@ -895,9 +909,24 @@ Compareは確認済みcandidate MODに絞り、Diagnosisはactive profile全体�
 Phase4 synthetic fixtureとPhase6 RuntimeOCD logをDesktop outputへpackし、Developer toolsから再現できます。
 MO2 write、AI chat、MCP、browser engine変更、browser syncは実装しません。
 
-### Phase 7：controlled write
+### Phase 7：controlled write（実装）
 
-必要性が確認できた場合に、dry-runと明示承認付きのMO2操作を追加します。
+Phase 7は、Controlled profile edit、junction deploy、Steam起動のvertical sliceです。
+
+- `src/ModScope.Deployment/`がread planeから独立したwrite planeです。
+- `DeploymentDraft`はprofile識別子、MOD key、enabled状態、順序だけを持ちます。
+- `DeploymentPlan`はplan ID、modlist差分、junction差分、source/profile/game fingerprint、blocking diagnosticを持ちます。
+- `IModDeploymentService.Preview`は実ディスクを再読してplanを作ります。
+- `IModDeploymentService.Apply`はplan IDと明示承認を要求します。
+- `DeploymentResult`は`Applied`、`Blocked`、`RecoveryRequired`を返します。
+- profileのcomment、空行、separator、未知行は`modlist.txt`のraw lineとして保持します。
+- junctionの所有情報はModScope派生manifestに保存します。
+- game rootはMO2 `ModOrganizer.ini`の`General.gamePath`から解決します。
+- frontendへGamePath、MO2 path、LocalModSnapshotを渡しません。
+- `game.launch`はpayloadを持たず、成功したApply後だけ有効です。
+- Steam URIは`steam://rungameid/251570`に固定します。
+
+Phase 7の実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施します。実行中MO2または7DTDを停止しません。
 
 ### Phase 8：Game Adapter拡張
 
@@ -923,7 +952,11 @@ MO2 write、AI chat、MCP、browser engine変更、browser syncは実装しま�
 - Inspectorからlocal metadata、files、XML reference、diagnosticへ進める
 - WPF + WebView2のDesktop appでBrowse、Observe、identity confirmation、Local context、Inspectorを実行できる
 - GUIがQuery layerのprojectionだけを利用する
-- MO2 sourceを変更しない
+- MO2のMOD本体を変更しない
+- controlled Applyで、選択profileの`modlist.txt`と管理junctionだけを明示承認付きで変更できる
+- Apply失敗時にrollbackまたは`recovery-required`を返す
+- Apply成功後だけ固定Steam URIを起動できる
+- GamePathの絶対値をfrontendへ渡さない
 - Codex、特定Site Adapter、特定agent backendへ依存しない
 
 ### v0.1以降
@@ -933,7 +966,7 @@ MO2 write、AI chat、MCP、browser engine変更、browser syncは実装しま�
 - Runtime evidenceをstatic evidenceと区別して比較できる
 - Site Adapterを追加してもgeneric page observationを壊さない
 - GUIがquery layerの派生データだけを利用する
-- write planeをread planeから分離できる
+- write planeをread planeから分離できる（Phase 7で実装）
 - 7DTD固有解析を壊さずにGame Adapterを追加できる
 
 ## 24. Web UI presentation layer
@@ -984,7 +1017,7 @@ profile selectorはpending、loading、ready、failedを表示します。
 
 Web frontendとDesktop hostはWebView2 WebMessageを使います。
 
-JSON contract versionは'1'です。
+JSON contract versionは'2'です。
 JSON propertyはcamelCaseです。
 日時はUTC ISO-8601です。
 
@@ -1009,6 +1042,9 @@ frontendからhostへ送るcommandは次です。
 - knowledge.switchProfile
 - identity.confirm
 - inspector.open
+- deployment.preview
+- deployment.apply
+- game.launch
 - analysis.selectBaseData
 - analysis.selectRuntimeLogs
 - analysis.analyzeConflicts
@@ -1041,6 +1077,10 @@ reparse pointと、MO2設定にない暗黙のglobal pathは読み取りませ�
 `profiles` directoryがない場合は、現在のexplicit profileだけを候補にします。
 Profile switchは新しいsnapshotをread-onlyで生成します。
 Profile pathの絶対値はfrontendへ送信しません。
+`deployment.preview`はdraftを受け取り、hostが実ディスクを再読します。
+`deployment.apply`はplan IDと明示承認を受け取ります。
+`game.launch`はpayloadを持ちません。
+Source candidateにはGamePathの絶対値を渡さず、ゲーム対象の準備状態だけを渡します。
 
 ### 24.3.2 Phase6 analysis bridge and display rules
 

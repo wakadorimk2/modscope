@@ -175,6 +175,28 @@ button:disabled {
   background: rgba(14, 116, 144, 0.14);
 }
 
+.deployment-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.deployment-toolbar .primary-button,
+.deployment-toolbar .secondary-button {
+  padding: 6px 9px;
+  font-size: 11px;
+}
+
+.deployment-mode-label {
+  margin-right: auto;
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .sidebar-count-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   flex: 0 0 auto;
@@ -211,6 +233,120 @@ button:disabled {
   display: grid;
   gap: 3px;
   margin-top: 5px;
+}
+
+.deployment-help {
+  margin: 7px 0 0;
+  font-size: 11px;
+}
+
+.deployment-edit-list {
+  margin-top: 8px;
+}
+
+.deployment-edit-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: grab;
+}
+
+.deployment-edit-item:active {
+  cursor: grabbing;
+}
+
+.deployment-drag-over {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.24);
+}
+
+.deployment-drag-handle {
+  flex: 0 0 16px;
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1;
+  text-align: center;
+}
+
+.deployment-edit-main {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.deployment-edit-main strong {
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-edit-main span {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.deployment-toggle-button {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  border-radius: 7px;
+  background: rgba(14, 116, 144, 0.2);
+  color: #bae6fd;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.deployment-separator {
+  padding: 5px 7px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.deployment-status-card {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 9px;
+  border: 1px solid rgba(56, 189, 248, 0.26);
+  border-radius: 8px;
+  background: rgba(14, 116, 144, 0.12);
+}
+
+.deployment-status-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #bae6fd;
+  font-size: 11px;
+}
+
+.deployment-status-heading span {
+  color: #64748b;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+}
+
+.deployment-change-summary {
+  display: grid;
+  gap: 3px;
+  color: #cbd5e1;
+  font-size: 10px;
+}
+
+.deployment-diagnostic {
+  margin: 0;
+  color: #fbbf24;
+  font-size: 10px;
 }
 
 .profile-count-summary {

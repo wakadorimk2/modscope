@@ -55,6 +55,10 @@ public interface ILocalKnowledgeQuery
         RuntimeOcdEvidenceInput runtimeEvidence,
         RuntimeEvidenceComparisonQuery? query = null,
         CancellationToken cancellationToken = default);
+
+    Mo2SourceInput? GetCurrentSource();
+
+    IReadOnlyList<ProfileEditEntryReadModel> GetCurrentProfileEntries();
 }
 
 public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
@@ -132,7 +136,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             candidate.Source.ProfilePath,
             candidate.Source.ModsPath)
         {
-            ProfilesPath = candidate.Source.ProfilesPath
+            ProfilesPath = candidate.Source.ProfilesPath,
+            GamePath = candidate.Source.GamePath
         };
         var session = Load(source, cancellationToken, progress);
         TryWritePreference(source);
@@ -149,7 +154,10 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
         var snapshot = _snapshotReader.Read(definition, cancellationToken, progress);
         var profiles = _snapshotReader.ListProfiles(definition, cancellationToken);
 
-        _source = source;
+        _source = source with
+        {
+            GamePath = definition.GamePath
+        };
         _snapshot = snapshot;
         _profiles = OrderProfiles(profiles, snapshot.ProfileName);
         _profileSnapshots.Clear();
@@ -171,6 +179,33 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
                 snapshot.ProfileEntries.FirstOrDefault(entry =>
                     string.Equals(entry.NormalizedModName, mod.DirectoryName, StringComparison.OrdinalIgnoreCase)),
                 roles[mod.ModKey]))
+            .ToList()
+            .AsReadOnly();
+    }
+
+    public Mo2SourceInput? GetCurrentSource()
+    {
+        return _source;
+    }
+
+    public IReadOnlyList<ProfileEditEntryReadModel> GetCurrentProfileEntries()
+    {
+        if (_snapshot is null)
+        {
+            return Array.Empty<ProfileEditEntryReadModel>();
+        }
+
+        return _snapshot.ProfileEntries
+            .Where(entry => entry.NormalizedModName is not null)
+            .OrderBy(entry => entry.Priority ?? int.MaxValue)
+            .ThenBy(entry => entry.SourceLineNumber)
+            .Select(entry => new ProfileEditEntryReadModel(
+                $"line-{entry.SourceLineNumber}",
+                entry.NormalizedModName!,
+                entry.EnabledState.ToString(),
+                entry.Priority,
+                entry.NormalizedModName!.EndsWith("_separator", StringComparison.OrdinalIgnoreCase),
+                QueryProjection.Diagnostics(entry.Diagnostics)))
             .ToList()
             .AsReadOnly();
     }
@@ -849,7 +884,9 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             source.ProfilePath,
             source.ModsPath)
         {
-            ProfilesPath = source.ProfilesPath
+            ProfilesPath = source.ProfilesPath,
+            GamePath = source.GamePath
+                ?? Mo2SourceDiscovery.ReadConfiguredGamePath(source.InstanceRootPath)
         };
     }
 
@@ -877,6 +914,7 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
                     candidate.Source.ProfileName,
                     candidate.Readiness.ToString(),
                     candidate.Readiness == Mo2SourceCandidateReadiness.Ready,
+                    IsGameTargetReady(candidate.Source.GamePath),
                     candidate.Evidence
                         .Select(evidence => $"{evidence.Kind}:{evidence.EvidenceKind}")
                         .ToList()
@@ -884,6 +922,13 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
                     QueryProjection.Diagnostics(candidate.Diagnostics)))
                 .ToList()
                 .AsReadOnly());
+    }
+
+    private static bool IsGameTargetReady(string? gamePath)
+    {
+        return !string.IsNullOrWhiteSpace(gamePath)
+            && Directory.Exists(gamePath)
+            && File.Exists(Path.Combine(gamePath, "7DaysToDie.exe"));
     }
 
     private void TryWritePreference(Mo2SourceInput source)
