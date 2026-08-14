@@ -940,6 +940,11 @@ Phase 7は、Controlled profile edit、junction deploy、Steam起動のvertical 
 - frontendへGamePath、MO2 path、LocalModSnapshotを渡しません。
 - `game.launch`はpayloadを持たず、成功したApply後だけ有効です。
 - Steam URIは`steam://rungameid/251570`に固定します。
+- Preview完了後は中央BrowserへDeployment preview tabを開きます。
+- 左ペインは変更件数を表示し、全変更とApply確認はDeployment preview tabへ集約します。
+- Web frontendは`window.confirm`を使いません。
+- 編集中のMOD rowは、左側のdrag handleと`+/-`を近接配置します。
+- ドラッグ中はeditable MODの間に差し込みラインを表示します。
 
 Phase 7の実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検証後に実施します。実行中MO2または7DTDを停止しません。
 
@@ -998,19 +1003,20 @@ Phase 7の実環境owner Playcheckは、匿名fixtureとMO2一時コピーの検
 - Contracts projectはQuery projectを参照しません。
 - Desktop hostだけがQuery modelをUI contractへ変換します。
 
-### 24.2 Three WebView2 surfaces
+### 24.2 WebView2 surfaces
 
 Desktopは4つのWebView2を、Global Browser chrome + MOD list + Content / Contextとして配置します。
 
 - Toolbar WebView2：全幅のnavigation、Home、tabs、history、pane icon
 - ModList WebView2：active profileのMOD一覧、profile selector、profile preload state
-- Browser WebView2：ユーザーが閲覧する外部Web page
+- Browser WebView2：ユーザーが閲覧する外部Web page、または内部Deployment preview tab
 - Context WebView2：Local context、例外確認、Developer tools、Inspector
 
 Toolbar、ModList、Contextは、同じfrontend bundleをsurface query付きで読み込みます。
 Toolbarは`?surface=toolbar`を使用します。
 ModListは`?surface=mod-list`を使用します。
 Contextは`?surface=context`を使用します。
+Deployment preview tabは`?surface=deployment-preview`を使用します。
 
 任意サイトをfrontendのiframeへ移しません。
 Browser WebView2へWPF panelを重ねません。
@@ -1070,7 +1076,7 @@ frontendからhostへ送るcommandは次です。
 - layout.setToolbarExpanded
 
 hostからfrontendへ送るmessageは、state、error、readyです。
-Toolbar、ModList、Contextの各App WebViewへ同じmessageをbroadcastします。
+Toolbar、ModList、Context、Deployment previewの各App WebViewへ同じmessageをbroadcastします。
 stateはUI stateの完全なsnapshotです。
 
 Hostは次を検証します。
@@ -1176,7 +1182,7 @@ Historyはbounded metadataとしてURL、title、訪問時刻だけを保存し�
 page本文、raw observation、absolute path、cookie、認証情報は保存しません。
 URL直接入力は通常Toolbarに置きます。http、https、file、aboutのabsolute URLだけを受け付けます。
 
-Bridge contract versionは`1`を維持します。
+Bridge contract versionは`2`を維持します。
 Browser tab、History、active tab、MOD roleのstateは既存stateへ追加します。
 `browser.newTab`、`browser.selectTab`、`browser.closeTab`、`browser.home`、`browser.history`、`browser.selectHistory`はactive tabへ適用します。
 Desktop hostはbrowser persistenceをlocal metadataへ限定します。
@@ -1184,6 +1190,11 @@ Historyは新しいBrowser tabの`about:history`ページとして生成しま�
 History pageはURL、title、訪問時刻だけをHTML encodeして表示します。
 History pageのentry linkは通常の`http` / `https` navigationとしてactive tabへ適用します。
 `about:history`はlast pageとして復元できます。
+Deployment previewは`about:deployment-preview`の内部Browser tabとして生成します。
+Deployment previewは既存Svelte bundleを読み込み、要約、検索、折りたたみ詳細、画面内Apply確認を表示します。
+Deployment preview tabはbrowser persistenceへ保存しません。
+Deployment preview tabは初期state取得の`frontend.ready`と、activeな内部tabからの既存`deployment.apply`だけを受け付けます。
+外部Web pageからDeployment commandは受け付けません。
 page本文、raw observation、absolute path、cookie、認証情報はHistoryへ保存しません。
 `layout.setToolbarExpanded`は互換性のため残しますが、History操作は使用しません。
 MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません。
