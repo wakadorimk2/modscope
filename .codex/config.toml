@@ -1,2 +1,6 @@
 [plugins."waka-dev-workbench@personal".mcp_servers.blender]
 enabled = false
+
+[mcp_servers.serena]
+command = "serena"
+args = ["start-mcp-server", "--context=codex", "--project-from-cwd"]
