@@ -1159,6 +1159,12 @@ operation stateは既存`OperationStateChanged`を使い、UiStateとbridge cont
 History展開時のToolbar高さは440pxです。
 `layout.setToolbarExpanded`を再利用し、Browser engineとWebView2構成は変更しません。
 
+ToolbarはChrome darkのtabstripとnavigation rowへ分離します。
+active tabは明るいsurfaceと丸い上端で表示し、inactive tabは透明背景と控えめなhoverで表示します。
+new tab buttonはtab listの末尾へ置き、tabと一緒に横スクロールします。
+navigation rowのURL入力はomniboxとして表示し、Goはcompactな`↵` iconで表示します。
+History、MOD list、Context、shortcut hintは右側のaction groupへまとめます。
+
 ModListはModScope viewの固定順序だけを表示します。
 順序は`Foundation`、`Compatibility`、`Content`、`Unknown`です。
 分類内はMO2 priority、同順位はMOD keyで決定します。

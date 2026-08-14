@@ -475,9 +475,17 @@ background profile preloadは表示対象にしません。
 overlayはprofile名、operation phase、completed / totalまたはindeterminate progressを表示し、loading中のclient area操作を無効にします。
 成功後は自動で閉じ、失敗時は既存diagnosticを表示します。
 
-Toolbarは96pxのChrome型2段構成にします。
-上段はtab strip、active tab、tab close、new tabです。
-下段はback、forward、reload、home、URL入力、Go、History、pane icon、shortcut hintです。
+Toolbarは96pxのChrome dark 2段構成にします。
+上段は濃いtabstripです。
+active tabは明るいsurfaceと丸い上端で表示します。
+inactive tabは透明背景と控えめなhoverで表示します。
+tab全体をpillにはしません。
+tab直後のnew tab buttonはtab listの末尾に置き、tabと一緒に横スクロールします。
+下段はnavigation rowです。
+back、forward、reload、homeは左側のcontrol groupへまとめます。
+URL入力は中央のomniboxとして表示します。
+Goはcompactな`↵` iconで表示します。
+History、pane icon、shortcut hintは右側のaction groupへまとめます。
 History展開時は440pxへ拡張します。
 既存のWebView2、Browser command、`layout.setToolbarExpanded`を維持します。
 
