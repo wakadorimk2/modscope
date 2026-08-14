@@ -16,7 +16,8 @@ public sealed class BridgeProtocolTests
               "requestId": "request-1",
               "command": "browser.navigate",
               "payload": {
-                "url": "https://example.test/mod"
+                "url": "https://www.nexusmods.com/7daystodie/search/?gsearch=Alpha",
+                "nexusSearchName": "Alpha Mod"
               }
             }
             """);
@@ -26,7 +27,39 @@ public sealed class BridgeProtocolTests
         Assert.Equal(1, envelope.ContractVersion);
         Assert.Equal("request-1", envelope.RequestId);
         Assert.Equal("browser.navigate", envelope.Command);
+        Assert.Equal("https://www.nexusmods.com/7daystodie/search/?gsearch=Alpha", payload.Url);
+        Assert.Equal("Alpha Mod", payload.NexusSearchName);
+    }
+
+    [Fact]
+    public void ParseLegacyNavigatePayloadLeavesNexusSearchNameNull()
+    {
+        var envelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 1,
+              "requestId": "request-legacy",
+              "command": "browser.navigate",
+              "payload": {
+                "url": "https://example.test/mod"
+              }
+            }
+            """);
+
+        var payload = BridgeProtocol.ReadPayload<NavigatePayload>(envelope.Payload);
+
         Assert.Equal("https://example.test/mod", payload.Url);
+        Assert.Null(payload.NexusSearchName);
+    }
+
+    [Fact]
+    public void SerializeNavigatePayloadUsesCamelCaseSearchName()
+    {
+        var json = JsonSerializer.Serialize(
+            new NavigatePayload("https://example.test/search", "Alpha Mod"),
+            BridgeProtocol.JsonOptions);
+
+        Assert.Contains("\"nexusSearchName\":\"Alpha Mod\"", json);
     }
 
     [Fact]

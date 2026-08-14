@@ -496,10 +496,15 @@ Historyはpopupではなく新しいBrowser tabの`about:history`ページとし
 同じ分類内ではMO2 priorityとMOD keyの決定的な順序を使います。
 
 MOD URLは有効なModInfo Websiteを`Verified`として最優先します。
-欠落または無効なWebsiteは、MOD名から7DTD Nexusのslug URLを`Inferred`として作ります。
-slugを作れない場合はNexus検索URLへfallbackします。
+欠落または無効なWebsiteは、MOD名から7DTD Nexus検索URLを`Inferred`として作ります。
+検索結果から数値IDのMODリンクを抽出し、検索名と正規化後に完全一致する候補が1件だけの場合に正規ページへ遷移します。
+一致しない場合、複数候補の場合、検索結果を解析できない場合は検索ページを表示したままにします。
 URLを作れないMODは`No usable URL`としてクリック不可で表示します。
-推定URLはページの存在確認ではありません。
+検索結果の最上位候補は自動採用しません。
+Verified Websiteの404はdiagnosticとして扱い、自動検索へ変更しません。
+
+`nexusSearchName`は`browser.navigate`にだけ付く一時的なnavigation intentです。
+これはUiState、History metadata、Local Knowledgeへ保存しません。
 
 ### Phase 6.8：ロード遮断、Chrome palette、History page（完了）
 
@@ -519,6 +524,16 @@ History buttonはpopupを開かず、新しいBrowser tabを開きます。
 新しいtabのtitleは`History`で、内部URLは`about:history`です。
 History pageはDesktop hostが生成し、URL、title、訪問時刻だけを表示します。
 History metadataはbounded local dataとして保存し、page本文、raw observation、absolute path、cookie、認証情報は保存しません。
+
+### Phase 6.9：Nexus検索によるMODページ解決（完了）
+
+推定MOD URLは7DTD Nexus検索を起点にします。
+Desktop hostは同一Nexus hostの`/7daystodie/mods/{numericId}`リンクだけを候補にします。
+検索名とリンク表示名を正規化し、完全一致が1件だけの場合に数値IDページへ遷移します。
+空、曖昧、解析不能な検索結果は検索ページに残します。
+手入力のNexus検索は自動解決しません。
+Verified Websiteの404はBrowser diagnosticとして保持します。
+検索結果解析用のnavigation intentはUiStateと永続データへ公開しません。
 
 ### Phase 7：Controlled write
 

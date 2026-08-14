@@ -415,17 +415,8 @@
   type ModWebsiteLink = {
     url: string | null;
     status: 'Verified' | 'Inferred' | 'No usable URL';
+    nexusSearchName?: string;
   };
-
-  function slugifyModName(value: string): string {
-    return value
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/&/g, ' and ')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
 
   function resolveModWebsite(candidate: ModCandidateUiState): ModWebsiteLink {
     if (isWebsiteUrl(candidate.website)) {
@@ -439,17 +430,10 @@
       return { url: null, status: 'No usable URL' };
     }
 
-    const slug = slugifyModName(name);
-    if (slug) {
-      return {
-        url: `https://www.nexusmods.com/7daystodie/mods/${slug}`,
-        status: 'Inferred'
-      };
-    }
-
     return {
       url: `https://www.nexusmods.com/7daystodie/search/?gsearch=${encodeURIComponent(name)}`,
-      status: 'Inferred'
+      status: 'Inferred',
+      nexusSearchName: name
     };
   }
 
@@ -475,7 +459,10 @@
     }
 
     closeModSearch();
-    send('browser.navigate', { url: website.url });
+    send('browser.navigate', {
+      url: website.url,
+      ...(website.nexusSearchName ? { nexusSearchName: website.nexusSearchName } : {})
+    });
   }
 
   function chooseModForRecognition(candidate: ModCandidateUiState) {
