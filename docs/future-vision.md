@@ -453,6 +453,8 @@ lampは`Running`、`Not assessed`、`Assessed`、`Issue`を文字とtooltipで�
 InspectorはContext WebView内の置換modeです。
 固定overlayと背景backdropは使いません。
 結論を先に表示し、static evidence、runtime evidence、raw XML、patch operation、raw diagnosticは折りたたみます。
+FilesはInspectorの初期状態で閉じ、展開時だけ全ファイルを表示します。
+Mod Roleはrole chip、assessment chip、短い`Reason:`要約だけを表示し、詳細reasonとrole evidenceは展開表示します。
 Back to Contextで通常Contextへ戻ります。
 profile、MO2 source、analysis inputの変更時は古いInspector表示を閉じます。
 Runtime comparisonの実行導線はDebugへ残します。

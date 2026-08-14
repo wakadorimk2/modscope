@@ -23,6 +23,7 @@
   let inspectorView: 'mod' | 'diagnosis' = 'mod';
   let inspectorModKey: string | null = null;
   let dismissedInspectorModKey: string | null = null;
+  let inspectorFilesOpen = false;
   let modSearchOpen = false;
   let modSearchMode: 'browse' | 'recognition' = 'browse';
   let modSearchQuery = '';
@@ -152,6 +153,9 @@
       lastError = null;
       if (surface === 'context' && state.inspector?.modKey) {
         if (state.inspector.modKey !== dismissedInspectorModKey) {
+          if (state.inspector.modKey !== inspectorModKey) {
+            inspectorFilesOpen = false;
+          }
           contextPanelMode = 'inspector';
           inspectorView = 'mod';
           inspectorModKey = state.inspector.modKey;
@@ -322,6 +326,7 @@
     inspectorView = 'mod';
     inspectorModKey = modKey;
     dismissedInspectorModKey = null;
+    inspectorFilesOpen = false;
     contextPanelMode = 'inspector';
     send('inspector.open', { modKey });
   }
@@ -330,6 +335,7 @@
     inspectorView = 'diagnosis';
     inspectorModKey = null;
     dismissedInspectorModKey = null;
+    inspectorFilesOpen = false;
     contextPanelMode = 'inspector';
   }
 
@@ -351,6 +357,7 @@
     contextPanelMode = 'context';
     inspectorView = 'mod';
     inspectorModKey = null;
+    inspectorFilesOpen = false;
   }
 
   function compareRuntimeEvidence() {
@@ -564,10 +571,20 @@
     const website = isWebsiteUrl(candidate.website) ? 'Verified Website' : 'No verified page';
     return [
       `${roleLabel(candidate)} · ${roleAssessmentLabel(candidate)}`,
-      formatLabel(candidate.profileState),
       `Priority ${candidate.priority ?? 'Unknown'}`,
       website
     ].join(' · ');
+  }
+
+  function roleReasonSummary(candidate: ModCandidateUiState): string {
+    const reason = candidate.role?.reason?.trim() ?? '';
+    if (reason.length === 0) {
+      return 'Unknown';
+    }
+
+    const match = reason.match(/^.*?(?:[.!?](?:\s|$)|$)/);
+    const summary = (match?.[0] ?? reason).trim().replace(/[.!?]$/, '');
+    return summary || 'Unknown';
   }
 
   function enabledLampLabel(candidate: ModCandidateUiState): string {
@@ -1593,14 +1610,20 @@
           {#if inspectorCandidate?.role}
             <div class="drawer-section">
               <span class="eyebrow">MOD ROLE</span>
-              <p class="analysis-meta">
+              <p class="analysis-meta role-summary-line">
                 <span class="role-chip role-{roleLabel(inspectorCandidate).toLowerCase()}">{roleLabel(inspectorCandidate)}</span>
                 <span class="status-chip status-role-assessment">{roleAssessmentLabel(inspectorCandidate)}</span>
               </p>
-              <p class="analysis-meta">{inspectorCandidate.role.reason}</p>
-              {#each inspectorCandidate.role.evidence as evidence}
-                <p class="provenance-line">{formatLabel(evidence.kind)} · {evidence.detail} · {evidence.source.relativePath}</p>
-              {/each}
+              <p class="analysis-meta role-reason-summary" title={inspectorCandidate.role.reason || 'Unknown'}>
+                Reason: {roleReasonSummary(inspectorCandidate)}
+              </p>
+              <details class="role-detail">
+                <summary>Role evidence · {inspectorCandidate.role.evidence.length}</summary>
+                <p class="analysis-meta">{inspectorCandidate.role.reason || 'Unknown'}</p>
+                {#each inspectorCandidate.role.evidence as evidence}
+                  <p class="provenance-line">{formatLabel(evidence.kind)} · {evidence.detail} · {evidence.source.relativePath}</p>
+                {/each}
+              </details>
             </div>
           {/if}
 
@@ -1627,14 +1650,17 @@
             </div>
           {/if}
 
-          <div class="drawer-section">
-            <span class="eyebrow">FILES · {state.inspector.files.length}</span>
+          <details class="drawer-section inspector-disclosure" bind:open={inspectorFilesOpen}>
+            <summary class="inspector-disclosure-summary">
+              <span class="eyebrow">FILES</span>
+              <span class="subtle">{state.inspector.files.length} files</span>
+            </summary>
             <ul class="compact-list">
               {#each state.inspector.files as file}
                 <li><code>{file.relativePath}</code><span>{sizeLabel(file.size)}</span></li>
               {/each}
             </ul>
-          </div>
+          </details>
 
           <div class="drawer-section">
             <span class="eyebrow">XML · {state.inspector.xmlFiles.length}</span>

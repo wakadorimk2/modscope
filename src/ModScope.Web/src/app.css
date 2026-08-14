@@ -353,7 +353,7 @@ button:disabled {
   height: 26px;
   flex: 0 0 26px;
   font-size: 14px;
-  opacity: 0.18;
+  opacity: 0.08;
   pointer-events: auto;
   transition: opacity 140ms ease;
 }
@@ -775,6 +775,19 @@ h2 {
 .role-detail summary {
   color: #7dd3fc;
   font-size: 10px;
+}
+
+.role-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-reason-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .local-awareness-heading,
@@ -1726,6 +1739,23 @@ label select {
 
 .drawer-section {
   margin-top: 20px;
+}
+
+.inspector-disclosure {
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  padding-top: 10px;
+}
+
+.inspector-disclosure-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.inspector-disclosure[open] .inspector-disclosure-summary {
+  margin-bottom: 8px;
 }
 
 dl {
