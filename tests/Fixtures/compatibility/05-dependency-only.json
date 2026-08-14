@@ -1,0 +1,35 @@
+{
+  "fixture_id": "dependency-only",
+  "source_assertions": [
+    "A020"
+  ],
+  "subject": "Quest Revamp-Gears Edition",
+  "object": "Gears",
+  "statement_type": "dependency",
+  "relation": "requires",
+  "status": "conditional",
+  "condition": {
+    "kind": "hard_dependency",
+    "text": "Quest Revamp-Gears Edition lists Gears as a requirement."
+  },
+  "version_scope": {
+    "subject": "2.6.1.2 observed on Nexus",
+    "list": "3.1.1.39"
+  },
+  "patch": null,
+  "evidence": [
+    {
+      "source_ref": "src_quest_revamp",
+      "url": "https://www.nexusmods.com/7daystodie/mods/7210?tab=description",
+      "quote": "Requirements: Gears",
+      "locator": "Quest Revamp-Gears Edition Nexus requirements"
+    }
+  ],
+  "confidence": "high",
+  "verification": {
+    "kind": "source_claim",
+    "runtime_verified": false
+  },
+  "semantic_note": "requires is dependency metadata. It is not a compatibility assertion.",
+  "unresolved_reason": null
+}
