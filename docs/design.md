@@ -711,7 +711,7 @@ storage engine、CLI framework、GUI framework、transport、installer、MO2 wri
 - 入力パスはinstance、profile、modsを明示指定します。
 - MO2 sourceはread-onlyで扱います。
 - snapshot、normalized value、source reference、diagnosticを保持します。
-- `modlist.txt`のprofile orderを初回のpriority根拠として保持します。
+- `modlist.txt`のraw lineを保持します。MO2の画面順はファイル末尾から始まるため、末尾の有効なprofile entryへpriority 0を付け、上へ向かって`0→N`を採番します。
 - file overwriteの勝者、semantic conflict、patch operationの意味解釈は行いません。
 
 Python、TypeScript、Browser先行の実装は今回の代替案として採用しません。
@@ -1080,7 +1080,7 @@ role assessmentは`Verified`、`Inferred`、`Unknown`で表示します。
 分類内の順序はMO2 priorityを維持し、同順位はMOD keyで決定します。
 `MO2 order`はactive profileのpriority順をそのまま表示します。
 根拠がないMODは`Unknown`へ置きます。
-MO2のpriorityはprofileの上から下へ`0→N`で保持します。
+MO2のpriorityはprofileの上から下へ`0→N`で保持します。`modlist.txt`の保存順はこの画面順と逆です。
 ModScope viewは`Foundation`、`Compatibility`、`Content`、`Unknown`の順で表示し、分類内だけpriority順を使います。
 他のreadable MODからtarget XMLとして参照されるMODは、base roleの静的証拠として`Foundation / Inferred`へ投影します。
 これは依存関係やゲーム内のwinner方向を断定しません。
