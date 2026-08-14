@@ -872,13 +872,13 @@
 {:else if surface === 'toolbar'}
   <main class="toolbar-surface">
     <div class="toolbar-tabs-row toolbar-row">
-      <div class="browser-tabs" aria-label="Browser tabs">
+      <div class="browser-tabs" role="tablist" aria-label="Browser tabs">
         {#each state.browser.tabs as tab (tab.tabId)}
           <div
             class:active={tab.isActive}
             class="browser-tab"
           >
-            <button type="button" class="browser-tab-select" aria-label={`Select tab ${tab.title || 'New tab'}`} aria-pressed={tab.isActive} onclick={() => selectTab(tab.tabId)}>
+            <button type="button" role="tab" class="browser-tab-select" aria-label={`Select tab ${tab.title || 'New tab'}`} aria-selected={tab.isActive} onclick={() => selectTab(tab.tabId)}>
               <span>{tab.title || 'New tab'}</span>
             </button>
             <button
@@ -890,8 +890,8 @@
             >×</button>
           </div>
         {/each}
+        <button type="button" class="icon-button compact-icon-button browser-new-tab" title="New tab" aria-label="New tab" onclick={openNewTab}>+</button>
       </div>
-      <button type="button" class="icon-button compact-icon-button" title="New tab" aria-label="New tab" onclick={openNewTab}>+</button>
     </div>
 
     <div class="toolbar-controls-row toolbar-row">
@@ -899,9 +899,8 @@
         <button class="icon-button" title="Back" aria-label="Back" disabled={!state.browser.canGoBack} onclick={() => send('browser.back')}>←</button>
         <button class="icon-button" title="Forward" aria-label="Forward" disabled={!state.browser.canGoForward} onclick={() => send('browser.forward')}>→</button>
         <button class="icon-button" title="Reload" aria-label="Reload" onclick={() => send('browser.reload')}>↻</button>
+        <button class="icon-button" title="Home" aria-label="Open Browse Home" onclick={openHome}>⌂</button>
       </div>
-
-      <button class="icon-button" title="Home" aria-label="Open Browse Home" onclick={openHome}>⌂</button>
 
       <div class="toolbar-omnibox" aria-label="Browser address controls">
         <input
@@ -911,52 +910,54 @@
           bind:value={address}
           onkeydown={(event) => event.key === 'Enter' && navigate()}
         />
-        <button class="secondary-button toolbar-go-button" type="button" onclick={navigate}>Go</button>
+        <button class="secondary-button toolbar-go-button" type="button" title="Go" aria-label="Go" onclick={navigate}>↵</button>
       </div>
 
-      <details
-        class="history-menu"
-        bind:open={historyOpen}
-        ontoggle={handleHistoryToggle}
-      >
-        <summary
-          class="icon-button"
-          title={`History (${state.browser.history.length})`}
-          aria-label={`Open history (${state.browser.history.length} entries)`}
-        >◷</summary>
-        <div class="history-popover">
-          <strong>History</strong>
-          {#if state.browser.history.length === 0}
-            <p class="subtle">No visited pages.</p>
-          {:else}
-            {#each state.browser.history as entry (entry.entryId)}
-              <button type="button" class="history-entry" onclick={() => selectHistory(entry.entryId)}>
-                <strong>{entry.title || 'Untitled page'}</strong>
-                <span>{entry.url}</span>
-                <small>{formatVisitedAt(entry.visitedAtUtc)}</small>
-              </button>
-            {/each}
-          {/if}
-        </div>
-      </details>
+      <div class="toolbar-actions" aria-label="Browser actions">
+        <details
+          class="history-menu"
+          bind:open={historyOpen}
+          ontoggle={handleHistoryToggle}
+        >
+          <summary
+            class="icon-button"
+            title={`History (${state.browser.history.length})`}
+            aria-label={`Open history (${state.browser.history.length} entries)`}
+          >◷</summary>
+          <div class="history-popover">
+            <strong>History</strong>
+            {#if state.browser.history.length === 0}
+              <p class="subtle">No visited pages.</p>
+            {:else}
+              {#each state.browser.history as entry (entry.entryId)}
+                <button type="button" class="history-entry" onclick={() => selectHistory(entry.entryId)}>
+                  <strong>{entry.title || 'Untitled page'}</strong>
+                  <span>{entry.url}</span>
+                  <small>{formatVisitedAt(entry.visitedAtUtc)}</small>
+                </button>
+              {/each}
+            {/if}
+          </div>
+        </details>
 
-      <button
-        class="pane-toggle-button"
-        class:active={state.layout.modListVisible}
-        title={state.layout.modListVisible ? 'Hide MOD list pane' : 'Show MOD list pane'}
-        aria-label={state.layout.modListVisible ? 'Hide MOD list pane' : 'Show MOD list pane'}
-        aria-pressed={state.layout.modListVisible}
-        onclick={toggleModList}
-      ><span aria-hidden="true">◧</span></button>
-      <button
-        class="pane-toggle-button"
-        class:active={state.layout.contextVisible}
-        title={state.layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
-        aria-label={state.layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
-        aria-pressed={state.layout.contextVisible}
-        onclick={toggleContext}
-      ><span aria-hidden="true">◨</span></button>
-      <span class="shortcut-hint">Ctrl/Cmd+I</span>
+        <button
+          class="pane-toggle-button"
+          class:active={state.layout.modListVisible}
+          title={state.layout.modListVisible ? 'Hide MOD list pane' : 'Show MOD list pane'}
+          aria-label={state.layout.modListVisible ? 'Hide MOD list pane' : 'Show MOD list pane'}
+          aria-pressed={state.layout.modListVisible}
+          onclick={toggleModList}
+        ><span aria-hidden="true">◧</span></button>
+        <button
+          class="pane-toggle-button"
+          class:active={state.layout.contextVisible}
+          title={state.layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
+          aria-label={state.layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
+          aria-pressed={state.layout.contextVisible}
+          onclick={toggleContext}
+        ><span aria-hidden="true">◨</span></button>
+        <span class="shortcut-hint">Ctrl/Cmd+I</span>
+      </div>
     </div>
 
     {#if lastError}
