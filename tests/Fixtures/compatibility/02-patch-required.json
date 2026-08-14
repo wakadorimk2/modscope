@@ -1,0 +1,38 @@
+{
+  "fixture_id": "patch-required",
+  "source_assertions": [
+    "A037"
+  ],
+  "subject": "Oakraven Ammo Press",
+  "object": "IZY-All in One Gun Pack",
+  "statement_type": "compatibility",
+  "relation": "requires_compatibility_patch",
+  "status": "conditional",
+  "condition": {
+    "kind": "patch_required",
+    "text": "The base ammo press needs the named add-on patch for IZY ammo support."
+  },
+  "version_scope": {
+    "subject": "1.2.0.1 observed in manifest",
+    "patch": "2.5.2 observed on Nexus"
+  },
+  "patch": {
+    "name": "Ammo Press Add-On Patch for EFT and Izy v2",
+    "required": true,
+    "version": "2.5.2 observed"
+  },
+  "evidence": [
+    {
+      "source_ref": "src_ammo_patch",
+      "url": "https://www.nexusmods.com/7daystodie/mods/6993",
+      "quote": "Adds support to IZY-All in One Gun Pack",
+      "locator": "Ammo Press Add-On Patch Nexus description"
+    }
+  ],
+  "confidence": "high",
+  "verification": {
+    "kind": "source_claim",
+    "runtime_verified": false
+  },
+  "unresolved_reason": null
+}

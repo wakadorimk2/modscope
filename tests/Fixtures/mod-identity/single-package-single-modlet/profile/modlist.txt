@@ -1,0 +1,2 @@
+# Synthetic identity fixture
++synthetic-single-package

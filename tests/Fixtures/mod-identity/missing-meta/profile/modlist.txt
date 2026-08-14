@@ -1,0 +1,2 @@
+# Synthetic missing .meta Version fixture
++synthetic-missing-meta-package
