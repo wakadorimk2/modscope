@@ -20,6 +20,9 @@ internal sealed class BrowserTabHostState
 
     public string? InternalPage { get; set; }
 
+    public bool IsDeploymentPreview =>
+        string.Equals(InternalPage, "deployment-preview", StringComparison.Ordinal);
+
     public string? PendingNexusSearchName { get; set; }
 
     public void Navigate(Uri uri, string? nexusSearchName = null)

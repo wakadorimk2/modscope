@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private IReadOnlyList<BrowserHistoryEntryUiState> _browserHistory = Array.Empty<BrowserHistoryEntryUiState>();
     private string? _activeBrowserTabId;
     private int _browserTabSequence;
+    private string? _webAssetsPath;
 
     private const string HomeHtml = """
         <!doctype html>
@@ -69,6 +70,8 @@ public partial class MainWindow : Window
                 throw new DirectoryNotFoundException(
                     $"The Web UI assets are missing: {webAssetsPath}. Run scripts/build.ps1.");
             }
+
+            _webAssetsPath = webAssetsPath;
 
             ConfigureFrontend(ToolbarShell, webAssetsPath, "toolbar");
             ConfigureFrontend(ModListWebView, webAssetsPath, "mod-list");
@@ -151,8 +154,13 @@ public partial class MainWindow : Window
         await webView.EnsureCoreWebView2Async();
         webView.NavigationCompleted += Browser_NavigationCompleted;
         webView.CoreWebView2.DocumentTitleChanged += Browser_DocumentTitleChanged;
+        webView.CoreWebView2.WebMessageReceived += Browser_WebMessageReceived;
 
-        if (IsHistoryUrl(initialUrl))
+        if (IsDeploymentPreviewUrl(initialUrl))
+        {
+            NavigateDeploymentPreview(tab);
+        }
+        else if (IsHistoryUrl(initialUrl))
         {
             NavigateHistory(tab);
         }
@@ -232,6 +240,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task OpenDeploymentPreviewTabAsync()
+    {
+        var existingTab = _browserTabs.Values.FirstOrDefault(tab => tab.IsDeploymentPreview);
+        if (existingTab is not null)
+        {
+            NavigateDeploymentPreview(existingTab);
+            await ActivateBrowserTabAsync(existingTab.TabId);
+            return;
+        }
+
+        await CreateBrowserTabAsync(
+            null,
+            "about:deployment-preview",
+            "Deployment preview",
+            activate: true);
+    }
+
     private void NavigateHome(BrowserTabHostState tab)
     {
         tab.InternalPage = "home";
@@ -250,6 +275,20 @@ public partial class MainWindow : Window
         tab.Title = "History";
         tab.WebView.NavigateToString(RenderHistoryHtml());
         _controller.SetStatus("Browser history is open.");
+    }
+
+    private void NavigateDeploymentPreview(BrowserTabHostState tab)
+    {
+        if (string.IsNullOrWhiteSpace(_webAssetsPath))
+        {
+            throw new InvalidOperationException("The Web UI assets are not initialized.");
+        }
+
+        tab.InternalPage = "deployment-preview";
+        tab.PendingNexusSearchName = null;
+        tab.Url = "about:deployment-preview";
+        tab.Title = "Deployment preview";
+        ConfigureFrontend(tab.WebView, _webAssetsPath, "deployment-preview");
     }
 
     private string RenderHistoryHtml()
@@ -293,9 +332,17 @@ public partial class MainWindow : Window
 
     private BrowserTabHostState? FindBrowserTab(object? sender)
     {
-        return sender is Microsoft.Web.WebView2.Wpf.WebView2 webView
-            ? _browserTabs.Values.FirstOrDefault(tab => ReferenceEquals(tab.WebView, webView))
-            : null;
+        if (sender is Microsoft.Web.WebView2.Wpf.WebView2 webView)
+        {
+            return _browserTabs.Values.FirstOrDefault(tab => ReferenceEquals(tab.WebView, webView));
+        }
+
+        if (sender is CoreWebView2 coreWebView)
+        {
+            return _browserTabs.Values.FirstOrDefault(tab => ReferenceEquals(tab.WebView.CoreWebView2, coreWebView));
+        }
+
+        return null;
     }
 
     private string NextBrowserTabId()
@@ -358,6 +405,17 @@ public partial class MainWindow : Window
     {
         return Uri.TryCreate(value, UriKind.Absolute, out var uri)
             && string.Equals(uri.AbsoluteUri, "about:history", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDeploymentPreviewUrl(string? value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && string.Equals(uri.AbsoluteUri, "about:deployment-preview", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsInternalBrowserPage(string? value)
+    {
+        return value is "home" or "history" or "deployment-preview";
     }
 
     private static bool IsNexusSearchUri(Uri uri)
@@ -596,6 +654,49 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             SendError("bridge.command.failed", exception.Message, command?.RequestId, sourceWebView);
+        }
+    }
+
+    private async void Browser_WebMessageReceived(
+        object? sender,
+        CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        var tab = FindBrowserTab(sender);
+        if (tab is null
+            || !tab.IsDeploymentPreview)
+        {
+            return;
+        }
+
+        BridgeCommandEnvelope? command = null;
+        try
+        {
+            if (!BridgeProtocol.IsAppHostUri(e.Source))
+            {
+                return;
+            }
+
+            command = BridgeProtocol.ParseCommand(e.WebMessageAsJson);
+            if (command.Command is not ("frontend.ready" or "deployment.apply"))
+            {
+                return;
+            }
+
+            if (command.Command == "deployment.apply"
+                && !ReferenceEquals(tab, ActiveBrowserTab))
+            {
+                return;
+            }
+
+            await HandleCommandAsync(tab.WebView, command);
+        }
+        catch (BridgeProtocolException exception)
+        {
+            SendError("bridge.message.invalid", exception.Message, command?.RequestId, tab.WebView);
+        }
+        catch (Exception exception)
+        {
+            SendError("bridge.command.failed", exception.Message, command?.RequestId, tab.WebView);
         }
     }
 
@@ -939,6 +1040,7 @@ public partial class MainWindow : Window
                 var previewTask = _controller.PreviewDeploymentAsync(draft);
                 SendState(targetWebView: sourceWebView);
                 await previewTask;
+                await OpenDeploymentPreviewTabAsync();
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
@@ -972,14 +1074,23 @@ public partial class MainWindow : Window
         }
 
         var browser = tab.WebView;
-        tab.Url = tab.InternalPage == "history"
-            ? "about:history"
-            : browser.Source?.ToString() ?? "about:blank";
+        tab.Url = tab.InternalPage switch
+        {
+            "history" => "about:history",
+            "deployment-preview" => "about:deployment-preview",
+            _ => browser.Source?.ToString() ?? "about:blank"
+        };
         tab.Title = string.IsNullOrWhiteSpace(browser.CoreWebView2.DocumentTitle)
             ? tab.Title
             : browser.CoreWebView2.DocumentTitle;
         AddBrowserHistory(tab);
         SaveBrowserState();
+
+        if (tab.InternalPage is "history" or "deployment-preview")
+        {
+            SendState(requestId, targetWebView);
+            return;
+        }
 
         if (!ReferenceEquals(tab, ActiveBrowserTab))
         {
@@ -1056,7 +1167,8 @@ public partial class MainWindow : Window
             };
         }
 
-        if (!string.Equals(source, "about:blank", StringComparison.OrdinalIgnoreCase))
+        if (!IsInternalBrowserPage(tab.InternalPage)
+            && !string.Equals(source, "about:blank", StringComparison.OrdinalIgnoreCase))
         {
             tab.InternalPage = null;
         }
@@ -1064,6 +1176,7 @@ public partial class MainWindow : Window
         tab.Url = tab.InternalPage switch
         {
             "history" => "about:history",
+            "deployment-preview" => "about:deployment-preview",
             _ => source
         };
         tab.Title = string.IsNullOrWhiteSpace(documentTitle)
@@ -1127,6 +1240,10 @@ public partial class MainWindow : Window
             if (tab.InternalPage == "history")
             {
                 tab.Url = "about:history";
+            }
+            else if (tab.InternalPage == "deployment-preview")
+            {
+                tab.Url = "about:deployment-preview";
             }
 
             tab.Title = string.IsNullOrWhiteSpace(title)
@@ -1332,6 +1449,15 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(targetWebView, ModListWebView))
             {
                 ModListWebView.CoreWebView2.PostWebMessageAsJson(message);
+            }
+        }
+
+        foreach (var browserTab in _browserTabs.Values.Where(tab => tab.IsDeploymentPreview))
+        {
+            if (browserTab.WebView.CoreWebView2 is not null
+                && !ReferenceEquals(targetWebView, browserTab.WebView))
+            {
+                browserTab.WebView.CoreWebView2.PostWebMessageAsJson(message);
             }
         }
     }

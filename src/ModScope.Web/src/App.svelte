@@ -16,7 +16,9 @@
     ? 'toolbar'
     : requestedSurface === 'mod-list'
       ? 'mod-list'
-      : 'context';
+      : requestedSurface === 'deployment-preview'
+        ? 'deployment-preview'
+        : 'context';
 
   let state: UiState = initialState;
   let address = initialState.browser.url;
@@ -35,7 +37,13 @@
   let deploymentEditMode = false;
   let deploymentDraftEntries: DeploymentEntryUiState[] = initialState.deployment.entries;
   let draggedDeploymentEntryId: string | null = null;
-  let deploymentDragOverEntryId: string | null = null;
+  let deploymentDropGap: number | null = null;
+  let deploymentApplyConfirmOpen = false;
+  let deploymentApplyPending = false;
+  let deploymentPreviewSearch = '';
+  let deploymentPreviewModChangesOpen = false;
+  let deploymentPreviewJunctionChangesOpen = false;
+  let deploymentPreviewDiagnosticsOpen = false;
   let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
   let operationRailTimer: number | undefined;
@@ -96,6 +104,22 @@
   $: inspectorCandidate = state.inspector
     ? state.knowledge.candidates.find((candidate) => candidate.modKey === state.inspector?.modKey)
     : null;
+  $: deploymentPreviewSearchValue = deploymentPreviewSearch.trim().toLocaleLowerCase();
+  $: deploymentPreviewSearchActive = deploymentPreviewSearchValue.length > 0;
+  $: deploymentPreviewModChanges = state.deployment.modChanges.filter((change) => (
+    deploymentChangeMatches(`${change.modKey} ${change.beforeEnabled ? 'enabled' : 'disabled'} ${change.afterEnabled ? 'enabled' : 'disabled'}`)
+  ));
+  $: deploymentPreviewJunctionChanges = state.deployment.junctionChanges.filter((change) => (
+    deploymentChangeMatches(`${change.action} ${change.targetName}`)
+  ));
+  $: deploymentPreviewDiagnostics = state.deployment.diagnostics.filter((diagnostic) => (
+    deploymentChangeMatches(`${diagnostic.code} ${diagnostic.message} ${diagnostic.rawValue ?? ''}`)
+  ));
+  $: deploymentModEnabledChangeCount = state.deployment.modChanges.filter((change) => change.beforeEnabled !== change.afterEnabled).length;
+  $: deploymentModOrderChangeCount = state.deployment.modChanges.filter((change) => change.beforeOrder !== change.afterOrder).length;
+  $: deploymentJunctionCreateCount = state.deployment.junctionChanges.filter((change) => change.action === 'create' || change.action === 'adopt').length;
+  $: deploymentJunctionRemoveCount = state.deployment.junctionChanges.filter((change) => change.action === 'remove').length;
+  $: deploymentBlockingDiagnosticCount = state.deployment.diagnostics.filter((diagnostic) => diagnostic.severity.toLowerCase() === 'error').length;
   $: operationBlocksInteraction = analysisBusy
     || (state.knowledge.operation.isBusy && !state.knowledge.operation.isBackground);
   $: if (!deploymentEditMode) {
@@ -154,6 +178,11 @@
       state = message.payload;
       if (state.deployment.status === 'applied') {
         deploymentEditMode = false;
+        deploymentApplyConfirmOpen = false;
+        deploymentApplyPending = false;
+      } else if (!state.deployment.canApply) {
+        deploymentApplyConfirmOpen = false;
+        deploymentApplyPending = false;
       }
       if (!addressIsBeingEdited) {
         address = state.browser.url;
@@ -189,6 +218,7 @@
 
     if (message.kind === 'error') {
       lastError = message.payload;
+      deploymentApplyPending = false;
     }
   }
 
@@ -252,7 +282,7 @@
     deploymentEditMode = false;
     deploymentDraftEntries = state.deployment.entries;
     draggedDeploymentEntryId = null;
-    deploymentDragOverEntryId = null;
+    deploymentDropGap = null;
   }
 
   function toggleDeploymentEntry(entryId: string) {
@@ -270,7 +300,7 @@
     }
 
     draggedDeploymentEntryId = entry.entryId;
-    deploymentDragOverEntryId = null;
+    deploymentDropGap = null;
     event.dataTransfer?.setData('text/plain', entry.entryId);
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
@@ -283,7 +313,12 @@
     }
 
     event.preventDefault();
-    deploymentDragOverEntryId = entry.entryId;
+    const targetElement = event.currentTarget as HTMLElement | null;
+    const targetIndex = deploymentEditableIndex(entry.entryId);
+    if (targetElement && targetIndex >= 0) {
+      const bounds = targetElement.getBoundingClientRect();
+      deploymentDropGap = targetIndex + (event.clientY >= bounds.top + bounds.height / 2 ? 1 : 0);
+    }
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move';
     }
@@ -293,7 +328,8 @@
     event.preventDefault();
     const draggedEntryId = draggedDeploymentEntryId;
     draggedDeploymentEntryId = null;
-    deploymentDragOverEntryId = null;
+    const requestedGap = deploymentDropGap;
+    deploymentDropGap = null;
 
     if (!draggedEntryId || !targetEntry.isEditable || draggedEntryId === targetEntry.entryId) {
       return;
@@ -302,13 +338,13 @@
     const editableEntries = deploymentDraftEntries.filter((entry) => entry.isEditable);
     const draggedIndex = editableEntries.findIndex((entry) => entry.entryId === draggedEntryId);
     const targetIndex = editableEntries.findIndex((entry) => entry.entryId === targetEntry.entryId);
-    if (draggedIndex < 0 || targetIndex < 0) {
+    if (draggedIndex < 0 || targetIndex < 0 || requestedGap === null) {
       return;
     }
 
     const [draggedEntry] = editableEntries.splice(draggedIndex, 1);
-    const nextTargetIndex = editableEntries.findIndex((entry) => entry.entryId === targetEntry.entryId);
-    editableEntries.splice(Math.max(0, nextTargetIndex), 0, draggedEntry);
+    const adjustedGap = requestedGap > draggedIndex ? requestedGap - 1 : requestedGap;
+    editableEntries.splice(Math.max(0, Math.min(adjustedGap, editableEntries.length)), 0, draggedEntry);
 
     let editableIndex = 0;
     deploymentDraftEntries = deploymentDraftEntries.map((entry) => (
@@ -318,7 +354,7 @@
 
   function endDeploymentDrag() {
     draggedDeploymentEntryId = null;
-    deploymentDragOverEntryId = null;
+    deploymentDropGap = null;
   }
 
   function previewDeployment() {
@@ -339,17 +375,26 @@
     });
   }
 
-  function applyDeployment() {
+  function requestApplyDeployment() {
     if (!state.deployment.planId || !state.deployment.canApply) {
       return;
     }
 
-    const approved = window.confirm(
-      'Apply the profile and junction changes? ModScope will back up modlist.txt first.'
-    );
-    if (approved) {
-      send('deployment.apply', { planId: state.deployment.planId, approved: true });
+    deploymentApplyConfirmOpen = true;
+  }
+
+  function cancelApplyDeployment() {
+    deploymentApplyConfirmOpen = false;
+  }
+
+  function applyDeployment() {
+    if (!state.deployment.planId || !state.deployment.canApply || !deploymentApplyConfirmOpen) {
+      return;
     }
+
+    deploymentApplyConfirmOpen = false;
+    deploymentApplyPending = true;
+    send('deployment.apply', { planId: state.deployment.planId, approved: true });
   }
 
   function launchGame() {
@@ -390,6 +435,12 @@
     if (event.key === 'Escape' && modSearchOpen) {
       event.preventDefault();
       closeModSearch();
+      return;
+    }
+
+    if (event.key === 'Escape' && deploymentApplyConfirmOpen) {
+      event.preventDefault();
+      cancelApplyDeployment();
       return;
     }
 
@@ -447,6 +498,17 @@
     } else {
       openProfileDiagnosis();
     }
+  }
+
+  function deploymentChangeMatches(value: string): boolean {
+    return deploymentPreviewSearchValue.length === 0
+      || value.toLocaleLowerCase().includes(deploymentPreviewSearchValue);
+  }
+
+  function deploymentEditableIndex(entryId: string): number {
+    return deploymentDraftEntries
+      .filter((entry) => entry.isEditable)
+      .findIndex((entry) => entry.entryId === entryId);
   }
 
   function openInspectorForMod(modKey: string) {
@@ -882,9 +944,6 @@
             onclick={startDeploymentEdit}
           >Edit profile</button>
         {/if}
-        {#if state.deployment.canApply && state.deployment.planId}
-          <button class="primary-button" type="button" onclick={applyDeployment}>Apply</button>
-        {/if}
         {#if state.deployment.canLaunch}
           <button class="secondary-button" type="button" onclick={launchGame}>Launch 7DTD</button>
         {/if}
@@ -917,40 +976,48 @@
         <div class="mod-list-scroll" aria-label="Edit active profile MOD list">
           <div class="mod-list-section-label">EDIT PROFILE ORDER · {deploymentDraftEntries.length}</div>
           <p class="subtle deployment-help">
-            Use + to enable a MOD. Use − to disable a MOD. Drag MOD rows to change priority.
+            Drag the handle to reorder. The line marks the insertion point. Use + or − to change the enabled state.
           </p>
           <div class="mod-list-items deployment-edit-list">
             {#each deploymentDraftEntries as entry (entry.entryId)}
               {#if entry.isSeparator}
                 <div class="deployment-separator" aria-label="Profile separator">{entry.modKey}</div>
               {:else}
+                {#if deploymentDropGap === deploymentEditableIndex(entry.entryId)}
+                  <div class="deployment-drop-line" role="status" aria-label={`Drop before ${entry.modKey}`}></div>
+                {/if}
                 <article
                   class="mod-list-item deployment-edit-item"
                   class:mod-list-item-disabled={!entry.enabled}
-                  class:deployment-drag-over={deploymentDragOverEntryId === entry.entryId}
                   draggable={entry.isEditable}
                   ondragstart={(event) => startDeploymentDrag(event, entry)}
                   ondragover={(event) => allowDeploymentDrop(event, entry)}
                   ondrop={(event) => dropDeploymentEntry(event, entry)}
                   ondragend={endDeploymentDrag}
                 >
-                  <span class="deployment-drag-handle" aria-hidden="true">☷</span>
+                  <div class="deployment-row-controls">
+                    <span class="deployment-drag-handle" title="Drag to reorder" aria-hidden="true">☷</span>
+                    <button
+                      class="deployment-toggle-button"
+                      type="button"
+                      title={entry.enabled ? 'Disable MOD' : 'Enable MOD'}
+                      aria-label={entry.enabled ? `Disable ${entry.modKey}` : `Enable ${entry.modKey}`}
+                      disabled={!entry.isEditable}
+                      onclick={() => toggleDeploymentEntry(entry.entryId)}
+                    >{entry.enabled ? '−' : '+'}</button>
+                  </div>
                   <div class="deployment-edit-main">
                     <strong>{entry.modKey}</strong>
                     {#if entry.priority !== null && entry.priority !== undefined}
                       <span>priority {entry.priority}</span>
                     {/if}
                   </div>
-                  <button
-                    class="deployment-toggle-button"
-                    type="button"
-                    aria-label={entry.enabled ? `Disable ${entry.modKey}` : `Enable ${entry.modKey}`}
-                    disabled={!entry.isEditable}
-                    onclick={() => toggleDeploymentEntry(entry.entryId)}
-                  >{entry.enabled ? '−' : '+'}</button>
                 </article>
               {/if}
             {/each}
+            {#if deploymentDropGap === deploymentDraftEntries.filter((entry) => entry.isEditable).length}
+              <div class="deployment-drop-line" role="status" aria-label="Drop at the end of the MOD list"></div>
+            {/if}
           </div>
 
           {#if deploymentDraftEntries.length === 0}
@@ -963,23 +1030,12 @@
                 <strong>Deployment {formatLabel(state.deployment.status)}</strong>
                 {#if state.deployment.planId}<span>{state.deployment.planId.slice(0, 8)}</span>{/if}
               </div>
-              {#if state.deployment.modChanges.length > 0}
-                <div class="deployment-change-summary">
-                  {#each state.deployment.modChanges as change}
-                    <span>{change.modKey}: {change.beforeEnabled ? '+' : '−'} → {change.afterEnabled ? '+' : '−'}</span>
-                  {/each}
-                </div>
-              {/if}
-              {#if state.deployment.junctionChanges.length > 0}
-                <div class="deployment-change-summary">
-                  {#each state.deployment.junctionChanges as change}
-                    <span>{formatLabel(change.action)}: {change.targetName}</span>
-                  {/each}
-                </div>
-              {/if}
-              {#each state.deployment.diagnostics as diagnostic}
-                <p class="deployment-diagnostic">{diagnostic.code}: {diagnostic.message}</p>
-              {/each}
+              <p class="subtle deployment-status-hint">Review the full change list in the Deployment preview tab.</p>
+              <div class="deployment-summary-grid">
+                <span>MOD changes <strong>{state.deployment.modChanges.length}</strong></span>
+                <span>Junction changes <strong>{state.deployment.junctionChanges.length}</strong></span>
+                <span>Blocking diagnostics <strong>{deploymentBlockingDiagnosticCount}</strong></span>
+              </div>
             </section>
           {/if}
         </div>
@@ -1094,6 +1150,173 @@
         <p class="subtle">Load an MO2 source to show the active profile.</p>
       </div>
     {/if}
+  </main>
+{:else if surface === 'deployment-preview'}
+  <main class="deployment-preview-surface">
+    {#if lastError}
+      <p class="error-notice"><strong>{lastError.code}</strong> {lastError.message}</p>
+    {/if}
+
+    <header class="deployment-preview-header">
+      <div>
+        <span class="eyebrow">DEPLOYMENT PREVIEW</span>
+        <h1>Review profile and junction changes</h1>
+        <p class="summary-meta">Profile · {state.deployment.profileName || 'Unknown profile'}</p>
+      </div>
+      <span class="status-chip status-{state.deployment.status.toLowerCase()}">{formatLabel(state.deployment.status)}</span>
+    </header>
+
+    <section class="deployment-preview-summary" aria-label="Deployment summary">
+      <div class="deployment-preview-summary-item">
+        <span>MOD changes</span>
+        <strong>{state.deployment.modChanges.length}</strong>
+        <small>{deploymentModEnabledChangeCount} enabled-state · {deploymentModOrderChangeCount} order</small>
+      </div>
+      <div class="deployment-preview-summary-item">
+        <span>Junction changes</span>
+        <strong>{state.deployment.junctionChanges.length}</strong>
+        <small>{deploymentJunctionCreateCount} create/adopt · {deploymentJunctionRemoveCount} remove</small>
+      </div>
+      <div class="deployment-preview-summary-item">
+        <span>Diagnostics</span>
+        <strong>{state.deployment.diagnostics.length}</strong>
+        <small>{deploymentBlockingDiagnosticCount} blocking</small>
+      </div>
+    </section>
+
+    <section class="deployment-preview-actions" aria-live="polite">
+      {#if deploymentApplyPending}
+        <div class="deployment-preview-action-bar">
+          <p><strong>Applying deployment…</strong> ModScope is verifying the profile and junction results.</p>
+        </div>
+      {:else if state.deployment.canApply && state.deployment.planId}
+        {#if deploymentApplyConfirmOpen}
+          <div class="deployment-apply-confirmation" role="alertdialog" aria-labelledby="deployment-apply-title" aria-describedby="deployment-apply-description">
+            <span class="eyebrow">EXPLICIT APPROVAL</span>
+            <h2 id="deployment-apply-title">Apply this deployment?</h2>
+            <p id="deployment-apply-description">ModScope will back up <code>modlist.txt</code>, apply the profile and junction changes, then verify both results.</p>
+            <div class="deployment-preview-confirm-summary">
+              <span>{state.deployment.modChanges.length} MOD changes</span>
+              <span>{state.deployment.junctionChanges.length} junction changes</span>
+            </div>
+            <div class="action-row">
+              <button class="secondary-button" type="button" onclick={cancelApplyDeployment}>Cancel</button>
+              <button class="primary-button" type="button" onclick={applyDeployment}>Apply profile and junctions</button>
+            </div>
+          </div>
+        {:else}
+          <div class="deployment-preview-action-bar">
+            <p class="subtle">No changes are written until you approve this plan.</p>
+            <button class="primary-button" type="button" onclick={requestApplyDeployment}>Review and apply</button>
+          </div>
+        {/if}
+      {:else if state.deployment.status === 'applied'}
+        <div class="deployment-preview-action-bar deployment-preview-success">
+          <p><strong>Deployment applied and verified.</strong> Launch 7DTD from the MOD list pane when you are ready.</p>
+        </div>
+      {:else if state.deployment.status === 'recovery-required'}
+        <div class="deployment-preview-action-bar deployment-preview-blocked">
+          <p><strong>Recovery is required.</strong> Review the diagnostics below before making another deployment change.</p>
+        </div>
+      {:else}
+        <div class="deployment-preview-action-bar deployment-preview-blocked">
+          <p><strong>Apply is blocked.</strong> Resolve the diagnostics below, then preview the current profile again.</p>
+        </div>
+      {/if}
+    </section>
+
+    <label class="deployment-preview-search">
+      <span>Search changes</span>
+      <input
+        type="search"
+        aria-label="Search deployment changes"
+        placeholder="MOD name, junction action, or diagnostic"
+        bind:value={deploymentPreviewSearch}
+      />
+    </label>
+
+    <div class="deployment-preview-sections">
+      <section class="deployment-preview-section" aria-labelledby="deployment-mod-changes-title">
+        <button
+          class="deployment-preview-section-toggle"
+          type="button"
+          aria-expanded={deploymentPreviewModChangesOpen || deploymentPreviewSearchActive}
+          onclick={() => (deploymentPreviewModChangesOpen = !deploymentPreviewModChangesOpen)}
+        >
+          <span id="deployment-mod-changes-title">MODLIST CHANGES</span>
+          <span>{deploymentPreviewModChanges.length}/{state.deployment.modChanges.length}</span>
+        </button>
+        {#if deploymentPreviewModChangesOpen || deploymentPreviewSearchActive}
+          <div class="deployment-preview-detail-list">
+            {#if deploymentPreviewModChanges.length === 0}
+              <p class="empty-state">No MOD changes match this search.</p>
+            {:else}
+              {#each deploymentPreviewModChanges as change, changeIndex (change.modKey + changeIndex)}
+                <article class="deployment-preview-detail-row">
+                  <strong>{change.modKey}</strong>
+                  <span>{change.beforeEnabled ? '+' : '−'} → {change.afterEnabled ? '+' : '−'}</span>
+                  {#if change.beforeOrder !== change.afterOrder}
+                    <small>priority {change.beforeOrder} → {change.afterOrder}</small>
+                  {/if}
+                </article>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+      </section>
+
+      <section class="deployment-preview-section" aria-labelledby="deployment-junction-changes-title">
+        <button
+          class="deployment-preview-section-toggle"
+          type="button"
+          aria-expanded={deploymentPreviewJunctionChangesOpen || deploymentPreviewSearchActive}
+          onclick={() => (deploymentPreviewJunctionChangesOpen = !deploymentPreviewJunctionChangesOpen)}
+        >
+          <span id="deployment-junction-changes-title">JUNCTION CHANGES</span>
+          <span>{deploymentPreviewJunctionChanges.length}/{state.deployment.junctionChanges.length}</span>
+        </button>
+        {#if deploymentPreviewJunctionChangesOpen || deploymentPreviewSearchActive}
+          <div class="deployment-preview-detail-list">
+            {#if deploymentPreviewJunctionChanges.length === 0}
+              <p class="empty-state">No junction changes match this search.</p>
+            {:else}
+              {#each deploymentPreviewJunctionChanges as change, changeIndex (change.action + change.targetName + changeIndex)}
+                <article class="deployment-preview-detail-row">
+                  <strong>{change.targetName}</strong>
+                  <span>{formatLabel(change.action)}</span>
+                </article>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+      </section>
+
+      <section class="deployment-preview-section" aria-labelledby="deployment-diagnostics-title">
+        <button
+          class="deployment-preview-section-toggle"
+          type="button"
+          aria-expanded={deploymentPreviewDiagnosticsOpen || deploymentPreviewSearchActive}
+          onclick={() => (deploymentPreviewDiagnosticsOpen = !deploymentPreviewDiagnosticsOpen)}
+        >
+          <span id="deployment-diagnostics-title">DIAGNOSTICS</span>
+          <span>{deploymentPreviewDiagnostics.length}/{state.deployment.diagnostics.length}</span>
+        </button>
+        {#if deploymentPreviewDiagnosticsOpen || deploymentPreviewSearchActive}
+          <div class="deployment-preview-detail-list">
+            {#if deploymentPreviewDiagnostics.length === 0}
+              <p class="empty-state">No diagnostics match this search.</p>
+            {:else}
+              {#each deploymentPreviewDiagnostics as diagnostic, diagnosticIndex (diagnostic.code + diagnostic.message + diagnosticIndex)}
+                <article class="deployment-preview-detail-row deployment-preview-diagnostic-row">
+                  <strong>{diagnostic.code}</strong>
+                  <span>{diagnostic.message}</span>
+                </article>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+      </section>
+    </div>
   </main>
 {:else if surface === 'toolbar'}
   <main class="toolbar-surface">
