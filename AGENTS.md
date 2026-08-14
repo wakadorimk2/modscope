@@ -92,6 +92,18 @@ Before starting implementation, be able to answer:
 
 > **How do MO2, Wabbajack, and Vortex already solve this, and what specifically remains unsolved for ModScope?**
 
+関連する製品だけを調査します。毎回3製品を形式的に調査しません。
+
+mature managerを明確な理由なく再実装しません。
+
+Evidence rules:
+
+- Unknownは有効な結果です。evidence不足時に推測で確定しません。
+- provenanceとobserved timeを保持します。
+- source claimはruntime verificationではありません。
+- dependencyはcompatibilityではありません。
+- manifest co-presenceはruntime evidenceではありません。
+
 ## MO2の安全境界
 
 - MO2のmods、profiles、downloads、MO2本体をsource of truthとして扱います。
