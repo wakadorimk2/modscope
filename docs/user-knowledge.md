@@ -78,7 +78,7 @@
 - 約500 MODをMO2で運用できることは、匿名化した1名の外部ユーザー報告です。
 - Nexusによる手動更新確認とrequirementsの手動確認は、外部ユーザーの運用上の知見です。
 - 高信頼バージョンチェック、requirementsチェック、互換性チェックは、ユーザーが明示した検証済み需要です。
-- Prior-artとEvidence Modelの設計判断は、research note `docs/research/prior-art-evidence-model.md`へ分離して記録します。
+- Prior-artとEvidence Modelの設計判断は、research note [`docs/research/prior-art/evidence-model.md`](research/prior-art/evidence-model.md)へ分離して記録します。
 - この記録から、各チェックの具体的な実装要件を確定しません。
 
 ## 次回追記用テンプレート
