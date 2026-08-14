@@ -108,6 +108,106 @@ public sealed class LocalKnowledgeQueryTests
     }
 
     [Fact]
+    public void InfersBaseDataConfigFromMo2GamePath()
+    {
+        var query = CreateQuery();
+        var source = CreateSource(FixtureRoot) with
+        {
+            GamePath = Path.Combine(FixtureRoot, "game")
+        };
+
+        query.Load(source);
+
+        Assert.Equal(
+            Path.Combine(FixtureRoot, "game", "Data", "Config"),
+            query.GetInferredBaseDataConfigPath());
+        Assert.Null(SevenDaysToDiePathInference.InferBaseDataConfigPath(null));
+    }
+
+    [Fact]
+    public void FindsStrongUrlAndNormalizedNameMatchesWithoutUsingPageBody()
+    {
+        var query = CreateQuery();
+        query.Load(CreateSource(FixtureRoot));
+
+        var matches = query.FindLocalModMatches(CreatePage(
+            "HTTP://EXAMPLE.TEST/alpha/?tab=files#description",
+            "body mentions another mod",
+            "  Ａｌｐｈａ　Ｍｏｄ  "));
+        var alpha = Assert.Single(matches, match => match.ModKey == "Alpha Mod");
+
+        Assert.Equal(LocalModMatchStrength.Strong, alpha.Strength);
+        Assert.Equal(LocalModMatchKind.UrlAndName, alpha.MatchKind);
+        Assert.True(alpha.AutoConfirmEligible);
+        Assert.Contains("normalized host/path", alpha.Evidence);
+        Assert.Contains("exactly matches", alpha.Evidence);
+    }
+
+    [Fact]
+    public void ShowsPartialUnlistedAndUnresolvedMatchesWithoutAutoConfirmation()
+    {
+        var query = CreateQuery();
+        query.Load(CreateSource(FixtureRoot));
+
+        var partial = Assert.Single(query.FindLocalModMatches(CreatePage(
+            "https://example.test/other",
+            title: "Alpha")), match => match.ModKey == "Alpha Mod");
+        Assert.Equal(LocalModMatchStrength.Partial, partial.Strength);
+        Assert.False(partial.AutoConfirmEligible);
+
+        var unlisted = Assert.Single(query.FindLocalModMatches(CreatePage(
+            "https://example.test/unlisted",
+            title: "Unlisted Display")), match => match.ModKey == "Unlisted Mod");
+        Assert.Equal(QueryProfileState.Unlisted, unlisted.ProfileState);
+        Assert.True(unlisted.AutoConfirmEligible);
+
+        var disabledQuery = CreateQuery();
+        disabledQuery.Load(CreateSource(Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "7dtd-mo2-phase4")));
+        var disabled = Assert.Single(disabledQuery.FindLocalModMatches(CreatePage(
+            "https://example.test/disabled",
+            title: "Disabled Mod")), match => match.ModKey == "Disabled Mod");
+        Assert.Equal(QueryEnabledState.Disabled, disabled.EnabledState);
+        Assert.True(disabled.AutoConfirmEligible);
+
+        var unresolved = Assert.Single(query.FindLocalModMatches(CreatePage(
+            "https://example.test/missing",
+            title: "Missing Mod")), match => match.ModKey == "Missing Mod");
+        Assert.Equal(QueryProfileState.Unresolved, unresolved.ProfileState);
+        Assert.False(unresolved.AutoConfirmEligible);
+    }
+
+    [Fact]
+    public void KeepsMultipleStrongMatchesAsCandidates()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"modscope-match-{Guid.NewGuid():N}");
+        CopyDirectory(FixtureRoot, root);
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(root, "mods", "Beta Mod", "ModInfo.xml"),
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?><xml><Name value=\"Beta Mod\" /><Website value=\"https://example.test/alpha\" /></xml>");
+            var query = CreateQuery();
+            query.Load(CreateSource(root));
+
+            var strongMatches = query.FindLocalModMatches(CreatePage(
+                    "https://example.test/alpha",
+                    title: "Unrelated page"))
+                .Where(match => match.Strength == LocalModMatchStrength.Strong)
+                .ToList();
+
+            Assert.Equal(2, strongMatches.Count);
+            Assert.All(strongMatches, match => Assert.True(match.AutoConfirmEligible));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ResolvesInstalledNotInstalledUnresolvedAndUnknownStates()
     {
         var query = CreateQuery();
@@ -630,16 +730,33 @@ public sealed class LocalKnowledgeQueryTests
         return LocalKnowledgeQueryService.CreateDefault();
     }
 
-    private static PageObservation CreatePage(string url, string? content = null)
+    private static PageObservation CreatePage(
+        string url,
+        string? content = null,
+        string title = "Synthetic page")
     {
         return new PageObservation(
             new Uri(url),
-            "Synthetic page",
+            title,
             content,
             DateTimeOffset.UtcNow,
             "test",
             PageExtractionStatus.Succeeded,
             Array.Empty<DiagnosticReadModel>());
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.GetFiles(source))
+        {
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
+        }
+
+        foreach (var directory in Directory.GetDirectories(source))
+        {
+            CopyDirectory(directory, Path.Combine(target, Path.GetFileName(directory)));
+        }
     }
 
     private static Mo2SourceInput CreateSource(string root)

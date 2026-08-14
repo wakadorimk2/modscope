@@ -279,7 +279,6 @@ public sealed record EvidenceReferenceUiState(
 public sealed record PageObservationUiState(
     string Url,
     string Title,
-    string? ContentPreview,
     DateTimeOffset ObservedAtUtc,
     string Source,
     string ExtractionStatus,
@@ -361,9 +360,23 @@ public sealed record SourceDiscoveryUiState(
     IReadOnlyList<SourceCandidateUiState> Candidates,
     string? SelectedCandidateId);
 
+public sealed record LocalModMatchUiState(
+    string ModKey,
+    string DirectoryName,
+    string? DisplayName,
+    string ProfileState,
+    string EnabledState,
+    string MatchKind,
+    string Strength,
+    string Evidence,
+    bool AutoConfirmEligible);
+
 public sealed record IdentityUiState(
     string CandidateIdentity,
-    string? SelectedLocalModKey);
+    string? SelectedLocalModKey,
+    string RecognitionStatus,
+    IReadOnlyList<LocalModMatchUiState> Matches,
+    string? AutoInspectToken);
 
 public sealed record LocalContextUiState(
     string CandidateIdentity,
@@ -552,7 +565,10 @@ public sealed record RuntimeEvidenceComparisonUiState(
     IReadOnlyList<RuntimeEvidenceComparisonItemUiState> Items,
     IReadOnlyList<DiagnosticUiState> Diagnostics);
 
-public sealed record AnalysisInputUiState(bool BaseDataReady, bool RuntimeLogsReady);
+public sealed record AnalysisInputUiState(
+    bool BaseDataReady,
+    bool RuntimeLogsReady,
+    string BaseDataStatus = "missing");
 
 public sealed record AnalysisOperationUiState(string Kind, bool IsBusy)
 {

@@ -20,6 +20,8 @@ public interface ILocalKnowledgeQuery
 
     IReadOnlyList<ModCandidateSummary> GetModCandidates();
 
+    IReadOnlyList<LocalModMatchReadModel> FindLocalModMatches(PageObservation page);
+
     IReadOnlyList<ProfileSummaryReadModel> GetProfiles();
 
     KnowledgeSessionReadModel SwitchProfile(
@@ -57,6 +59,8 @@ public interface ILocalKnowledgeQuery
         CancellationToken cancellationToken = default);
 
     Mo2SourceInput? GetCurrentSource();
+
+    string? GetInferredBaseDataConfigPath();
 
     IReadOnlyList<ProfileEditEntryReadModel> GetCurrentProfileEntries();
 }
@@ -183,9 +187,22 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             .AsReadOnly();
     }
 
+    public IReadOnlyList<LocalModMatchReadModel> FindLocalModMatches(PageObservation page)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        return _snapshot is null
+            ? Array.Empty<LocalModMatchReadModel>()
+            : LocalModMatchQuery.Find(_snapshot, page);
+    }
+
     public Mo2SourceInput? GetCurrentSource()
     {
         return _source;
+    }
+
+    public string? GetInferredBaseDataConfigPath()
+    {
+        return SevenDaysToDiePathInference.InferBaseDataConfigPath(_source?.GamePath);
     }
 
     public IReadOnlyList<ProfileEditEntryReadModel> GetCurrentProfileEntries()

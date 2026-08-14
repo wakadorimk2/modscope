@@ -23,6 +23,10 @@ public sealed class DesktopSessionController
     private InspectorReadModel? _inspector;
     private string _candidateIdentity = string.Empty;
     private string? _selectedLocalModKey;
+    private IReadOnlyList<LocalModMatchReadModel> _localModMatches =
+        Array.Empty<LocalModMatchReadModel>();
+    private string _recognitionStatus = "not-searched";
+    private string? _autoInspectToken;
     private string _statusMessage = "Load a source and observe the current page.";
     private bool _contextVisible = true;
     private bool _modListVisible = true;
@@ -34,6 +38,7 @@ public sealed class DesktopSessionController
     private Task? _profilePreloadTask;
     private bool _startProfilePreloadAfterOperation;
     private string? _baseDataPath;
+    private bool _baseDataIsInferred;
     private string? _runtimeLogsPath;
     private ConflictAnalysisReadModel? _conflictAnalysis;
     private RuntimeEvidenceComparisonReadModel? _runtimeComparison;
@@ -128,6 +133,7 @@ public sealed class DesktopSessionController
     {
         ThrowIfAnalysisBusy();
         _baseDataPath = ValidateDirectoryPath(path, "The base Data/Config path");
+        _baseDataIsInferred = false;
         _conflictAnalysis = null;
         _runtimeComparison = null;
         _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
@@ -351,15 +357,23 @@ public sealed class DesktopSessionController
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-load", null);
         var progress = CreateProgressReporter(operationToken);
+        var loaded = false;
         try
         {
-            return await LoadSourceCandidateCoreAsync(candidateId, progress);
+            loaded = await LoadSourceCandidateCoreAsync(candidateId, progress);
         }
         finally
         {
             EndOperation(operationToken);
             _operationGate.Release();
         }
+
+        if (loaded)
+        {
+            await AnalyzeInferredBaseDataAsync();
+        }
+
+        return loaded;
     }
 
     public async Task<bool> LoadSourceAsync(Mo2SourceInput source)
@@ -370,6 +384,7 @@ public sealed class DesktopSessionController
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("source-load", source.ProfileName);
         var progress = CreateProgressReporter(operationToken);
+        var loaded = false;
         try
         {
             try
@@ -377,12 +392,11 @@ public sealed class DesktopSessionController
                 var session = await Task.Run(() => _query.Load(source, progress: progress));
                 ApplyLoadedSession(session, null);
                 _sourceDiscovery = null;
-                return true;
+                loaded = true;
             }
             catch (Exception exception)
             {
                 _statusMessage = $"MO2 source loading failed. Existing session was kept. {exception.Message}";
-                return false;
             }
         }
         finally
@@ -390,25 +404,22 @@ public sealed class DesktopSessionController
             EndOperation(operationToken);
             _operationGate.Release();
         }
+
+        if (loaded)
+        {
+            await AnalyzeInferredBaseDataAsync();
+        }
+
+        return loaded;
     }
 
     public void LoadSource(Mo2SourceInput source)
     {
         ArgumentNullException.ThrowIfNull(source);
         ThrowIfAnalysisBusy();
-        _session = _query.Load(source);
-        _candidates = _query.GetModCandidates();
-        _profiles = _query.GetProfiles();
-        InitializeProfileLoadStates(source.ProfileName);
-        _candidateIdentity = string.Empty;
-        _selectedLocalModKey = null;
-        _localContext = null;
-        _inspector = null;
-        ResetDeploymentState();
+        var session = _query.Load(source);
+        ApplyLoadedSession(session, null);
         _sourceDiscovery = null;
-        _selectedSourceCandidateId = null;
-        ClearAnalysis();
-        _statusMessage = $"Loaded {_candidates.Count} MOD records. Confirm the page identity.";
         StartBackgroundProfilePreload();
     }
 
@@ -416,18 +427,7 @@ public sealed class DesktopSessionController
     {
         ThrowIfAnalysisBusy();
         var session = _query.SwitchProfile(profileName);
-        _session = session;
-        _candidates = _query.GetModCandidates();
-        _profiles = _query.GetProfiles();
-        InitializeProfileLoadStates(session.ProfileName);
-        _candidateIdentity = string.Empty;
-        _selectedLocalModKey = null;
-        _localContext = null;
-        _inspector = null;
-        ResetDeploymentState();
-        _selectedSourceCandidateId = null;
-        ClearAnalysis();
-        _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
+        ApplyProfileSession(session);
         StartBackgroundProfilePreload();
     }
 
@@ -439,18 +439,18 @@ public sealed class DesktopSessionController
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("profile-switch", profileName.Trim());
         var progress = CreateProgressReporter(operationToken);
+        var switched = false;
         try
         {
             try
             {
                 var session = await Task.Run(() => _query.SwitchProfile(profileName, progress: progress));
                 ApplyProfileSession(session);
-                return true;
+                switched = true;
             }
             catch (Exception exception)
             {
                 _statusMessage = $"Profile loading failed. Existing session was kept. {exception.Message}";
-                return false;
             }
         }
         finally
@@ -458,6 +458,13 @@ public sealed class DesktopSessionController
             EndOperation(operationToken);
             _operationGate.Release();
         }
+
+        if (switched)
+        {
+            await AnalyzeInferredBaseDataAsync();
+        }
+
+        return switched;
     }
 
     public async Task<bool> PreviewDeploymentAsync(DeploymentDraft draft)
@@ -624,7 +631,7 @@ public sealed class DesktopSessionController
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
-        _statusMessage = $"Observed {observation.Url}. Identity confirmation is required.";
+        RefreshPageRecognition();
     }
 
     public void ConfirmIdentity(string candidateIdentity, string? localModKey)
@@ -646,6 +653,8 @@ public sealed class DesktopSessionController
             _candidateIdentity,
             localModKey));
         _inspector = null;
+        _recognitionStatus = "manual-confirmed";
+        _autoInspectToken = null;
         _statusMessage = $"Identity confirmed as {_localContext.Status}.";
     }
 
@@ -671,7 +680,15 @@ public sealed class DesktopSessionController
             _session,
             _candidates,
             _profiles,
-            new IdentityUiState(_candidateIdentity, _selectedLocalModKey),
+            new IdentityUiState(
+                _candidateIdentity,
+                _selectedLocalModKey,
+                _recognitionStatus,
+                _localModMatches
+                    .Select(DesktopStateMapper.LocalModMatch)
+                    .ToList()
+                    .AsReadOnly(),
+                _autoInspectToken),
             _localContext,
             _inspector,
             DesktopStateMapper.MapAnalysis(
@@ -679,6 +696,7 @@ public sealed class DesktopSessionController
                 _runtimeComparison,
                 _baseDataPath is not null && Directory.Exists(_baseDataPath),
                 _runtimeLogsPath is not null && Directory.Exists(_runtimeLogsPath),
+                GetBaseDataStatus(),
                 _analysisOperation,
                 _analysisDiagnostics),
             new LayoutUiState(_contextVisible, _modListVisible),
@@ -1072,7 +1090,12 @@ public sealed class DesktopSessionController
         ResetDeploymentState();
         _selectedSourceCandidateId = null;
         ClearAnalysis();
-        _statusMessage = $"Switched to profile {session.ProfileName}. Confirm the page identity.";
+        ApplyInferredBaseData();
+        RefreshPageRecognition();
+        if (_observation is null)
+        {
+            _statusMessage = $"Switched to profile {session.ProfileName}. Observe a page to search local MODs.";
+        }
         _startProfilePreloadAfterOperation = true;
     }
 
@@ -1119,13 +1142,117 @@ public sealed class DesktopSessionController
         _selectedSourceCandidateId = candidateId;
         ResetDeploymentState();
         ClearAnalysis();
-        _statusMessage = $"Loaded {_candidates.Count} MOD records. Confirm the page identity.";
+        ApplyInferredBaseData();
+        RefreshPageRecognition();
+        if (_observation is null)
+        {
+            _statusMessage = $"Loaded {_candidates.Count} MOD records. Observe a page to search local MODs.";
+        }
         _startProfilePreloadAfterOperation = true;
+    }
+
+    private void ApplyInferredBaseData()
+    {
+        var inferredPath = _query.GetInferredBaseDataConfigPath();
+        if (inferredPath is not null && Directory.Exists(inferredPath))
+        {
+            _baseDataPath = inferredPath;
+            _baseDataIsInferred = true;
+            _analysisDiagnostics = Array.Empty<DiagnosticUiState>();
+            _statusMessage = "MO2 gamePath Data/Config detected. Static analysis will start.";
+            return;
+        }
+
+        _baseDataPath = null;
+        _baseDataIsInferred = false;
+        _analysisDiagnostics = new[]
+        {
+            new DiagnosticUiState(
+                "analysis.base-data.inferred-missing",
+                "warning",
+                "Data/Config was not found from MO2 gamePath. Select another Data/Config folder.")
+        };
+        _statusMessage = "Data/Config was not found from MO2 gamePath. Select another Data/Config folder.";
+    }
+
+    private async Task AnalyzeInferredBaseDataAsync()
+    {
+        if (!_baseDataIsInferred
+            || _baseDataPath is null
+            || !Directory.Exists(_baseDataPath))
+        {
+            return;
+        }
+
+        await AnalyzeConflictsAsync();
+    }
+
+    private void RefreshPageRecognition()
+    {
+        _localModMatches = Array.Empty<LocalModMatchReadModel>();
+        _autoInspectToken = null;
+
+        if (_observation is null)
+        {
+            _recognitionStatus = "not-searched";
+            return;
+        }
+
+        if (_session is null)
+        {
+            _recognitionStatus = "source-not-loaded";
+            _statusMessage = "Observe complete. Load Local Knowledge to search local MODs.";
+            return;
+        }
+
+        _localModMatches = _query.FindLocalModMatches(_observation);
+        var strongMatches = _localModMatches
+            .Where(match => match.Strength == LocalModMatchStrength.Strong
+                && match.AutoConfirmEligible)
+            .GroupBy(match => match.ModKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+
+        if (strongMatches.Count == 1)
+        {
+            var match = strongMatches[0];
+            _candidateIdentity = match.DisplayName ?? match.DirectoryName;
+            _selectedLocalModKey = match.ModKey;
+            _localContext = _query.ConfirmIdentity(new IdentityConfirmation(
+                _observation,
+                _candidateIdentity,
+                match.ModKey));
+            _inspector = _query.GetInspector(match.ModKey);
+            _recognitionStatus = "auto-confirmed";
+            _autoInspectToken = Guid.NewGuid().ToString("N");
+            _statusMessage = $"Local MOD identity auto-confirmed as {_candidateIdentity}. Inspector opened.";
+            return;
+        }
+
+        _candidateIdentity = string.Empty;
+        _selectedLocalModKey = null;
+        _localContext = null;
+        _inspector = null;
+        _recognitionStatus = _localModMatches.Count == 0 ? "no-match" : "candidates";
+        _statusMessage = _localModMatches.Count == 0
+            ? "No local MOD candidates matched the observed page."
+            : "Local MOD candidates found. Confirm the page identity manually.";
+    }
+
+    private string GetBaseDataStatus()
+    {
+        if (_baseDataPath is null || !Directory.Exists(_baseDataPath))
+        {
+            return "missing";
+        }
+
+        return _baseDataIsInferred ? "inferred" : "manual";
     }
 
     private void ClearAnalysis()
     {
         _baseDataPath = null;
+        _baseDataIsInferred = false;
         _runtimeLogsPath = null;
         _conflictAnalysis = null;
         _runtimeComparison = null;

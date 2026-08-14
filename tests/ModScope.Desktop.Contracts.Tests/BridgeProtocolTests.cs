@@ -411,7 +411,12 @@ public sealed class BridgeProtocolTests
                 Array.Empty<ModCandidateUiState>(),
                 Array.Empty<ProfileUiState>(),
                 KnowledgeOperationUiState.Idle),
-            new IdentityUiState("", null),
+            new IdentityUiState(
+                "",
+                null,
+                "not-searched",
+                Array.Empty<LocalModMatchUiState>(),
+                null),
             null,
             null,
             new AnalysisUiState(
@@ -442,6 +447,24 @@ public sealed class BridgeProtocolTests
         Assert.DoesNotContain("rawResult", message);
         Assert.DoesNotContain("runtime log body", message);
         Assert.DoesNotContain("C:\\\\private", message);
+    }
+
+    [Fact]
+    public void SerializesPageObservationWithoutPageBody()
+    {
+        var observation = new PageObservationUiState(
+            "https://example.test/mod",
+            "Example Mod",
+            DateTimeOffset.UnixEpoch,
+            "WebView2",
+            "succeeded",
+            Array.Empty<DiagnosticUiState>());
+
+        var message = BridgeProtocol.SerializeMessage("observation", observation);
+
+        Assert.Contains("Example Mod", message);
+        Assert.DoesNotContain("contentPreview", message);
+        Assert.DoesNotContain("body", message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

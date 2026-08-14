@@ -306,6 +306,30 @@ public sealed record ModCandidateSummary(
     ModRoleReadModel Role,
     IReadOnlyList<DiagnosticReadModel> Diagnostics);
 
+public enum LocalModMatchKind
+{
+    Url,
+    Name,
+    UrlAndName
+}
+
+public enum LocalModMatchStrength
+{
+    Partial,
+    Strong
+}
+
+public sealed record LocalModMatchReadModel(
+    string ModKey,
+    string DirectoryName,
+    string? DisplayName,
+    QueryProfileState ProfileState,
+    QueryEnabledState EnabledState,
+    LocalModMatchKind MatchKind,
+    LocalModMatchStrength Strength,
+    string Evidence,
+    bool AutoConfirmEligible);
+
 public sealed record ModRoleReadModel(
     QueryModRole Role,
     QueryModRoleAssessment Assessment,

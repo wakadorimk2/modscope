@@ -20,7 +20,7 @@ ModScopeは、MODをWeb上で探し、吟味し、比較する作業を、ユー
 この文書では、次の用語を使います。
 
 - page observation：Human browserまたはagent browserから取得したURL、title、基本page contentなどの事実
-- MOD identity confirmation：pageが示す候補MODを、ユーザーが確認または選択した状態
+- MOD identity confirmation：pageが示す候補MODを、高信頼自動認識またはユーザーが確認した状態
 - Local context：確認したMOD identityと、現在のMO2 profileを照合した派生結果
 - Inspector：Local contextの根拠と詳細へ段階的に進むための画面またはread model
 
@@ -50,7 +50,10 @@ ModScopeは、MO2のデータを移行しません。MO2をsource of truthとし
 
 ### Recognize
 
-ModScopeは、page observationから候補MODを示します。v0.1では、MOD identityをユーザーが確認します。
+ModScopeは、page observationのURLとtitleから候補MODを示します。
+正規化したURLまたは名称の強い一致が1件だけの場合は、hostがidentityを自動確定します。
+複数候補、弱い一致、unresolved recordは自動確定しません。
+ユーザーはいつでも候補を検索してidentityを手動確認できます。
 
 ### Local awareness
 
@@ -386,11 +389,18 @@ page observationは、次の最小情報を持ちます。
 - extraction status
 - diagnostic
 
-ページ情報からMOD identityが確定しない場合があります。確定しない状態を自動推測で閉じません。
+ページ情報からMOD identityが確定しない場合があります。
+確定しない状態を自動推測で閉じません。
+自動認識はpage URLとtitleだけを使います。
+page本文は自動認識の入力に使いません。
 
 ### 9.3 MOD identity confirmation
 
-v0.1では、ユーザーが候補MODを確認または選択します。
+強いURL一致は、scheme、query、fragment、末尾slashを正規化したhost/pathの一致です。
+強い名称一致は、Unicode、空白、大文字小文字を正規化したpage titleと、ModKey、DisplayName、DirectoryNameの完全一致です。
+部分一致は候補表示だけに使います。
+強い一致が同じMOD keyで1件だけの場合は、自動確定とInspector表示を行います。
+それ以外は、ユーザーが候補MODを確認または選択します。
 
 確認後、page observationとlocal MOD recordを結びます。結合できない場合は、unresolvedとして表示します。
 
@@ -638,12 +648,14 @@ ModScopeが管理したjunctionだけを削除します。既存junctionは、�
 - forward indexとreverse indexの最小形
 - WPF + WebView2上の最小Browse surface
 - URL、title、基本page contentのpage observation
-- ユーザーによるMOD identity confirmation
+- URL/titleによるLocal MOD候補検索
+- 高信頼な一意候補の自動identity確認
+- ユーザーによるMOD identity confirmation fallback
 - installed、not installed、active profile、known versionなどのLocal context
 - Inspectorによるlocal metadata、files、XML reference、diagnosticの確認
 - unknown、unresolved、not assessedの明示
 - Query layerが提供するneutral read model
-- page observation、手動MOD identity confirmation、Local context、Inspectorの縦切り
+- page observation、自動または手動のMOD identity confirmation、Local context、Inspectorの縦切り
 
 ### 15.2 含めないもの
 
@@ -743,7 +755,10 @@ Python、TypeScript、Browser先行の実装は今回の代替案として採用
 - WebView2とLocal contextは左右に配置します。
 - page scriptへlocal MOD情報を注入しません。
 - page observationはObserve操作で取得します。
-- MOD identityはユーザーが確認します。
+- GamePathからData/Configを推定し、存在する場合は静的解析を自動開始します。
+- page observation後とprofile switch後にLocal MOD候補を再検索します。
+- 強い一致が1件だけの場合はidentityを自動確認し、Inspectorを開きます。
+- 複数候補、弱い一致、unresolved recordは手動確認へ戻します。
 - page observationはv0.1ではメモリ上のbounded previewだけを保持します。
 - MO2 sourceはread-onlyです。
 
@@ -752,8 +767,8 @@ GUIはQuery layerのprojectionだけを読みます。
 
 ## 19. Risksとunknowns
 
-- URL、title、基本page contentだけでMOD identityを有用に候補化できるか
-- ユーザー確認を含むpage recognitionが、実際の探索負荷を下げるか
+- URLとtitleだけでMOD identityを安全に候補化できるか
+- 高信頼自動確認と手動fallbackが、実際の探索負荷を下げるか
 - Web pageの認証、cookie、scriptを安全に扱えるか
 - local profile情報を必要最小限だけpage contextへ出せるか
 - Site AdapterなしでどこまでLocal contextを提供できるか
@@ -1082,7 +1097,21 @@ Profile pathの絶対値はfrontendへ送信しません。
 `game.launch`はpayloadを持ちません。
 Source candidateにはGamePathの絶対値を渡さず、ゲーム対象の準備状態だけを渡します。
 
-### 24.3.2 Phase6 analysis bridge and display rules
+### 24.3.2 Base Data inference and Local MOD recognition
+
+Desktop hostは、内部MO2 sourceの`General.gamePath`から`GamePath\\Data\\Config`を推定します。
+推定directoryが存在する場合は、base Dataを設定してstatic analysisを自動開始します。
+存在しない場合は、`Data\\Configが見つかりません`を表示し、manual folder pickerをfallbackにします。
+推定pathはDesktop sessionだけに保持します。
+
+`browser.observe`後、source load後、profile switch後に、Queryのread-only match queryを実行します。
+candidate recordにはMOD key、display name、directory name、match kind、strength、evidenceだけを投影します。
+disabled、profile外のreadable MODを候補へ含めます。
+unresolved recordは候補へ表示できますが、自動確認の対象にしません。
+page本文、GamePath、MO2 path、LocalModSnapshotはWeb stateへ送信しません。
+`autoInspectToken`は自動Inspector表示を一度だけ通知するopaque tokenです。
+
+### 24.3.3 Phase6 analysis bridge and display rules
 
 Phase6は既存Queryの`AnalyzeConflicts`と`CompareRuntimeOcdEvidence`をDesktop hostから呼び出します。
 Desktop hostは、選択したbase Data/Config directoryとRuntimeOCD logs directoryをsession-onlyで保持します。
@@ -1353,7 +1382,7 @@ ready候補が複数件ならsource cardで選択します。
 candidateがない場合は再探索とnative folder pickerを表示します。
 unsupported candidateとload failureはsource cardへ要約表示します。
 ModListのProfile selectorは、解決済みsource内のread-only profile switchだけを実行します。
-page identity自動認識とoverlap判定は追加しません。
+高信頼page identity自動認識を追加しました。overlap判定は追加しません。
 既存のQuery modelとread-only境界を維持し、profile catalogとlayout stateを明示的なread modelへ追加します。
 
 Profile-first Browser UI整理では、左のModListにactive profileの全MODをpriority順で表示します。
