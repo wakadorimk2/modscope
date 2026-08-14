@@ -1,0 +1,92 @@
+{
+  "scenario": "same-nexus-mod-multiple-files",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "package-1",
+      "name": "synthetic-same-mod-package",
+      "relativePath": "mods/synthetic-same-mod-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-1",
+      "name": "Synthetic Same Nexus Mod",
+      "version": "3.0.0",
+      "relativePath": "mods/synthetic-same-mod-package/same-modlet/ModInfo.xml"
+    },
+    {
+      "kind": "nexus-mod",
+      "id": "nexus-mod-1",
+      "modId": "synthetic-mod-7001"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-1",
+      "fileId": "synthetic-file-8001",
+      "version": "3.0.0"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-2",
+      "fileId": "synthetic-file-8002",
+      "version": "3.0.1"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-3",
+      "fileId": "synthetic-file-8003",
+      "version": "3.1.0"
+    }
+  ],
+  "relations": [
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-1"
+    },
+    {
+      "from": "modlet-1",
+      "type": "candidate-source",
+      "to": "nexus-file-1"
+    },
+    {
+      "from": "modlet-1",
+      "type": "candidate-source",
+      "to": "nexus-file-2"
+    },
+    {
+      "from": "modlet-1",
+      "type": "candidate-source",
+      "to": "nexus-file-3"
+    },
+    {
+      "from": "nexus-file-1",
+      "type": "belongs-to",
+      "to": "nexus-mod-1"
+    },
+    {
+      "from": "nexus-file-2",
+      "type": "belongs-to",
+      "to": "nexus-mod-1"
+    },
+    {
+      "from": "nexus-file-3",
+      "type": "belongs-to",
+      "to": "nexus-mod-1"
+    }
+  ],
+  "observations": [
+    {
+      "type": "same-nexus-mod-multiple-files",
+      "target": "nexus-mod-1",
+      "value": 3
+    }
+  ],
+  "expected": {
+    "identityStatus": "ambiguous",
+    "versionStatus": "not-comparable",
+    "notes": [
+      "modID alone does not identify the selected file."
+    ]
+  }
+}

@@ -1,0 +1,2 @@
+# Synthetic IZY-like package fixture
++izy-like-package

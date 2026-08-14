@@ -1,0 +1,2 @@
+# Synthetic same Nexus Mod, multiple files fixture
++synthetic-same-mod-package

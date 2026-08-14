@@ -1,0 +1,102 @@
+{
+  "scenario": "ambiguous-meta",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "package-1",
+      "name": "synthetic-ambiguous-package",
+      "relativePath": "mods/synthetic-ambiguous-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-1",
+      "name": "Synthetic Ambiguous Modlet",
+      "version": "4.1.1",
+      "relativePath": "mods/synthetic-ambiguous-package/ambiguous-modlet/ModInfo.xml"
+    },
+    {
+      "kind": "nexus-mod",
+      "id": "nexus-mod-1",
+      "modId": "synthetic-mod-3001"
+    },
+    {
+      "kind": "nexus-mod",
+      "id": "nexus-mod-2",
+      "modId": "synthetic-mod-3002"
+    },
+    {
+      "kind": "nexus-mod",
+      "id": "nexus-mod-3",
+      "modId": "synthetic-mod-3003"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-1",
+      "fileId": "synthetic-file-4001",
+      "version": "4.1.1"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-2",
+      "fileId": "synthetic-file-4002",
+      "version": "4.1.0"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-3",
+      "fileId": "synthetic-file-4003",
+      "version": "4.0.0"
+    }
+  ],
+  "relations": [
+    {
+      "from": "package-1",
+      "type": "contains",
+      "to": "modlet-1"
+    },
+    {
+      "from": "modlet-1",
+      "type": "candidate-source",
+      "to": "nexus-file-1"
+    },
+    {
+      "from": "modlet-1",
+      "type": "candidate-source",
+      "to": "nexus-file-2"
+    },
+    {
+      "from": "modlet-1",
+      "type": "candidate-source",
+      "to": "nexus-file-3"
+    },
+    {
+      "from": "nexus-file-1",
+      "type": "belongs-to",
+      "to": "nexus-mod-1"
+    },
+    {
+      "from": "nexus-file-2",
+      "type": "belongs-to",
+      "to": "nexus-mod-2"
+    },
+    {
+      "from": "nexus-file-3",
+      "type": "belongs-to",
+      "to": "nexus-mod-3"
+    }
+  ],
+  "observations": [
+    {
+      "type": "ambiguous-meta-candidates",
+      "target": "modlet-1",
+      "value": 3
+    }
+  ],
+  "expected": {
+    "identityStatus": "ambiguous",
+    "versionStatus": "not-comparable",
+    "notes": [
+      "Do not select the closest name automatically."
+    ]
+  }
+}
