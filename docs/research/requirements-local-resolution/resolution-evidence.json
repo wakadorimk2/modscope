@@ -1,0 +1,1683 @@
+{
+  "schema_version": "local-resolution-evidence-1",
+  "generated_at": "2026-08-14T10:46:58Z",
+  "baseline": {
+    "dataset_path": "analysis/requirements-research/dataset.csv",
+    "total_observations": 549,
+    "unresolved_target_identity_observations": 33,
+    "unresolved_target_identity_unique_raw_names": 30,
+    "target_rows_with_nexus_mod_id": 0,
+    "target_rows_with_local_evidence": 33
+  },
+  "scope": {
+    "local_root": {
+      "relative_to_workspace": "wabbajack/smorgasbord",
+      "exists": true,
+      "role": "MO2 portable instance"
+    },
+    "mods": {
+      "relative_to_workspace": "wabbajack/smorgasbord/mods",
+      "exists": true,
+      "role": "installed MO2 packages and Modlets"
+    },
+    "requested_downloads": {
+      "relative_to_workspace": "downloads/smorgasbord",
+      "exists": false,
+      "status": "not_observable"
+    },
+    "actual_configured_downloads": {
+      "relative_to_workspace": "wabbajack/smorgasbord/downloads",
+      "exists": true,
+      "status": "observed"
+    },
+    "profiles": {
+      "relative_to_workspace": "wabbajack/smorgasbord/profiles",
+      "exists": true,
+      "role": "MO2 profile and modlist"
+    }
+  },
+  "resolution_summary": {
+    "observation_count": 33,
+    "unique_target_raw_name_count": 30,
+    "status_counts": {
+      "ambiguous": 2,
+      "not_applicable": 18,
+      "not_found_locally": 9,
+      "partially_resolved": 2,
+      "resolved": 2
+    },
+    "target_kind_counts": {
+      "environment": 3,
+      "manual_step": 9,
+      "mod": 15,
+      "unresolved_reference": 6
+    },
+    "resolved_local_package_observation_count": 4,
+    "resolved_local_modlet_observation_count": 2,
+    "resolved_nexus_mod_id_observation_count": 3,
+    "resolved_nexus_file_id_observation_count": 3,
+    "local_evidence_observation_count": 4,
+    "local_evidence_rate": 0.1212,
+    "evidence_contribution_counts": {
+      "multiple_local_sources": 3,
+      "none": 29,
+      "package_name_only": 1
+    }
+  },
+  "target_observations": [
+    {
+      "observation_id": "local-resolution-0011",
+      "baseline_row_number": 12,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "mod (enabled by default)",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "github_readme",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=12",
+        "source_url_safe": "",
+        "source_locator": "readme sentence 84",
+        "evidence": "This is an optional mod (enabled by default).",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is an instruction or a fragment of a sentence, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "github_readme",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=12",
+          "source_url_safe": "",
+          "source_locator": "readme sentence 84",
+          "evidence": "This is an optional mod (enabled by default).",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0013",
+      "baseline_row_number": 14,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "**ONE UI Suite** (Choose either Cat or Steel, or disable both for vanilla)",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "github_readme",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=14",
+        "source_url_safe": "",
+        "source_locator": "readme sentence 138",
+        "evidence": "- Choose **ONE UI Suite** (Choose either Cat or Steel, or disable both for vanilla)",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": "local-any-2d6712d9b7",
+        "operator": "any"
+      },
+      "resolution_status": "ambiguous",
+      "confidence": "low",
+      "in_smorgasbord": "unknown",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "name similarity produced candidate(s); automatic identity resolution was intentionally withheld",
+      "evidence": [
+        {
+          "source_kind": "github_readme",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=14",
+          "source_url_safe": "",
+          "source_locator": "readme sentence 138",
+          "evidence": "- Choose **ONE UI Suite** (Choose either Cat or Steel, or disable both for vanilla)",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": [
+        {
+          "score": 0.75,
+          "package_path": "mods/CATUI",
+          "package_name": "CATUI",
+          "matched_field": "modinfo_display_name",
+          "matched_value": "CATUI"
+        },
+        {
+          "score": 0.75,
+          "package_path": "mods/CATUI Backpack - 91 Slot",
+          "package_name": "CATUI Backpack - 91 Slot",
+          "matched_field": "modinfo_display_name",
+          "matched_value": "CATUI_backpack_91slot"
+        },
+        {
+          "score": 0.75,
+          "package_path": "mods/CATUI Toolbelt - 12 Slot - Configurable",
+          "package_name": "CATUI Toolbelt - 12 Slot - Configurable",
+          "matched_field": "modinfo_display_name",
+          "matched_value": "CATUI_toolbelt_more_slot"
+        },
+        {
+          "score": 0.75,
+          "package_path": "mods/Steelshot UI - Black Glass Style - Includes a Toolbelt (15) and Backpack (90)",
+          "package_name": "Steelshot UI - Black Glass Style - Includes a Toolbelt (15) and Backpack (90)",
+          "matched_field": "modinfo_display_name",
+          "matched_value": "Steelshot UI Hybrid (Beta)"
+        }
+      ]
+    },
+    {
+      "observation_id": "local-resolution-0014",
+      "baseline_row_number": 15,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "mods as desired",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "github_readme",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=15",
+        "source_url_safe": "",
+        "source_locator": "readme sentence 140",
+        "evidence": "- Enable optional mods as desired",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is an instruction or a fragment of a sentence, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "github_readme",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=15",
+          "source_url_safe": "",
+          "source_locator": "readme sentence 140",
+          "evidence": "- Enable optional mods as desired",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0017",
+      "baseline_row_number": 18,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "mods selected and your hardware",
+      "target_kind": "environment",
+      "baseline_source": {
+        "source_kind": "github_readme",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=18",
+        "source_url_safe": "",
+        "source_locator": "readme sentence 147",
+        "evidence": "This depends on mods selected and your hardware.",
+        "relationship_type": "hard_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text describes hardware or game-start condition",
+      "evidence": [
+        {
+          "source_kind": "github_readme",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=18",
+          "source_url_safe": "",
+          "source_locator": "readme sentence 147",
+          "evidence": "This depends on mods selected and your hardware.",
+          "relationship_type": "hard_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0032",
+      "baseline_row_number": 33,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "stronger hardware",
+      "target_kind": "environment",
+      "baseline_source": {
+        "source_kind": "github_installation_guide",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=33",
+        "source_url_safe": "",
+        "source_locator": "installation sentence 9",
+        "evidence": "⚠️ Some mods are heavier and may require stronger hardware",
+        "relationship_type": "hard_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text describes hardware or game-start condition",
+      "evidence": [
+        {
+          "source_kind": "github_installation_guide",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=33",
+          "source_url_safe": "",
+          "source_locator": "installation sentence 9",
+          "evidence": "⚠️ Some mods are heavier and may require stronger hardware",
+          "relationship_type": "hard_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0037",
+      "baseline_row_number": 38,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "new game",
+      "target_kind": "environment",
+      "baseline_source": {
+        "source_kind": "github_installation_guide",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=38",
+        "source_url_safe": "",
+        "source_locator": "installation sentence 123",
+        "evidence": "Not save-safe → requires new game",
+        "relationship_type": "hard_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text describes hardware or game-start condition",
+      "evidence": [
+        {
+          "source_kind": "github_installation_guide",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=38",
+          "source_url_safe": "",
+          "source_locator": "installation sentence 123",
+          "evidence": "Not save-safe → requires new game",
+          "relationship_type": "hard_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0042",
+      "baseline_row_number": 43,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "Parachute item mod",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "github_mod_notes",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=43",
+        "source_url_safe": "",
+        "source_locator": "mod_notes sentence 11",
+        "evidence": "You need the Parachute item mod installed on your chest armor, and a single use parachute item in your tool belt for it to work.",
+        "relationship_type": "hard_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "github_mod_notes",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=43",
+          "source_url_safe": "",
+          "source_locator": "mod_notes sentence 11",
+          "evidence": "You need the Parachute item mod installed on your chest armor, and a single use parachute item in your tool belt for it to work.",
+          "relationship_type": "hard_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0043",
+      "baseline_row_number": 44,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "Advanced Weapons Repair Kit",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "github_mod_notes",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=44",
+        "source_url_safe": "",
+        "source_locator": "mod_notes sentence 29",
+        "evidence": "Some Tier 3 and all Tier 4 Weapons require the Advanced Weapons Repair Kit.",
+        "relationship_type": "hard_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "github_mod_notes",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=44",
+          "source_url_safe": "",
+          "source_locator": "mod_notes sentence 29",
+          "evidence": "Some Tier 3 and all Tier 4 Weapons require the Advanced Weapons Repair Kit.",
+          "relationship_type": "hard_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0044",
+      "baseline_row_number": 45,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "Advanced Weapons Repair Kit to repair it",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "github_mod_notes",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=45",
+        "source_url_safe": "",
+        "source_locator": "mod_notes sentence 30",
+        "evidence": "If a weapon has a gold star on the icon, it needs an Advanced Weapons Repair Kit to repair it.",
+        "relationship_type": "hard_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "github_mod_notes",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=45",
+          "source_url_safe": "",
+          "source_locator": "mod_notes sentence 30",
+          "evidence": "If a weapon has a gold star on the icon, it needs an Advanced Weapons Repair Kit to repair it.",
+          "relationship_type": "hard_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0045",
+      "baseline_row_number": 46,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "Legendary Part",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "github_mod_notes",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=46",
+        "source_url_safe": "",
+        "source_locator": "mod_notes sentence 32",
+        "evidence": "requires a Legendary Part.",
+        "relationship_type": "hard_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "github_mod_notes",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=46",
+          "source_url_safe": "",
+          "source_locator": "mod_notes sentence 32",
+          "evidence": "requires a Legendary Part.",
+          "relationship_type": "hard_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0046",
+      "baseline_row_number": 47,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "to change the shape variation of the red-dot sight, hold the reflex sight in hand and press the right or left mouse button",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "github_mod_notes",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=47",
+        "source_url_safe": "",
+        "source_locator": "mod_notes sentence 34",
+        "evidence": "If you want to change the shape variation of the red-dot sight, hold the reflex sight in hand and press the right or left mouse button.",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is an instruction or a fragment of a sentence, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "github_mod_notes",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=47",
+          "source_url_safe": "",
+          "source_locator": "mod_notes sentence 34",
+          "evidence": "If you want to change the shape variation of the red-dot sight, hold the reflex sight in hand and press the right or left mouse button.",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0047",
+      "baseline_row_number": 48,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "to toggle the flashlight on/off, you can crouch, then press the F-key",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "github_mod_notes",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=48",
+        "source_url_safe": "",
+        "source_locator": "mod_notes sentence 43",
+        "evidence": "If you want to toggle the flashlight on/off, you can crouch, then press the F-key.",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is an instruction or a fragment of a sentence, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "github_mod_notes",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=48",
+          "source_url_safe": "",
+          "source_locator": "mod_notes sentence 43",
+          "evidence": "If you want to toggle the flashlight on/off, you can crouch, then press the F-key.",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0048",
+      "baseline_row_number": 49,
+      "subject_nexus_mod_id": "6764",
+      "subject_name": "Smorgasbord",
+      "target_raw_name": "this mod enabled",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "github_mod_notes",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=49",
+        "source_url_safe": "",
+        "source_locator": "mod_notes sentence 47",
+        "evidence": "You must have this mod enabled when you start a new save.",
+        "relationship_type": "hard_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is an instruction or a fragment of a sentence, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "github_mod_notes",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=49",
+          "source_url_safe": "",
+          "source_locator": "mod_notes sentence 47",
+          "evidence": "You must have this mod enabled when you start a new save.",
+          "relationship_type": "hard_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0061",
+      "baseline_row_number": 62,
+      "subject_nexus_mod_id": "2832",
+      "subject_name": "Bungalow",
+      "target_raw_name": "jaildoors",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_offsite_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=62",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+        "source_locator": "Nexus offsite_requirements row 1",
+        "evidence": "jaildoors | check version!",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_offsite_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=62",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+          "source_locator": "Nexus offsite_requirements row 1",
+          "evidence": "jaildoors | check version!",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0062",
+      "baseline_row_number": 63,
+      "subject_nexus_mod_id": "2832",
+      "subject_name": "Bungalow",
+      "target_raw_name": "Smitty's Bunker Assets",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_offsite_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=63",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+        "source_locator": "Nexus offsite_requirements row 2",
+        "evidence": "Smitty's Bunker Assets |",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_offsite_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=63",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+          "source_locator": "Nexus offsite_requirements row 2",
+          "evidence": "Smitty's Bunker Assets |",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0063",
+      "baseline_row_number": 64,
+      "subject_nexus_mod_id": "2832",
+      "subject_name": "Bungalow",
+      "target_raw_name": "Videoplayers",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_offsite_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=64",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+        "source_locator": "Nexus offsite_requirements row 3",
+        "evidence": "Videoplayers |",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_offsite_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=64",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+          "source_locator": "Nexus offsite_requirements row 3",
+          "evidence": "Videoplayers |",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0064",
+      "baseline_row_number": 65,
+      "subject_nexus_mod_id": "2832",
+      "subject_name": "Bungalow",
+      "target_raw_name": "War3zuk HD Forge",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_offsite_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=65",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+        "source_locator": "Nexus offsite_requirements row 4",
+        "evidence": "War3zuk HD Forge |",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_offsite_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=65",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+          "source_locator": "Nexus offsite_requirements row 4",
+          "evidence": "War3zuk HD Forge |",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0065",
+      "baseline_row_number": 66,
+      "subject_nexus_mod_id": "2832",
+      "subject_name": "Bungalow",
+      "target_raw_name": "Ztensity's Unnecessarily Beautiful But Immersive (UBBI)",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_offsite_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=66",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+        "source_locator": "Nexus offsite_requirements row 5",
+        "evidence": "Ztensity's Unnecessarily Beautiful But Immersive (UBBI) |",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_found_locally",
+      "confidence": "low",
+      "in_smorgasbord": "no",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "no exact local package, Modlet, or ModInfo identity was observed",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_offsite_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=66",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/2832",
+          "source_locator": "Nexus offsite_requirements row 5",
+          "evidence": "Ztensity's Unnecessarily Beautiful But Immersive (UBBI) |",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0131",
+      "baseline_row_number": 132,
+      "subject_nexus_mod_id": "10789",
+      "subject_name": "WitosRootMRat.7z",
+      "target_raw_name": "missiles, and camera systems",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "nexus_description",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=132",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/10789",
+        "source_locator": "Nexus Description sentence 1",
+        "evidence": "About this mod Adds the M-RAT, a seven-seat armored military vehicle with five mounted machine guns, optional missiles, and camera systems.",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is a description fragment, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "nexus_description",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=132",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/10789",
+          "source_locator": "Nexus Description sentence 1",
+          "evidence": "About this mod Adds the M-RAT, a seven-seat armored military vehicle with five mounted machine guns, optional missiles, and camera systems.",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0174",
+      "baseline_row_number": 175,
+      "subject_nexus_mod_id": "8466",
+      "subject_name": "LittleRedSonja_Mumpfy_ArmorPack06_Resident_Evil.zip",
+      "target_raw_name": "LittleRedSonja Cosmetic Armor System (CAS)",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=175",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+        "source_locator": "Nexus nexus_requirements row 1",
+        "evidence": "LittleRedSonja Cosmetic Armor System (CAS) | Only required if you want to integrate the armors into the V2 cosmetic system. Only for game v2 or later",
+        "relationship_type": "optional_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "resolved",
+      "confidence": "medium",
+      "in_smorgasbord": "yes",
+      "resolved_identity": {
+        "kind": "local_modlet",
+        "package_path": "mods/LittleRedSonja Cosmetic Armor System (CAS)",
+        "package_name": "LittleRedSonja Cosmetic Armor System (CAS)",
+        "modlet_paths": [
+          "LittleRedSonja Cosmetic Armor System (CAS)/LittleRedSonja_CAS"
+        ],
+        "modinfo_names": [
+          "LittleRedSonja_CAS"
+        ],
+        "display_names": [
+          "LittleRedSonja Cosmetic Armor System"
+        ],
+        "enabled_state": "enabled",
+        "archive_path": "downloads/LittleRedSonja_CAS_3.0.0_ARC10F1ed.zip",
+        "nexus_mod_id": 7591,
+        "nexus_file_id": 41465,
+        "archive_link_status": "strong_name_link"
+      },
+      "matched_fields": [
+        "archive_name",
+        "meta_file_id",
+        "meta_mod_id",
+        "modinfo_display_name",
+        "package_name"
+      ],
+      "conflicting_fields": [],
+      "unresolved_reason": "exact ModInfo name/display name matched; archive linkage remains separately qualified",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=175",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+          "source_locator": "Nexus nexus_requirements row 1",
+          "evidence": "LittleRedSonja Cosmetic Armor System (CAS) | Only required if you want to integrate the armors into the V2 cosmetic system. Only for game v2 or later",
+          "relationship_type": "optional_dependency",
+          "confidence": "high"
+        },
+        {
+          "source_kind": "local_package_name",
+          "source_ref": "local:mods/LittleRedSonja Cosmetic Armor System (CAS)",
+          "source_locator": "package directory name",
+          "evidence": "LittleRedSonja Cosmetic Armor System (CAS)",
+          "evidence_class": "package_name_exact"
+        },
+        {
+          "source_kind": "local_modinfo",
+          "source_ref": "local:mods/LittleRedSonja Cosmetic Armor System (CAS)/LittleRedSonja_CAS/ModInfo.xml",
+          "source_locator": "modinfo_display_name",
+          "evidence": "LittleRedSonja Cosmetic Armor System",
+          "evidence_class": "modinfo_exact_name"
+        },
+        {
+          "source_kind": "local_meta",
+          "source_ref": "local:downloads/LittleRedSonja_CAS_3.0.0_ARC10F1ed.zip.meta",
+          "source_locator": "[General] modID/fileID",
+          "evidence": "modID=7591; fileID=41465",
+          "evidence_class": "meta_identity"
+        },
+        {
+          "source_kind": "local_archive_name",
+          "source_ref": "local:downloads/LittleRedSonja_CAS_3.0.0_ARC10F1ed.zip",
+          "source_locator": "archive filename linkage",
+          "evidence": "LittleRedSonja_CAS_3.0.0_ARC10F1ed.zip",
+          "evidence_class": "archive_name_linkage"
+        },
+        {
+          "source_kind": "local_readme_or_document",
+          "source_ref": "local:mods/LittleRedSonja Cosmetic Armor System (CAS)/LittleRedSonja_CAS/Changelog.txt",
+          "source_locator": "line 19",
+          "evidence": "1.2.0 - Adds a configuration file that allows you to choose and switch between 3 options on how to use and unlock your cosmetics: \"Standard\" (the cosmetics will unlock like in vanilla, you need to scrap the armor to unlock the cosmetic), \"UnlockAll\" (ALL the cosmetics are unlocked and available fro…",
+          "evidence_class": "readme_or_document"
+        },
+        {
+          "source_kind": "local_readme_or_document",
+          "source_ref": "local:mods/LittleRedSonja Cosmetic Armor System (CAS)/LittleRedSonja_CAS/Readme.txt",
+          "source_locator": "line 7",
+          "evidence": "To verify you have installed the mod correctly, the ModInfo.xml file should be located at Mods\\LittleRedSonja_CAS\\ModInfo.xml relative to your 7D2D install folder.",
+          "evidence_class": "readme_or_document"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0175",
+      "baseline_row_number": 176,
+      "subject_nexus_mod_id": "8466",
+      "subject_name": "LittleRedSonja_Mumpfy_ArmorPack06_Resident_Evil.zip",
+      "target_raw_name": "Language",
+      "target_kind": "unresolved_reference",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=176",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+        "source_locator": "Nexus nexus_requirements row 2",
+        "evidence": "Language | Name",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "structured row appears to describe language or translation author metadata; no package identity assertion was made",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=176",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+          "source_locator": "Nexus nexus_requirements row 2",
+          "evidence": "Language | Name",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0176",
+      "baseline_row_number": 177,
+      "subject_nexus_mod_id": "8466",
+      "subject_name": "LittleRedSonja_Mumpfy_ArmorPack06_Resident_Evil.zip",
+      "target_raw_name": "Russian Author: Slobodskoy",
+      "target_kind": "unresolved_reference",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=177",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+        "source_locator": "Nexus nexus_requirements row 3",
+        "evidence": "Russian Author: Slobodskoy | LittleRedSonja and Mumpfy ArmorPack06 Resident Evil RUS",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "structured row appears to describe language or translation author metadata; no package identity assertion was made",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=177",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+          "source_locator": "Nexus nexus_requirements row 3",
+          "evidence": "Russian Author: Slobodskoy | LittleRedSonja and Mumpfy ArmorPack06 Resident Evil RUS",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0177",
+      "baseline_row_number": 178,
+      "subject_nexus_mod_id": "8466",
+      "subject_name": "LittleRedSonja_Mumpfy_ArmorPack06_Resident_Evil.zip",
+      "target_raw_name": "German Author: Scomar",
+      "target_kind": "unresolved_reference",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=178",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+        "source_locator": "Nexus nexus_requirements row 4",
+        "evidence": "German Author: Scomar | LittleRedSonja_Mumpfy_ArmorPack06_ResidentEvil-Deutsch",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "structured row appears to describe language or translation author metadata; no package identity assertion was made",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=178",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+          "source_locator": "Nexus nexus_requirements row 4",
+          "evidence": "German Author: Scomar | LittleRedSonja_Mumpfy_ArmorPack06_ResidentEvil-Deutsch",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0181",
+      "baseline_row_number": 182,
+      "subject_nexus_mod_id": "8466",
+      "subject_name": "LittleRedSonja_Mumpfy_ArmorPack06_Resident_Evil.zip",
+      "target_raw_name": "to integrate the armors into the V2 cosmetic system",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "nexus_description",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=182",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+        "source_locator": "Nexus Description sentence 8",
+        "evidence": "Requirements Nexus requirements Nexus requirements Mod name Notes LittleRedSonja Cosmetic Armor System (CAS) Only required if you want to integrate the armors into the V2 cosmetic system.",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is an instruction or a fragment of a sentence, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "nexus_description",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=182",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8466",
+          "source_locator": "Nexus Description sentence 8",
+          "evidence": "Requirements Nexus requirements Nexus requirements Mod name Notes LittleRedSonja Cosmetic Armor System (CAS) Only required if you want to integrate the armors into the V2 cosmetic system.",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0199",
+      "baseline_row_number": 200,
+      "subject_nexus_mod_id": "7344",
+      "subject_name": "LittleRedSonja_and_Mumpfy_ArmorPack01_DangerGirls_2.2.0_Dz6pUCLin.zip",
+      "target_raw_name": "LittleRedSonja Cosmetic Armor System (CAS)",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=200",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+        "source_locator": "Nexus nexus_requirements row 1",
+        "evidence": "LittleRedSonja Cosmetic Armor System (CAS) | Only required if you want to integrate the armors into the 2.0 cosmetic system. Only for game v2 or later",
+        "relationship_type": "optional_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "resolved",
+      "confidence": "medium",
+      "in_smorgasbord": "yes",
+      "resolved_identity": {
+        "kind": "local_modlet",
+        "package_path": "mods/LittleRedSonja Cosmetic Armor System (CAS)",
+        "package_name": "LittleRedSonja Cosmetic Armor System (CAS)",
+        "modlet_paths": [
+          "LittleRedSonja Cosmetic Armor System (CAS)/LittleRedSonja_CAS"
+        ],
+        "modinfo_names": [
+          "LittleRedSonja_CAS"
+        ],
+        "display_names": [
+          "LittleRedSonja Cosmetic Armor System"
+        ],
+        "enabled_state": "enabled",
+        "archive_path": "downloads/LittleRedSonja_CAS_3.0.0_ARC10F1ed.zip",
+        "nexus_mod_id": 7591,
+        "nexus_file_id": 41465,
+        "archive_link_status": "strong_name_link"
+      },
+      "matched_fields": [
+        "archive_name",
+        "meta_file_id",
+        "meta_mod_id",
+        "modinfo_display_name",
+        "package_name"
+      ],
+      "conflicting_fields": [],
+      "unresolved_reason": "exact ModInfo name/display name matched; archive linkage remains separately qualified",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=200",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+          "source_locator": "Nexus nexus_requirements row 1",
+          "evidence": "LittleRedSonja Cosmetic Armor System (CAS) | Only required if you want to integrate the armors into the 2.0 cosmetic system. Only for game v2 or later",
+          "relationship_type": "optional_dependency",
+          "confidence": "high"
+        },
+        {
+          "source_kind": "local_package_name",
+          "source_ref": "local:mods/LittleRedSonja Cosmetic Armor System (CAS)",
+          "source_locator": "package directory name",
+          "evidence": "LittleRedSonja Cosmetic Armor System (CAS)",
+          "evidence_class": "package_name_exact"
+        },
+        {
+          "source_kind": "local_modinfo",
+          "source_ref": "local:mods/LittleRedSonja Cosmetic Armor System (CAS)/LittleRedSonja_CAS/ModInfo.xml",
+          "source_locator": "modinfo_display_name",
+          "evidence": "LittleRedSonja Cosmetic Armor System",
+          "evidence_class": "modinfo_exact_name"
+        },
+        {
+          "source_kind": "local_meta",
+          "source_ref": "local:downloads/LittleRedSonja_CAS_3.0.0_ARC10F1ed.zip.meta",
+          "source_locator": "[General] modID/fileID",
+          "evidence": "modID=7591; fileID=41465",
+          "evidence_class": "meta_identity"
+        },
+        {
+          "source_kind": "local_archive_name",
+          "source_ref": "local:downloads/LittleRedSonja_CAS_3.0.0_ARC10F1ed.zip",
+          "source_locator": "archive filename linkage",
+          "evidence": "LittleRedSonja_CAS_3.0.0_ARC10F1ed.zip",
+          "evidence_class": "archive_name_linkage"
+        },
+        {
+          "source_kind": "local_readme_or_document",
+          "source_ref": "local:mods/LittleRedSonja Cosmetic Armor System (CAS)/LittleRedSonja_CAS/Changelog.txt",
+          "source_locator": "line 19",
+          "evidence": "1.2.0 - Adds a configuration file that allows you to choose and switch between 3 options on how to use and unlock your cosmetics: \"Standard\" (the cosmetics will unlock like in vanilla, you need to scrap the armor to unlock the cosmetic), \"UnlockAll\" (ALL the cosmetics are unlocked and available fro…",
+          "evidence_class": "readme_or_document"
+        },
+        {
+          "source_kind": "local_readme_or_document",
+          "source_ref": "local:mods/LittleRedSonja Cosmetic Armor System (CAS)/LittleRedSonja_CAS/Readme.txt",
+          "source_locator": "line 7",
+          "evidence": "To verify you have installed the mod correctly, the ModInfo.xml file should be located at Mods\\LittleRedSonja_CAS\\ModInfo.xml relative to your 7D2D install folder.",
+          "evidence_class": "readme_or_document"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0200",
+      "baseline_row_number": 201,
+      "subject_nexus_mod_id": "7344",
+      "subject_name": "LittleRedSonja_and_Mumpfy_ArmorPack01_DangerGirls_2.2.0_Dz6pUCLin.zip",
+      "target_raw_name": "Language",
+      "target_kind": "unresolved_reference",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=201",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+        "source_locator": "Nexus nexus_requirements row 2",
+        "evidence": "Language | Name",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "structured row appears to describe language or translation author metadata; no package identity assertion was made",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=201",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+          "source_locator": "Nexus nexus_requirements row 2",
+          "evidence": "Language | Name",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0201",
+      "baseline_row_number": 202,
+      "subject_nexus_mod_id": "7344",
+      "subject_name": "LittleRedSonja_and_Mumpfy_ArmorPack01_DangerGirls_2.2.0_Dz6pUCLin.zip",
+      "target_raw_name": "Russian Author: Slobodskoy",
+      "target_kind": "unresolved_reference",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=202",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+        "source_locator": "Nexus nexus_requirements row 3",
+        "evidence": "Russian Author: Slobodskoy | LittleRedSonja_Mumpfy_ArmorPack01_DangerGirls RUS",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "structured row appears to describe language or translation author metadata; no package identity assertion was made",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=202",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+          "source_locator": "Nexus nexus_requirements row 3",
+          "evidence": "Russian Author: Slobodskoy | LittleRedSonja_Mumpfy_ArmorPack01_DangerGirls RUS",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0202",
+      "baseline_row_number": 203,
+      "subject_nexus_mod_id": "7344",
+      "subject_name": "LittleRedSonja_and_Mumpfy_ArmorPack01_DangerGirls_2.2.0_Dz6pUCLin.zip",
+      "target_raw_name": "German Author: Kaffeekirsche",
+      "target_kind": "unresolved_reference",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=203",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+        "source_locator": "Nexus nexus_requirements row 4",
+        "evidence": "German Author: Kaffeekirsche | LittleRedSonja Mumpfy ArmorPack01 DangerGirls - German",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "structured row appears to describe language or translation author metadata; no package identity assertion was made",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=203",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+          "source_locator": "Nexus nexus_requirements row 4",
+          "evidence": "German Author: Kaffeekirsche | LittleRedSonja Mumpfy ArmorPack01 DangerGirls - German",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0204",
+      "baseline_row_number": 205,
+      "subject_nexus_mod_id": "7344",
+      "subject_name": "LittleRedSonja_and_Mumpfy_ArmorPack01_DangerGirls_2.2.0_Dz6pUCLin.zip",
+      "target_raw_name": "to integrate the armors into the 2",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "nexus_description",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=205",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+        "source_locator": "Nexus Description sentence 7",
+        "evidence": "Requirements Nexus requirements Nexus requirements Mod name Notes LittleRedSonja Cosmetic Armor System (CAS) Only required if you want to integrate the armors into the 2.0 cosmetic system.",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is an instruction or a fragment of a sentence, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "nexus_description",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=205",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/7344",
+          "source_locator": "Nexus Description sentence 7",
+          "evidence": "Requirements Nexus requirements Nexus requirements Mod name Notes LittleRedSonja Cosmetic Armor System (CAS) Only required if you want to integrate the armors into the 2.0 cosmetic system.",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0221",
+      "baseline_row_number": 222,
+      "subject_nexus_mod_id": "8211",
+      "subject_name": "TechFreqsTLDRAutoReadDukeNoteV1.1(V3.0)_1.1_mlA9wJ9lM.zip",
+      "target_raw_name": "to survive” buff/message on new games",
+      "target_kind": "manual_step",
+      "baseline_source": {
+        "source_kind": "nexus_description",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=222",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8211",
+        "source_locator": "Nexus Description sentence 1",
+        "evidence": "About this mod The TechFreqsTLDR Auto Read Duke Note is an ultra-lightweight modlet removes the Duke’s note from your starting inventory and completely disables the annoying “Read this note if you want to survive” buff/message on new games.",
+        "relationship_type": "optional_dependency",
+        "confidence": "medium"
+      },
+      "relationship_type": "optional_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "not_applicable",
+      "confidence": "medium",
+      "in_smorgasbord": "not_applicable",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "target text is an instruction or a fragment of a sentence, not a stable identity",
+      "evidence": [
+        {
+          "source_kind": "nexus_description",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=222",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8211",
+          "source_locator": "Nexus Description sentence 1",
+          "evidence": "About this mod The TechFreqsTLDR Auto Read Duke Note is an ultra-lightweight modlet removes the Duke’s note from your starting inventory and completely disables the annoying “Read this note if you want to survive” buff/message on new games.",
+          "relationship_type": "optional_dependency",
+          "confidence": "medium"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0223",
+      "baseline_row_number": 224,
+      "subject_nexus_mod_id": "6926",
+      "subject_name": "Vault Pack - Combined (3.1) 6926 3.1.1 2026-08-07T23-10Z xisFfaGPK.zip",
+      "target_raw_name": "The Descent - Procedural caves - V2.5",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=224",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/6926",
+        "source_locator": "Nexus nexus_requirements row 1",
+        "evidence": "The Descent - Procedural caves - V2.5 | Required for Vaults to Spawn: (TheDescent) - (TheDescent-cave-assets) - (7DTD-mod-utils)",
+        "relationship_type": "game_version_requirement",
+        "confidence": "high"
+      },
+      "relationship_type": "game_version_requirement",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "ambiguous",
+      "confidence": "low",
+      "in_smorgasbord": "unknown",
+      "resolved_identity": null,
+      "matched_fields": [],
+      "conflicting_fields": [],
+      "unresolved_reason": "name similarity produced candidate(s); automatic identity resolution was intentionally withheld",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=224",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/6926",
+          "source_locator": "Nexus nexus_requirements row 1",
+          "evidence": "The Descent - Procedural caves - V2.5 | Required for Vaults to Spawn: (TheDescent) - (TheDescent-cave-assets) - (7DTD-mod-utils)",
+          "relationship_type": "game_version_requirement",
+          "confidence": "high"
+        }
+      ],
+      "suggestions": [
+        {
+          "score": 0.88,
+          "package_path": "mods/The Descent - Procedural caves - 16GB+ RAM Required - Must be enabled when you create a map!",
+          "package_name": "The Descent - Procedural caves - 16GB+ RAM Required - Must be enabled when you create a map!",
+          "matched_field": "package_name",
+          "matched_value": "The Descent - Procedural caves - 16GB+ RAM Required - Must be enabled when you create a map!"
+        }
+      ]
+    },
+    {
+      "observation_id": "local-resolution-0341",
+      "baseline_row_number": 342,
+      "subject_nexus_mod_id": "8310",
+      "subject_name": "vinylplz's LRS Weapons In Loot and Traders 8310 3.0.1 2hZsQos8a.zip",
+      "target_raw_name": "LittleRedSonja T2 into T3 grade weapons",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=342",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8310",
+        "source_locator": "Nexus nexus_requirements row 1",
+        "evidence": "LittleRedSonja T2 into T3 grade weapons | v2.0.1 \"full\" or \"melee only\" release, plus optionally \"big bad bat\"",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "partially_resolved",
+      "confidence": "low",
+      "in_smorgasbord": "yes",
+      "resolved_identity": {
+        "kind": "local_package",
+        "package_path": "mods/LittleRedSonja T2 into T3 grade weapons",
+        "package_name": "LittleRedSonja T2 into T3 grade weapons",
+        "modlet_paths": [
+          "LittleRedSonja T2 into T3 grade weapons/LittleRedSonja_T2IT3weapons"
+        ],
+        "modinfo_names": [
+          "LittleRedSonja_T2IT3"
+        ],
+        "display_names": [
+          "LittleRedSonja Tier 2 into Tier 3 Weapons"
+        ],
+        "enabled_state": "enabled",
+        "archive_path": "downloads/LittleRedSonja_T2IT3_ADD-ON_POSTERS.zip",
+        "nexus_mod_id": 5370,
+        "nexus_file_id": 40707,
+        "archive_link_status": "strong_name_link"
+      },
+      "matched_fields": [
+        "archive_name",
+        "meta_file_id",
+        "meta_mod_id",
+        "package_name"
+      ],
+      "conflicting_fields": [],
+      "unresolved_reason": "exact package name matched, but ModInfo identity did not provide an exact target name",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=342",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8310",
+          "source_locator": "Nexus nexus_requirements row 1",
+          "evidence": "LittleRedSonja T2 into T3 grade weapons | v2.0.1 \"full\" or \"melee only\" release, plus optionally \"big bad bat\"",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        },
+        {
+          "source_kind": "local_package_name",
+          "source_ref": "local:mods/LittleRedSonja T2 into T3 grade weapons",
+          "source_locator": "package directory name",
+          "evidence": "LittleRedSonja T2 into T3 grade weapons",
+          "evidence_class": "package_name_exact"
+        },
+        {
+          "source_kind": "local_meta",
+          "source_ref": "local:downloads/LittleRedSonja_T2IT3_ADD-ON_POSTERS.zip.meta",
+          "source_locator": "[General] modID/fileID",
+          "evidence": "modID=5370; fileID=40707",
+          "evidence_class": "meta_identity"
+        },
+        {
+          "source_kind": "local_archive_name",
+          "source_ref": "local:downloads/LittleRedSonja_T2IT3_ADD-ON_POSTERS.zip",
+          "source_locator": "archive filename linkage",
+          "evidence": "LittleRedSonja_T2IT3_ADD-ON_POSTERS.zip",
+          "evidence_class": "archive_name_linkage"
+        },
+        {
+          "source_kind": "local_readme_or_document",
+          "source_ref": "local:mods/LittleRedSonja T2 into T3 grade weapons/LittleRedSonja_T2IT3weapons/Changelog.txt",
+          "source_locator": "line 7",
+          "evidence": "1.0.0 - Add 2 new weapons, the \"Seal Combat Knife\" and the \"Titanium Baseball Bat\". Keep look, animations and sounds of the T2 weapons but get upgraded stats. Weapon stats are tweaked and tested to make it as balanced as possible, while keeping it fun. The Seal Combat Knife can equip a Flame mod, u…",
+          "evidence_class": "readme_or_document"
+        },
+        {
+          "source_kind": "local_readme_or_document",
+          "source_ref": "local:mods/LittleRedSonja T2 into T3 grade weapons/LittleRedSonja_T2IT3weapons/Changelog.txt",
+          "source_locator": "line 60",
+          "evidence": "Do you love the Hunting Knife but late game have to upgrade to Machete \"because higher damage\"? Did you upgrade to Steel Club but miss the distinct THUNK sound of your beloved Baseball Bat? Fear no more! Keep look, animations and sounds of the T2 weapons but get upgraded stats. Unlocks at same leve…",
+          "evidence_class": "readme_or_document"
+        },
+        {
+          "source_kind": "local_readme_or_document",
+          "source_ref": "local:mods/LittleRedSonja T2 into T3 grade weapons/LittleRedSonja_T2IT3weapons/Readme.txt",
+          "source_locator": "line 10",
+          "evidence": "To verify you have installed the mod correctly, the ModInfo.xml file should be located at Mods\\LittleRedSonja_T2IT3weapons\\ModInfo.xml relative to your 7D2D install folder.",
+          "evidence_class": "readme_or_document"
+        }
+      ],
+      "suggestions": []
+    },
+    {
+      "observation_id": "local-resolution-0486",
+      "baseline_row_number": 487,
+      "subject_nexus_mod_id": "8242",
+      "subject_name": "Hunlight_GupZombiesTweaks V1.2-8242-1-2-1755194873.zip",
+      "target_raw_name": "Guppycur's Zombies (REAL)",
+      "target_kind": "mod",
+      "baseline_source": {
+        "source_kind": "nexus_structured_nexus_requirements",
+        "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=487",
+        "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8242",
+        "source_locator": "Nexus nexus_requirements row 1",
+        "evidence": "Guppycur's Zombies (REAL) |",
+        "relationship_type": "hard_dependency",
+        "confidence": "high"
+      },
+      "relationship_type": "hard_dependency",
+      "requirement_group": {
+        "id": null,
+        "operator": "all"
+      },
+      "resolution_status": "partially_resolved",
+      "confidence": "low",
+      "in_smorgasbord": "yes",
+      "resolved_identity": {
+        "kind": "local_package",
+        "package_path": "mods/Guppycur's Zombies",
+        "package_name": "Guppycur's Zombies",
+        "modlet_paths": [
+          "Guppycur's Zombies/Guppy_Zombies_V3"
+        ],
+        "modinfo_names": [
+          "Guppy_Zombies_V3"
+        ],
+        "display_names": [
+          "Guppy's Zombies for V3"
+        ],
+        "enabled_state": "enabled",
+        "archive_path": "",
+        "nexus_mod_id": null,
+        "nexus_file_id": null,
+        "archive_link_status": ""
+      },
+      "matched_fields": [
+        "package_name"
+      ],
+      "conflicting_fields": [],
+      "unresolved_reason": "exact package name matched, but ModInfo identity did not provide an exact target name",
+      "evidence": [
+        {
+          "source_kind": "nexus_structured_nexus_requirements",
+          "source_ref": "baseline:analysis/requirements-research/dataset.csv#row=487",
+          "source_url_safe": "https://www.nexusmods.com/7daystodie/mods/8242",
+          "source_locator": "Nexus nexus_requirements row 1",
+          "evidence": "Guppycur's Zombies (REAL) |",
+          "relationship_type": "hard_dependency",
+          "confidence": "high"
+        },
+        {
+          "source_kind": "local_package_name",
+          "source_ref": "local:mods/Guppycur's Zombies",
+          "source_locator": "package directory name",
+          "evidence": "Guppycur's Zombies",
+          "evidence_class": "package_name_exact"
+        }
+      ],
+      "suggestions": []
+    }
+  ]
+}
