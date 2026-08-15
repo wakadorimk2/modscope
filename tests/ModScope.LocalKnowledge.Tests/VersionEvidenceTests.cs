@@ -322,10 +322,9 @@ public sealed class VersionEvidenceTests
     [Fact]
     public void ComparesInstalledAndLatestValuesInReleaseOrder()
     {
-        Assert.True(VersionComparator.TryCompareNormalized(
-            "3.1.9.1528",
-            "3.1.25.1615",
-            VersionScheme.NumericDotted,
+        Assert.True(VersionComparator.TryCompare(
+            VersionNormalizer.Normalize("3.1.9.1528"),
+            VersionNormalizer.Normalize("3.1.25.1615"),
             out var comparison));
 
         Assert.True(comparison < 0);
@@ -334,16 +333,85 @@ public sealed class VersionEvidenceTests
     [Fact]
     public void ComparesInstalledVersionWithPrefixedNexusModPageVersion()
     {
-        var latest = VersionNormalizer.Normalize("v8.0.1", out var scheme);
+        var latest = VersionNormalizer.Normalize("v8.0.1");
 
-        Assert.Equal("8.0.1", latest);
-        Assert.Equal(VersionScheme.Semver, scheme);
-        Assert.True(VersionComparator.TryCompareNormalized(
-            "8.0.1",
+        Assert.Equal("v8.0.1", latest.RawValue);
+        Assert.Equal("8.0.1", latest.NormalizedValue);
+        Assert.Equal(VersionScheme.Semver, latest.Scheme);
+        Assert.True(VersionComparator.TryCompare(
+            VersionNormalizer.Normalize("8.0.1"),
             latest,
-            scheme,
             out var comparison));
         Assert.Equal(0, comparison);
+    }
+
+    [Fact]
+    public void NormalizesSupportedAndUnsupportedValuesIntoOneResult()
+    {
+        var prefixed = VersionNormalizer.Normalize("v8.0.1");
+        Assert.Equal("v8.0.1", prefixed.RawValue);
+        Assert.Equal("8.0.1", prefixed.NormalizedValue);
+        Assert.Equal(VersionScheme.Semver, prefixed.Scheme);
+        Assert.True(prefixed.IsSupported);
+
+        var semver = VersionNormalizer.Normalize("8.0.1");
+        Assert.Equal("8.0.1", semver.NormalizedValue);
+        Assert.Equal(VersionScheme.Semver, semver.Scheme);
+
+        var numeric = VersionNormalizer.Normalize("3.1.9.1528");
+        Assert.Equal("3.1.9.1528", numeric.NormalizedValue);
+        Assert.Equal(VersionScheme.NumericDotted, numeric.Scheme);
+        Assert.True(numeric.IsSupported);
+
+        var empty = VersionNormalizer.Normalize(" ");
+        Assert.Equal(" ", empty.RawValue);
+        Assert.Null(empty.NormalizedValue);
+        Assert.Equal(VersionScheme.Unknown, empty.Scheme);
+        Assert.False(empty.IsSupported);
+
+        var unsupported = VersionNormalizer.Normalize("latest");
+        Assert.Equal("latest", unsupported.RawValue);
+        Assert.Equal("latest", unsupported.NormalizedValue);
+        Assert.Equal(VersionScheme.Unknown, unsupported.Scheme);
+        Assert.False(unsupported.IsSupported);
+
+        Assert.False(VersionComparator.TryCompare(
+            VersionNormalizer.Normalize("1.2.3"),
+            VersionNormalizer.Normalize("1.2.3.4"),
+            out _));
+        Assert.False(VersionComparator.TryCompare(
+            VersionNormalizer.Normalize("latest"),
+            VersionNormalizer.Normalize("1.2.3"),
+            out _));
+    }
+
+    [Fact]
+    public void VersionObservationPublishesTheProvidedNormalizationResult()
+    {
+        var normalization = VersionNormalizer.Normalize("v8.0.1");
+        var observation = new VersionObservation(
+            "modlet",
+            VersionObservationRole.Release,
+            VersionObservationSourceKind.ModInfoXml,
+            normalization,
+            new SourceReference(SourceReferenceKind.ModFile, "evidence/modlet"),
+            DateTimeOffset.UtcNow,
+            Array.Empty<Diagnostic>());
+
+        Assert.Same(normalization, observation.Normalization);
+        Assert.Equal(normalization.RawValue, observation.RawValue);
+        Assert.Equal(normalization.NormalizedValue, observation.NormalizedValue);
+        Assert.Equal(normalization.Scheme, observation.Scheme);
+    }
+
+    [Fact]
+    public void ComparatorUsesStoredNormalizedValuesWithoutRenormalizingRawValues()
+    {
+        var left = new VersionNormalizationResult("1.0.0", "9.0.0", VersionScheme.Semver);
+        var right = new VersionNormalizationResult("2.0.0", "1.0.0", VersionScheme.Semver);
+
+        Assert.True(VersionComparator.TryCompare(left, right, out var comparison));
+        Assert.True(comparison > 0);
     }
 
     [Fact]
@@ -690,14 +758,12 @@ public sealed class VersionEvidenceTests
                 _ => SourceReferenceKind.ModFile
             },
             $"evidence/{ownerKey}");
-        var normalized = VersionNormalizer.Normalize(rawValue, out var scheme);
+        var normalization = VersionNormalizer.Normalize(rawValue);
         return new VersionObservation(
             ownerKey,
             role,
             sourceKind,
-            rawValue,
-            normalized,
-            scheme,
+            normalization,
             source,
             DateTimeOffset.UtcNow,
             Array.Empty<Diagnostic>());

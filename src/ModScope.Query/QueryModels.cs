@@ -1,3 +1,5 @@
+using ModScope.LocalKnowledge;
+
 namespace ModScope.Query;
 
 public enum PageExtractionStatus
@@ -677,13 +679,21 @@ public sealed record VersionObservationReadModel(
     string OwnerKey,
     string Role,
     string SourceKind,
-    string? RawValue,
-    string? NormalizedValue,
-    QueryVersionScheme Scheme,
+    VersionNormalizationResult Normalization,
     SourceReferenceReadModel Source,
     DateTimeOffset ObservedAtUtc,
     IReadOnlyList<DiagnosticReadModel> Diagnostics)
 {
+    public string? RawValue => Normalization.RawValue;
+    public string? NormalizedValue => Normalization.NormalizedValue;
+    public QueryVersionScheme Scheme => Normalization.Scheme switch
+    {
+        VersionScheme.Unknown => QueryVersionScheme.Unknown,
+        VersionScheme.Semver => QueryVersionScheme.Semver,
+        VersionScheme.NumericDotted => QueryVersionScheme.NumericDotted,
+        _ => throw new ArgumentOutOfRangeException(nameof(Normalization), Normalization.Scheme, null)
+    };
+
     public string? SourceSite { get; init; }
     public string? TargetUrl { get; init; }
     public string? Evidence { get; init; }

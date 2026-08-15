@@ -754,7 +754,7 @@ public sealed class DesktopSessionController
         _pendingWebVersionObservation = new PendingWebVersionObservation(
             new WebVersionObservationResult(
                 "Manual",
-                trimmed,
+                VersionNormalizer.Normalize(trimmed),
                 "Manual Web version input",
                 Array.Empty<DiagnosticReadModel>()),
             _observation.Url,
@@ -1488,29 +1488,11 @@ public sealed class DesktopSessionController
             .Select(diagnostic => diagnostic with { Source = source })
             .ToList()
             .AsReadOnly();
-        var normalizedScheme = ModScope.LocalKnowledge.VersionScheme.Unknown;
-        var normalized = pending.Result.RawValue is null
-            ? null
-            : ModScope.LocalKnowledge.VersionNormalizer.Normalize(
-                pending.Result.RawValue,
-                out normalizedScheme);
-        if (pending.Result.RawValue is null)
-        {
-            normalizedScheme = ModScope.LocalKnowledge.VersionScheme.Unknown;
-        }
-
         return new VersionObservationReadModel(
             ownerKey,
             "Release",
             "WebObservation",
-            pending.Result.RawValue,
-            normalized,
-            normalizedScheme switch
-            {
-                ModScope.LocalKnowledge.VersionScheme.Semver => QueryVersionScheme.Semver,
-                ModScope.LocalKnowledge.VersionScheme.NumericDotted => QueryVersionScheme.NumericDotted,
-                _ => QueryVersionScheme.Unknown
-            },
+            pending.Result.Normalization,
             source,
             pending.ObservedAtUtc,
             diagnostics)

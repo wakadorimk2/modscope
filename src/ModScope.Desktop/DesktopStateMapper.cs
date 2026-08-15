@@ -304,13 +304,21 @@ internal static class DesktopStateMapper
         IReadOnlyList<DiagnosticReadModel> sessionWebCompatibilityDiagnostics,
         IReadOnlyDictionary<string, VersionObservationReadModel> sessionNexusFileVersionObservations)
     {
+        var versionObservations = value.PackageRelation is null
+            ? Array.Empty<VersionObservationReadModel>()
+            : MergeVersionObservations(
+                value.PackageRelation,
+                value.ModKey,
+                sessionWebVersionObservation,
+                sessionNexusFileVersionObservations);
         var packageRelation = value.PackageRelation is null
             ? null
             : PackageRelation(
                 value.PackageRelation,
                 value.ModKey,
                 sessionWebVersionObservation,
-                sessionNexusFileVersionObservations);
+                sessionNexusFileVersionObservations,
+                versionObservations);
         var applicableCompatibilityObservations = sessionWebCompatibilityObservations
             .Where(observation => string.Equals(observation.OwnerKey, value.ModKey, StringComparison.OrdinalIgnoreCase))
             .ToList()
@@ -339,6 +347,7 @@ internal static class DesktopStateMapper
             Conclusion = Conclusion(
                 value,
                 packageRelation,
+                versionObservations,
                 identity,
                 localContext,
                 applicableCompatibilityObservations,
@@ -441,42 +450,30 @@ internal static class DesktopStateMapper
         PackageRelationReadModel value,
         string? modKey = null,
         VersionObservationReadModel? sessionWebVersionObservation = null,
-        IReadOnlyDictionary<string, VersionObservationReadModel>? sessionNexusFileVersionObservations = null)
+        IReadOnlyDictionary<string, VersionObservationReadModel>? sessionNexusFileVersionObservations = null,
+        IReadOnlyList<VersionObservationReadModel>? mergedVersionObservations = null)
     {
-        var allObservations = value.VersionObservations.ToList();
+        var allObservations = (mergedVersionObservations
+            ?? MergeVersionObservations(
+                value,
+                modKey,
+                sessionWebVersionObservation,
+                sessionNexusFileVersionObservations))
+            .ToList();
         var comparisonObservations = value.Comparison.Observations
             .Where(observation =>
                 string.Equals(observation.SourceKind, "Mo2MetaIni", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(observation.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var nexusObservations = value.SourceArtifacts
-            .Select(artifact => sessionNexusFileVersionObservations is not null
-                && sessionNexusFileVersionObservations.TryGetValue(artifact.ArtifactId, out var observation)
-                ? observation
-                : null)
-            .Where(observation => observation is not null)
-            .Cast<VersionObservationReadModel>()
+        var nexusObservations = allObservations
+            .Where(observation => string.Equals(observation.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase))
             .ToList();
-
         foreach (var observation in nexusObservations)
         {
-            allObservations.RemoveAll(existing =>
-                string.Equals(existing.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(existing.OwnerKey, observation.OwnerKey, StringComparison.OrdinalIgnoreCase));
-            allObservations.Add(observation);
             comparisonObservations.RemoveAll(existing =>
                 string.Equals(existing.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(existing.OwnerKey, observation.OwnerKey, StringComparison.OrdinalIgnoreCase));
             comparisonObservations.Add(observation);
-        }
-
-        if (sessionWebVersionObservation is not null
-            && string.Equals(sessionWebVersionObservation.OwnerKey, modKey, StringComparison.OrdinalIgnoreCase))
-        {
-            allObservations.RemoveAll(existing =>
-                string.Equals(existing.SourceKind, "WebObservation", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(existing.OwnerKey, sessionWebVersionObservation.OwnerKey, StringComparison.OrdinalIgnoreCase));
-            allObservations.Add(sessionWebVersionObservation);
         }
 
         return new PackageRelationUiState(
@@ -503,6 +500,42 @@ internal static class DesktopStateMapper
             allObservations.Select(VersionObservation).ToList().AsReadOnly(),
             VersionComparison(value, comparisonObservations),
             Diagnostics(value.Diagnostics));
+    }
+
+    private static IReadOnlyList<VersionObservationReadModel> MergeVersionObservations(
+        PackageRelationReadModel value,
+        string? modKey,
+        VersionObservationReadModel? sessionWebVersionObservation,
+        IReadOnlyDictionary<string, VersionObservationReadModel>? sessionNexusFileVersionObservations)
+    {
+        var allObservations = value.VersionObservations.ToList();
+        var nexusObservations = value.SourceArtifacts
+            .Select(artifact => sessionNexusFileVersionObservations is not null
+                && sessionNexusFileVersionObservations.TryGetValue(artifact.ArtifactId, out var observation)
+                ? observation
+                : null)
+            .Where(observation => observation is not null)
+            .Cast<VersionObservationReadModel>()
+            .ToList();
+
+        foreach (var observation in nexusObservations)
+        {
+            allObservations.RemoveAll(existing =>
+                string.Equals(existing.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.OwnerKey, observation.OwnerKey, StringComparison.OrdinalIgnoreCase));
+            allObservations.Add(observation);
+        }
+
+        if (sessionWebVersionObservation is not null
+            && string.Equals(sessionWebVersionObservation.OwnerKey, modKey, StringComparison.OrdinalIgnoreCase))
+        {
+            allObservations.RemoveAll(existing =>
+                string.Equals(existing.SourceKind, "WebObservation", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.OwnerKey, sessionWebVersionObservation.OwnerKey, StringComparison.OrdinalIgnoreCase));
+            allObservations.Add(sessionWebVersionObservation);
+        }
+
+        return allObservations.AsReadOnly();
     }
 
     private static VersionObservationUiState VersionObservation(VersionObservationReadModel value)
@@ -557,6 +590,7 @@ internal static class DesktopStateMapper
     private static InspectorConclusionUiState Conclusion(
         InspectorReadModel inspector,
         PackageRelationUiState? packageRelation,
+        IReadOnlyList<VersionObservationReadModel> versionObservations,
         IdentityUiState identity,
         LocalContextReadModel? localContext,
         IReadOnlyList<CompatibilityObservationReadModel> compatibilityObservations,
@@ -572,6 +606,23 @@ internal static class DesktopStateMapper
         };
         var observations = packageRelation?.VersionObservations
             ?? Array.Empty<VersionObservationUiState>();
+        var latestObservation = versionObservations
+            .Where(observation => string.Equals(observation.SourceKind, "WebObservation", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(observation => observation.ObservedAtUtc)
+            .FirstOrDefault();
+        var nexusFileObservation = versionObservations
+            .Where(observation => string.Equals(observation.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(observation => observation.ObservedAtUtc)
+            .FirstOrDefault();
+        var installedObservation = nexusFileObservation is null
+            ? versionObservations
+                .Where(observation => string.Equals(observation.SourceKind, "ModInfoXml", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(observation => observation.ObservedAtUtc)
+                .FirstOrDefault()
+            : versionObservations
+                .Where(observation => string.Equals(observation.SourceKind, "Mo2MetaIni", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(observation => observation.ObservedAtUtc)
+                .FirstOrDefault();
         var latest = observations
             .Where(observation => string.Equals(observation.SourceKind, "WebObservation", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(observation => observation.ObservedAtUtc)
@@ -649,24 +700,11 @@ internal static class DesktopStateMapper
         }
         else
         {
-            var installedNormalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(
-                installedVersion,
-                out var installedScheme);
-            var latestNormalized = latest.NormalizedValue ?? latest.RawValue;
-            var latestScheme = latest.Scheme switch
-            {
-                "semver" => ModScope.LocalKnowledge.VersionScheme.Semver,
-                "numericDotted" => ModScope.LocalKnowledge.VersionScheme.NumericDotted,
-                _ => ModScope.LocalKnowledge.VersionScheme.Unknown
-            };
-            if (installedNormalized is null
-                || latestNormalized is null
-                || installedScheme != latestScheme
-                || installedScheme is not (ModScope.LocalKnowledge.VersionScheme.Semver or ModScope.LocalKnowledge.VersionScheme.NumericDotted)
-                || !ModScope.LocalKnowledge.VersionComparator.TryCompareNormalized(
-                    installedNormalized,
-                    latestNormalized,
-                    installedScheme,
+            if (installedObservation is null
+                || latestObservation is null
+                || !VersionComparator.TryCompare(
+                    installedObservation.Normalization,
+                    latestObservation.Normalization,
                     out var comparison))
             {
                 versionStatus = "notComparable";
@@ -1052,7 +1090,8 @@ internal static class DesktopStateMapper
             ? "Identity is not exact, so the MO2 meta.ini and Nexus File comparison was not assessed."
             : "Both an MO2 meta.ini version and a Nexus File version are required.";
         var comparable = observations
-            .Where(observation => !string.IsNullOrWhiteSpace(observation.NormalizedValue))
+            .Where(observation => observation.Normalization.IsSupported
+                && !string.IsNullOrWhiteSpace(observation.Normalization.NormalizedValue))
             .ToList();
         if (package.IdentityState == QueryIdentityResolutionState.Exact
             && observations.Count >= 2
@@ -1064,17 +1103,27 @@ internal static class DesktopStateMapper
             }
             else
             {
-                var schemes = comparable.Select(observation => observation.Scheme).Distinct().ToList();
-                if (schemes.Count != 1
-                    || schemes[0] is not (QueryVersionScheme.Semver or QueryVersionScheme.NumericDotted))
+                var comparisons = new List<int>();
+                var allComparisonsComparable = true;
+                var first = comparable[0].Normalization;
+                foreach (var observation in comparable.Skip(1))
+                {
+                    if (!VersionComparator.TryCompare(first, observation.Normalization, out var comparison))
+                    {
+                        allComparisonsComparable = false;
+                        break;
+                    }
+
+                    comparisons.Add(comparison);
+                }
+
+                if (!allComparisonsComparable)
                 {
                     reason = "The MO2 meta.ini and Nexus File observations do not use one supported version scheme.";
                 }
                 else
                 {
-                    var first = comparable[0].NormalizedValue;
-                    var equal = comparable.All(observation =>
-                        string.Equals(observation.NormalizedValue, first, StringComparison.OrdinalIgnoreCase));
+                    var equal = comparisons.All(comparison => comparison == 0);
                     status = equal
                         ? QueryVersionComparisonStatus.Equal
                         : QueryVersionComparisonStatus.Mismatch;

@@ -293,14 +293,12 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
         IReadOnlyList<Diagnostic> diagnostics)
     {
         var source = new SourceReference(SourceReferenceKind.NexusApi, endpoint);
-        var normalized = VersionNormalizer.Normalize(rawValue, out var scheme);
+        var normalization = VersionNormalizer.Normalize(rawValue);
         return new VersionObservation(
             artifact.ArtifactId,
             VersionObservationRole.Release,
             VersionObservationSourceKind.NexusApi,
-            rawValue,
-            normalized,
-            scheme,
+            normalization,
             source,
             observedAt,
             diagnostics);

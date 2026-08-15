@@ -1390,15 +1390,7 @@ internal static class QueryProjection
             value.OwnerKey,
             value.Role.ToString(),
             value.SourceKind.ToString(),
-            value.RawValue,
-            value.NormalizedValue,
-            value.Scheme switch
-            {
-                VersionScheme.Unknown => QueryVersionScheme.Unknown,
-                VersionScheme.Semver => QueryVersionScheme.Semver,
-                VersionScheme.NumericDotted => QueryVersionScheme.NumericDotted,
-                _ => throw new ArgumentOutOfRangeException(nameof(value), value.Scheme, null)
-            },
+            value.Normalization,
             Source(value.Source),
             value.ObservedAtUtc,
             Diagnostics(value.Diagnostics));

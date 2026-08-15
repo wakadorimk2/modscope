@@ -19,6 +19,14 @@ public enum VersionScheme
     NumericDotted
 }
 
+public sealed record VersionNormalizationResult(
+    string? RawValue,
+    string? NormalizedValue,
+    VersionScheme Scheme)
+{
+    public bool IsSupported => Scheme is VersionScheme.Semver or VersionScheme.NumericDotted;
+}
+
 public enum VersionObservationSourceKind
 {
     ModInfoXml,
@@ -98,12 +106,15 @@ public sealed record VersionObservation(
     string OwnerKey,
     VersionObservationRole Role,
     VersionObservationSourceKind SourceKind,
-    string? RawValue,
-    string? NormalizedValue,
-    VersionScheme Scheme,
+    VersionNormalizationResult Normalization,
     SourceReference Source,
     DateTimeOffset ObservedAtUtc,
-    IReadOnlyList<Diagnostic> Diagnostics);
+    IReadOnlyList<Diagnostic> Diagnostics)
+{
+    public string? RawValue => Normalization.RawValue;
+    public string? NormalizedValue => Normalization.NormalizedValue;
+    public VersionScheme Scheme => Normalization.Scheme;
+}
 
 public sealed record VersionComparison(
     VersionComparisonStatus Status,
@@ -689,16 +700,14 @@ public static class VersionEvidenceManifestReader
             var source = new SourceReference(
                 SourceReferenceKind.EvidenceManifest,
                 $"{manifestSource.RelativePath}/observation/{artifactId.Trim()}");
-            var normalized = VersionNormalizer.Normalize(rawValue, out var scheme);
+            var normalization = VersionNormalizer.Normalize(rawValue);
             var observationDiagnostics = new List<Diagnostic>();
             var role = ReadObservationRole(item, manifestSource, diagnostics, observationDiagnostics);
             result.Add(new VersionObservation(
                 artifactId.Trim(),
                 role,
                 VersionObservationSourceKind.EvidenceManifest,
-                rawValue,
-                normalized,
-                scheme,
+                normalization,
                 source,
                 ReadDateTime(item, "observedAtUtc") ?? defaultObservedAt,
                 observationDiagnostics.AsReadOnly()));
@@ -1036,12 +1045,10 @@ public static class VersionEvidenceAssembler
             return Array.Empty<Diagnostic>();
         }
 
-        var normalizedModInfo = VersionNormalizer.Normalize(modInfo.RawValue, out var modInfoScheme);
-        var normalizedMeta = VersionNormalizer.Normalize(meta.RawValue, out var metaScheme);
-        var equivalent = normalizedModInfo is not null
-            && normalizedMeta is not null
-            && modInfoScheme == metaScheme
-            && string.Equals(normalizedModInfo, normalizedMeta, StringComparison.OrdinalIgnoreCase);
+        var equivalent = modInfo.NormalizedValue is not null
+            && meta.NormalizedValue is not null
+            && modInfo.Scheme == meta.Scheme
+            && string.Equals(modInfo.NormalizedValue, meta.NormalizedValue, StringComparison.OrdinalIgnoreCase);
         if (equivalent || string.Equals(modInfo.RawValue.Trim(), meta.RawValue.Trim(), StringComparison.Ordinal))
         {
             return Array.Empty<Diagnostic>();
@@ -1147,14 +1154,12 @@ public static class VersionEvidenceAssembler
             return;
         }
 
-        var normalized = VersionNormalizer.Normalize(rawValue, out var scheme);
+        var normalization = VersionNormalizer.Normalize(rawValue);
         result.Add(new VersionObservation(
             ownerKey,
             VersionObservationRole.Release,
             sourceKind,
-            rawValue,
-            normalized,
-            scheme,
+            normalization,
             source ?? new SourceReference(SourceReferenceKind.Diagnostic, "version-evidence/unknown"),
             observedAt,
             Array.Empty<Diagnostic>()));
@@ -1163,32 +1168,26 @@ public static class VersionEvidenceAssembler
 
 public static class VersionComparator
 {
-    public static bool TryCompareNormalized(
-        string? left,
-        string? right,
-        VersionScheme scheme,
+    public static bool TryCompare(
+        VersionNormalizationResult? left,
+        VersionNormalizationResult? right,
         out int comparison)
     {
         comparison = 0;
-        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        if (left is null
+            || right is null
+            || !left.IsSupported
+            || !right.IsSupported
+            || string.IsNullOrWhiteSpace(left.NormalizedValue)
+            || string.IsNullOrWhiteSpace(right.NormalizedValue)
+            || left.Scheme != right.Scheme)
         {
             return false;
         }
 
-        var leftNormalized = VersionNormalizer.Normalize(left, out var leftScheme);
-        var rightNormalized = VersionNormalizer.Normalize(right, out var rightScheme);
-        if (leftNormalized is null
-            || rightNormalized is null
-            || leftScheme != scheme
-            || rightScheme != scheme
-            || scheme is not (VersionScheme.Semver or VersionScheme.NumericDotted))
-        {
-            return false;
-        }
-
-        comparison = scheme == VersionScheme.Semver
-            ? CompareSemver(leftNormalized, rightNormalized)
-            : CompareNumericDotted(leftNormalized, rightNormalized);
+        comparison = left.Scheme == VersionScheme.Semver
+            ? CompareSemver(left.NormalizedValue, right.NormalizedValue)
+            : CompareNumericDotted(left.NormalizedValue, right.NormalizedValue);
         return true;
     }
 
@@ -1206,7 +1205,8 @@ public static class VersionComparator
         }
 
         var comparable = observations
-            .Where(observation => !string.IsNullOrWhiteSpace(observation.NormalizedValue))
+            .Where(observation => observation.Normalization.IsSupported
+                && !string.IsNullOrWhiteSpace(observation.NormalizedValue))
             .ToList();
         if (comparable.Count < 2)
         {
@@ -1264,6 +1264,8 @@ public static class VersionComparator
         }
 
         if (mo2MetaIniObservation is null || nexusApiObservation is null
+            || !mo2MetaIniObservation.Normalization.IsSupported
+            || !nexusApiObservation.Normalization.IsSupported
             || string.IsNullOrWhiteSpace(mo2MetaIniObservation.NormalizedValue)
             || string.IsNullOrWhiteSpace(nexusApiObservation.NormalizedValue))
         {
@@ -1410,19 +1412,17 @@ public static class VersionNormalizer
         "^\\d+(?:\\.\\d+){3,}$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    public static string? Normalize(string? rawValue, out VersionScheme scheme)
+    public static VersionNormalizationResult Normalize(string? rawValue)
     {
-        scheme = VersionScheme.Unknown;
         if (string.IsNullOrWhiteSpace(rawValue))
         {
-            return null;
+            return new VersionNormalizationResult(rawValue, null, VersionScheme.Unknown);
         }
 
         var value = rawValue.Trim();
         var semver = SemverPattern.Match(value);
         if (semver.Success)
         {
-            scheme = VersionScheme.Semver;
             var suffix = semver.Groups["suffix"].Value;
             var plus = suffix.IndexOf('+');
             if (plus >= 0)
@@ -1430,23 +1430,24 @@ public static class VersionNormalizer
                 suffix = suffix[..plus];
             }
 
-            return string.Join(
+            var normalized = string.Join(
                 ".",
                 ParseNumber(semver.Groups["major"].Value),
                 ParseNumber(semver.Groups["minor"].Value),
                 ParseNumber(semver.Groups["patch"].Value))
                 + suffix.ToLowerInvariant();
+            return new VersionNormalizationResult(rawValue, normalized, VersionScheme.Semver);
         }
 
         if (NumericDottedPattern.IsMatch(value))
         {
-            scheme = VersionScheme.NumericDotted;
-            return string.Join(
+            var normalized = string.Join(
                 ".",
                 value.Split('.').Select(ParseNumber));
+            return new VersionNormalizationResult(rawValue, normalized, VersionScheme.NumericDotted);
         }
 
-        return value;
+        return new VersionNormalizationResult(rawValue, value, VersionScheme.Unknown);
     }
 
     private static string ParseNumber(string value)
