@@ -109,6 +109,46 @@ unresolvedは、観測済みだがidentityまたは意味を確定できない�
 この表はcandidateの分類です。
 実環境のruntime compatibility、dependency、latest、deprecatedを主張しません。
 
+## このPRで分かったこと
+
+### 確認できた事実
+
+- MO2のDefault profileには、98件のprofile entryがあります。
+- 98件のpackage directoryがあります。
+- enabled entryは54件です。
+- disabled entryは44件です。
+- ModInfo.xmlは105件あります。
+- package metadataは87件あります。
+- download metadataは204件あります。
+- dirty caseは8件のcandidateとして整理できました。
+- candidateの内訳は、accepted 0件、rejected 0件、uncertain 8件です。
+- diagnosticを伴うcandidateは6件です。
+
+### 採掘で分かったこと
+
+- MO2 packageのmeta.ini、download metadata、ModInfo.xmlは、同じversionを示さない場合があります。
+- ModInfo.xmlのversionとpackage metadataのversionは、別のversion observationとして保持する必要があります。
+- MO2のnewestVersionはcache observationです。
+- newestVersionの差だけでは、live latestやupdate availableを確定できません。
+- 同じMOD IDに複数File IDがある場合、MOD IDだけではselected fileを確定できません。
+- 1つのpackageに複数Modletがある場合、package-level sourceを各Modletへ割り当てられません。
+- ModInfo、package metadata、download metadataの欠落は、identityやversionの不在を意味しません。
+- Wabbajack list versionは、MOD versionとは別のversion seriesです。
+
+### このPRで確定していないこと
+
+- owner-local Wabbajack fileが未提示のため、Wabbajack側のprimary evidenceは未完了です。
+- 既存のWabbajack snapshotは、candidate抽出用のsecondary evidenceです。
+- そのため、今回の8件をaccepted real caseへ昇格させていません。
+- deprecated、latest、runtime compatibility、dependencyは判定していません。
+
+### ModScopeへの示唆
+
+artifact identity、package identity、Modlet identity、Nexus File identityを分離します。
+current installation、current source record、historical observation、deprecated candidateを分離します。
+identity stateとversion comparison stateを別々に表示します。
+not_observableとunresolvedを別々に保持します。
+
 ## Rejected interpretations
 
 - Wabbajack recordの存在だけでinstalledを確定する解釈をrejectします。
