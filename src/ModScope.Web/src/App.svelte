@@ -1573,12 +1573,20 @@
             <div class="recognition-candidate-list" aria-label="Local MOD recognition candidates">
               {#each state.identity.matches.slice(0, 6) as match}
                 <article class="recognition-candidate">
-                  <div class="recognition-candidate-heading">
-                    <strong>{match.displayName || match.directoryName || match.modKey}</strong>
-                    <span class="status-chip {match.strength === 'strong' ? 'status-ready' : 'status-unknown'}">{formatLabel(match.strength)}</span>
-                  </div>
-                  <p class="analysis-meta">{match.evidence}</p>
-                  <p class="subtle">{match.profileState} · {match.enabledState} · {match.modKey}</p>
+                  <button
+                    type="button"
+                    class="recognition-candidate-action"
+                    aria-label={`Use ${match.displayName || match.directoryName || match.modKey} as the local MOD`}
+                    onclick={() => confirmIdentity(match.modKey)}
+                  >
+                    <span class="recognition-candidate-heading">
+                      <strong>{match.displayName || match.directoryName || match.modKey}</strong>
+                      <span class="status-chip {match.strength === 'strong' ? 'status-ready' : 'status-unknown'}">{formatLabel(match.strength)}</span>
+                    </span>
+                    <span class="analysis-meta">{match.evidence}</span>
+                    <span class="subtle">{match.profileState} · {match.enabledState} · {match.modKey}</span>
+                    <span class="recognition-candidate-action-label">Use this MOD</span>
+                  </button>
                 </article>
               {/each}
             </div>
