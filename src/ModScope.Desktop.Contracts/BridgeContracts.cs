@@ -35,6 +35,8 @@ public static class BridgeProtocol
         "browser.observe",
         "frontend.ready",
         "knowledge.useFixture",
+        "knowledge.selectEvidenceManifest",
+        "knowledge.setWebVersionObservation",
         "knowledge.loadSource",
         "knowledge.discoverSources",
         "knowledge.selectSource",
@@ -192,16 +194,13 @@ public sealed record BrowserTabPayload(string TabId);
 
 public sealed record BrowserHistoryPayload(string EntryId);
 
-public sealed record LoadSourcePayload(
-    string InstanceName,
-    string ProfileName,
-    string InstanceRootPath,
-    string ProfilePath,
-    string ModsPath);
+public sealed record LoadSourcePayload(string? CandidateId = null);
 
 public sealed record DiscoverSourcesPayload(IReadOnlyList<string>? SelectedRoots = null);
 
 public sealed record SelectSourcePayload(string CandidateId);
+
+public sealed record SetWebVersionObservationPayload(string RawValue);
 
 public sealed record ConfirmIdentityPayload(
     string CandidateIdentity,
@@ -291,7 +290,10 @@ public sealed record KnowledgeSessionUiState(
     DateTimeOffset CreatedAtUtc,
     string ParserVersion,
     int SchemaVersion,
-    IReadOnlyList<DiagnosticUiState> Diagnostics);
+    IReadOnlyList<DiagnosticUiState> Diagnostics)
+{
+    public VersionEvidenceManifestUiState? VersionEvidenceManifest { get; init; }
+}
 
 public sealed record ModRoleEvidenceUiState(
     string Kind,
@@ -316,7 +318,10 @@ public sealed record ModCandidateUiState(
     SourceReferenceUiState Source,
     EvidenceReferenceUiState? PriorityEvidence,
     IReadOnlyList<DiagnosticUiState> Diagnostics,
-    ModRoleUiState? Role = null);
+    ModRoleUiState? Role = null)
+{
+    public PackageRelationUiState? PackageRelation { get; init; }
+}
 
 public sealed record ProfileUiState(string Name, string LoadState);
 
@@ -472,7 +477,57 @@ public sealed record InspectorUiState(
     IReadOnlyList<ModFileUiState> Files,
     IReadOnlyList<XmlFileUiState> XmlFiles,
     IReadOnlyList<DiagnosticUiState> Diagnostics,
+    SourceReferenceUiState Source)
+{
+    public PackageRelationUiState? PackageRelation { get; init; }
+}
+
+public sealed record VersionEvidenceManifestUiState(
+    bool IsLoaded,
+    string? DisplayName,
+    string? Status,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record SourceArtifactUiState(
+    string ArtifactId,
+    string Kind,
+    string? Name,
+    string? ModId,
+    string? FileId,
+    string? SourceUrl,
     SourceReferenceUiState Source);
+
+public sealed record VersionObservationUiState(
+    string OwnerKey,
+    string Role,
+    string SourceKind,
+    string? RawValue,
+    string? NormalizedValue,
+    string Scheme,
+    SourceReferenceUiState Source,
+    DateTimeOffset ObservedAtUtc,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
+
+public sealed record VersionComparisonUiState(
+    string Status,
+    string Reason,
+    IReadOnlyList<VersionObservationUiState> Observations);
+
+public sealed record PackageRelationUiState(
+    string PackageDirectoryName,
+    int ModletCount,
+    bool SharedAcrossModlets,
+    string IdentityState,
+    string IdentityReason,
+    string MetadataStatus,
+    string? PackageModId,
+    string? PackageFileId,
+    string? PackageVersion,
+    SourceReferenceUiState PackageSource,
+    IReadOnlyList<SourceArtifactUiState> SourceArtifacts,
+    IReadOnlyList<VersionObservationUiState> VersionObservations,
+    VersionComparisonUiState Comparison,
+    IReadOnlyList<DiagnosticUiState> Diagnostics);
 
 public sealed record BaseDataFileUiState(
     string TargetXml,

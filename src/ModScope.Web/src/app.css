@@ -2417,3 +2417,39 @@ dd {
   justify-content: space-between;
   gap: 8px;
 }
+
+.mod-list-item-status {
+  display: block;
+  margin-top: 4px;
+  color: var(--chrome-muted);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.inspector-conclusion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.inspector-conclusion-grid > div {
+  display: grid;
+  gap: 4px;
+}
+
+.inspector-conclusion-grid > div > span {
+  color: var(--chrome-muted);
+  font-size: 11px;
+}
+
+.web-version-observation {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.web-version-observation label {
+  flex: 1;
+}

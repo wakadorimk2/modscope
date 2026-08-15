@@ -480,6 +480,40 @@ identity未解決時は`Not assessed`です。version observationが欠落、曖
 identityがresolvedでも、version observationが一致するとは限りません。
 `ModInfo.xml` versionとMO2 package `meta.ini` versionは別の値として保持します。
 
+#### 7.5.1 Identity / version evidence vertical slice
+
+North Star反映の最初のvertical sliceは、package、Modlet、source artifact、version observationの説明に限定します。
+
+MO2 packageの`meta.ini`はread-onlyで読み取ります。
+既知key、未知key、欠落、破損、encoding errorをdiagnostic付きで保持します。
+
+production inputの`VersionEvidenceManifest`はschema version `1`の小さなJSONです。
+manifestは、source artifact、packageとartifactの明示的なbinding、artifactのversion observationを持ちます。
+既存のtest fixture manifestをproduction contractへ流用しません。
+
+`SourceArtifact`、`MO2Package`、`Modlet`は別entityとしてLocal Mod Knowledgeへ投影します。
+1つのpackageから複数のModletが生成される場合、source artifact relationはpackage単位で表示します。
+各Modletへsource file identityを推測しません。
+名前の類似だけでidentityを確定しません。
+
+version observationは、`ModInfo.xml`、MO2 `meta.ini`、explicit manifest、現在のDesktop session内のWeb observationを分離します。
+各observationはraw value、normalized value、version scheme、source locator、observed time、diagnosticを保持します。
+`semver`と`numeric_dotted`だけを同一scheme内で比較します。
+
+比較結果は`equal`、`mismatch`、`Not comparable`、`Not assessed`を分離します。
+identityがexactでない場合は`Not assessed`です。
+versionが欠落、schemeが異なる、または比較対象が不足する場合は`Not comparable`です。
+version observationのroleが一致しない場合も`Not comparable`です。
+latest判定、update通知、dependency、compatibility、runtime保証はこのsliceへ追加しません。
+
+Desktopだけがnative file pickerで明示されたmanifest pathを扱います。
+Web frontendへabsolute path、manifest path、raw local file contentを渡しません。
+Web version observationは現在のDesktop sessionにだけ保持します。
+Bridge contract version `2`は維持します。
+
+この変更の理由は、Libraryの情報量を増やさずに、Inspectorで「何が有効か」「どのpackageに含まれるか」「どのsource artifactと対応するか」「各sourceがどのversionを観測したか」「なぜ比較結果になったか」を説明するためです。
+Browser、Deployment、Runtime evidenceは既存責務を維持し、今回のsliceでは拡張しません。
+
 MO2 separator textはcurator-authored evidenceとしてraw保持します。
 separator textからenable、dependency、compatibilityを断定しません。
 

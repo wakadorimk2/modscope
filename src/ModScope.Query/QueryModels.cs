@@ -70,7 +70,35 @@ public enum QuerySourceReferenceKind
     ModDirectory,
     ModFile,
     GameDataFile,
-    RuntimeLog
+    RuntimeLog,
+    PackageFile,
+    EvidenceManifest,
+    WebObservation,
+    Diagnostic
+}
+
+public enum QueryIdentityResolutionState
+{
+    Exact,
+    Ambiguous,
+    Missing,
+    Conflicting,
+    Unresolved
+}
+
+public enum QueryVersionScheme
+{
+    Unknown,
+    Semver,
+    NumericDotted
+}
+
+public enum QueryVersionComparisonStatus
+{
+    Equal,
+    Mismatch,
+    NotComparable,
+    NotAssessed
 }
 
 public enum QueryXmlParseStatus
@@ -217,6 +245,8 @@ public sealed record Mo2SourceInput(
     public string? ProfilesPath { get; init; }
 
     public string? GamePath { get; init; }
+
+    public string? VersionEvidenceManifestPath { get; init; }
 }
 
 public sealed record Mo2SourceCandidateReadModel(
@@ -280,7 +310,10 @@ public sealed record KnowledgeSessionReadModel(
     DateTimeOffset CreatedAtUtc,
     string ParserVersion,
     int SchemaVersion,
-    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public VersionEvidenceManifestReadModel? VersionEvidenceManifest { get; init; }
+}
 
 public sealed record ProfileSummaryReadModel(string ProfileName);
 
@@ -304,7 +337,10 @@ public sealed record ModCandidateSummary(
     SourceReferenceReadModel Source,
     EvidenceReferenceReadModel? PriorityEvidence,
     ModRoleReadModel Role,
-    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public PackageRelationReadModel? PackageRelation { get; init; }
+}
 
 public enum LocalModMatchKind
 {
@@ -616,4 +652,54 @@ public sealed record InspectorReadModel(
     IReadOnlyList<ModFileReadModel> Files,
     IReadOnlyList<XmlFileReadModel> XmlFiles,
     IReadOnlyList<DiagnosticReadModel> Diagnostics,
+    SourceReferenceReadModel Source)
+{
+    public PackageRelationReadModel? PackageRelation { get; init; }
+}
+
+public sealed record VersionEvidenceManifestReadModel(
+    bool IsLoaded,
+    string? DisplayName,
+    string? Status,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+
+public sealed record SourceArtifactReadModel(
+    string ArtifactId,
+    string Kind,
+    string? Name,
+    string? ModId,
+    string? FileId,
+    string? SourceUrl,
     SourceReferenceReadModel Source);
+
+public sealed record VersionObservationReadModel(
+    string OwnerKey,
+    string Role,
+    string SourceKind,
+    string? RawValue,
+    string? NormalizedValue,
+    QueryVersionScheme Scheme,
+    SourceReferenceReadModel Source,
+    DateTimeOffset ObservedAtUtc,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+
+public sealed record VersionComparisonReadModel(
+    QueryVersionComparisonStatus Status,
+    string Reason,
+    IReadOnlyList<VersionObservationReadModel> Observations);
+
+public sealed record PackageRelationReadModel(
+    string PackageDirectoryName,
+    int ModletCount,
+    bool SharedAcrossModlets,
+    QueryIdentityResolutionState IdentityState,
+    string IdentityReason,
+    string MetadataStatus,
+    string? PackageModId,
+    string? PackageFileId,
+    string? PackageVersion,
+    SourceReferenceReadModel PackageSource,
+    IReadOnlyList<SourceArtifactReadModel> SourceArtifacts,
+    IReadOnlyList<VersionObservationReadModel> VersionObservations,
+    VersionComparisonReadModel Comparison,
+    IReadOnlyList<DiagnosticReadModel> Diagnostics);
