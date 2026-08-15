@@ -18,6 +18,8 @@ public sealed record Mo2SourceDefinition(
     public string? ProfilesPath { get; init; }
 
     public string? GamePath { get; init; }
+
+    public string? VersionEvidenceManifestPath { get; init; }
 }
 
 public enum Mo2SourceCandidateReadiness
@@ -139,7 +141,11 @@ public enum SourceReferenceKind
     ModDirectory,
     ModFile,
     GameDataFile,
-    RuntimeLog
+    RuntimeLog,
+    PackageFile,
+    EvidenceManifest,
+    WebObservation,
+    Diagnostic
 }
 
 public enum XmlParseStatus
@@ -302,6 +308,10 @@ public sealed record LocalModRecord(
     public SourceReference? Mo2OuterSource { get; init; }
 
     public ModRootResolution? RootResolution { get; init; }
+
+    public Mo2PackageMetadata? PackageMetadata { get; init; }
+
+    public PackageVersionEvidence? PackageEvidence { get; init; }
 }
 
 public sealed record InputManifestFile(
@@ -313,7 +323,10 @@ public sealed record InputManifest(
     string ProfileModListSha256,
     IReadOnlyList<InputManifestFile> Files,
     string ParserVersion,
-    int SchemaVersion);
+    int SchemaVersion)
+{
+    public string? VersionEvidenceManifestSha256 { get; init; }
+}
 
 public sealed record LocalModSnapshot(
     string SnapshotId,
@@ -328,6 +341,8 @@ public sealed record LocalModSnapshot(
     IReadOnlyList<Diagnostic> Diagnostics)
 {
     public LocalKnowledgeIndex Index { get; init; } = LocalKnowledgeIndex.Empty;
+
+    public VersionEvidenceManifestLoadResult? VersionEvidenceManifest { get; init; }
 }
 
 public enum LocalKnowledgeNodeKind

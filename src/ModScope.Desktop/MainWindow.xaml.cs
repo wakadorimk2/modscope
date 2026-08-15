@@ -851,6 +851,28 @@ public partial class MainWindow : Window
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
+            case "knowledge.selectEvidenceManifest":
+            {
+                var path = ChooseFile(
+                    "Select the version evidence manifest",
+                    "JSON manifest (*.json)|*.json|All files (*.*)|*.*");
+                if (path is not null)
+                {
+                    var loadTask = _controller.LoadVersionEvidenceManifestAsync(path);
+                    SendState(targetWebView: sourceWebView);
+                    await loadTask;
+                }
+
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "knowledge.setWebVersionObservation":
+            {
+                var payload = BridgeProtocol.ReadPayload<SetWebVersionObservationPayload>(command.Payload);
+                _controller.SetSessionWebVersionObservation(payload.RawValue);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
             case "analysis.selectBaseData":
             {
                 var path = ChooseFolder("Select the 7 Days to Die base Data/Config folder");
@@ -903,12 +925,12 @@ public partial class MainWindow : Window
             case "knowledge.loadSource":
             {
                 var payload = BridgeProtocol.ReadPayload<LoadSourcePayload>(command.Payload);
-                var loadTask = _controller.LoadSourceAsync(new Mo2SourceInput(
-                    payload.InstanceName,
-                    payload.ProfileName,
-                    payload.InstanceRootPath,
-                    payload.ProfilePath,
-                    payload.ModsPath));
+                if (string.IsNullOrWhiteSpace(payload.CandidateId))
+                {
+                    throw new BridgeProtocolException("Select a discovered MO2 source before loading it.");
+                }
+
+                var loadTask = _controller.LoadSourceCandidateAsync(payload.CandidateId);
                 SendState(targetWebView: sourceWebView);
                 await loadTask;
                 SendState(command.RequestId, sourceWebView);
@@ -1394,6 +1416,19 @@ public partial class MainWindow : Window
         };
 
         return dialog.ShowDialog() == true ? dialog.FolderName : null;
+    }
+
+    private static string? ChooseFile(string title, string filter)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = title,
+            Filter = filter,
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
     private void SendError(

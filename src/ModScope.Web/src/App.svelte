@@ -50,14 +50,7 @@
   let operationRailVisible = false;
   let runtimeToolVersion = '';
   let runtimeGameVersion = '';
-  let source = {
-    instanceName: 'explicit-instance',
-    profileName: 'default',
-    instanceRootPath: '',
-    profilePath: '',
-    modsPath: ''
-  };
-
+  let webObservedVersion = '';
   $: {
     const operationBusy = state.knowledge.operation.isBusy;
     if (operationBusy && !operationRailVisible && operationRailTimer === undefined) {
@@ -199,6 +192,7 @@
         if (state.inspector.modKey !== dismissedInspectorModKey) {
           if (state.inspector.modKey !== inspectorModKey) {
             inspectorFilesOpen = false;
+            webObservedVersion = '';
           }
           contextPanelMode = 'inspector';
           inspectorView = 'mod';
@@ -244,6 +238,7 @@
       'knowledge.selectSource',
       'knowledge.switchProfile',
       'knowledge.useFixture',
+      'knowledge.selectEvidenceManifest',
       'deployment.preview',
       'deployment.apply',
       'game.launch',
@@ -450,8 +445,8 @@
     }
   }
 
-  function loadSource() {
-    send('knowledge.loadSource', source);
+  function selectMo2Source() {
+    send('knowledge.selectRoot');
   }
 
   function discoverSources() {
@@ -512,6 +507,9 @@
   }
 
   function openInspectorForMod(modKey: string) {
+    if (inspectorModKey !== modKey) {
+      webObservedVersion = '';
+    }
     inspectorView = 'mod';
     inspectorModKey = modKey;
     dismissedInspectorModKey = null;
@@ -554,6 +552,12 @@
       toolVersion: runtimeToolVersion.trim() || null,
       gameVersion: runtimeGameVersion.trim() || null
     });
+  }
+
+  function setWebVersionObservation() {
+    if (state.inspector && webObservedVersion.trim().length > 0) {
+      send('knowledge.setWebVersionObservation', { rawValue: webObservedVersion.trim() });
+    }
   }
 
   function openModSearch(mode: 'browse' | 'recognition' = 'browse') {
@@ -1084,6 +1088,11 @@
                   ></span>
                 </div>
                 <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)}</span>
+                {#if candidate.packageRelation}
+                  <span class="mod-list-item-status" aria-label="Identity and version status">
+                    ID {formatLabel(candidate.packageRelation.identityState)} · Version {formatLabel(candidate.packageRelation.comparison.status)}
+                  </span>
+                {/if}
               </article>
             {/each}
           </div>
@@ -1135,6 +1144,11 @@
                     ></span>
                   </div>
                   <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)} · Profile outside</span>
+                  {#if candidate.packageRelation}
+                    <span class="mod-list-item-status" aria-label="Identity and version status">
+                      ID {formatLabel(candidate.packageRelation.identityState)} · Version {formatLabel(candidate.packageRelation.comparison.status)}
+                    </span>
+                  {/if}
                 </article>
               {/each}
             </div>
@@ -1875,7 +1889,8 @@
 
       <div class="developer-actions">
         <button class="secondary-button" disabled={operationBlocksInteraction} onclick={() => send('knowledge.useFixture')}>Use fixture</button>
-        <button class="primary-button" disabled={operationBlocksInteraction} onclick={loadSource}>Load source</button>
+        <button class="secondary-button" disabled={operationBlocksInteraction || !state.knowledge.session} onclick={() => send('knowledge.selectEvidenceManifest')}>Select version manifest</button>
+        <button class="primary-button" disabled={operationBlocksInteraction} onclick={selectMo2Source}>Select MO2 source</button>
         <button class="secondary-button" onclick={() => send('browser.observe')}>Observe now</button>
       </div>
 
@@ -1916,22 +1931,16 @@
         <p class="subtle developer-status">Paths stay in the Desktop session. Runtime log bodies and raw results stay out of Web state.</p>
       </div>
 
-      <details class="source-details">
-        <summary>Explicit MO2 source paths</summary>
-        <div class="source-grid">
-          <label>Instance name<input bind:value={source.instanceName} /></label>
-          <label>Profile name<input bind:value={source.profileName} /></label>
-          <label>Instance root<input bind:value={source.instanceRootPath} /></label>
-          <label>Profile path<input bind:value={source.profilePath} /></label>
-          <label>Mods path<input bind:value={source.modsPath} /></label>
-        </div>
-      </details>
+      <p class="subtle developer-status">MO2 paths stay in the Desktop session. Use the native source picker.</p>
 
       {#if state.knowledge.session}
         <p class="subtle developer-status">
           {state.knowledge.session.instanceName} / {state.knowledge.session.profileName}
           · {state.knowledge.candidates.length} MOD records
           · {state.knowledge.profiles.length} profiles
+          {#if state.knowledge.session.versionEvidenceManifest}
+            · Evidence manifest {formatLabel(state.knowledge.session.versionEvidenceManifest.status || 'unknown')}
+          {/if}
         </p>
       {/if}
       {#if state.statusMessage}
@@ -2071,6 +2080,59 @@
         </div>
 
         {#if state.inspector}
+          {#if state.inspector.packageRelation}
+            <div class="drawer-section inspector-evidence-conclusion">
+              <span class="eyebrow">IDENTITY / VERSION EVIDENCE</span>
+              <div class="inspector-conclusion-grid">
+                <div>
+                  <span>Identity</span>
+                  <strong class="status-chip {statusClass(state.inspector.packageRelation.identityState)}">
+                    {formatLabel(state.inspector.packageRelation.identityState)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Version</span>
+                  <strong class="status-chip {statusClass(state.inspector.packageRelation.comparison.status)}">
+                    {formatLabel(state.inspector.packageRelation.comparison.status)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Package</span>
+                  <strong>{state.inspector.packageRelation.packageDirectoryName}</strong>
+                </div>
+                <div>
+                  <span>Modlets</span>
+                  <strong>{state.inspector.packageRelation.modletCount}</strong>
+                </div>
+              </div>
+              <p class="analysis-meta">{state.inspector.packageRelation.comparison.reason}</p>
+              <p class="analysis-meta">{state.inspector.packageRelation.identityReason}</p>
+              <div class="web-version-observation">
+                <label>Web observed version<input bind:value={webObservedVersion} placeholder="Optional, e.g. 1.2.3" /></label>
+                <button class="secondary-button" type="button" disabled={operationBlocksInteraction || webObservedVersion.trim().length === 0} onclick={setWebVersionObservation}>Record for this session</button>
+              </div>
+              <details class="inspector-disclosure">
+                <summary>Version observations · {state.inspector.packageRelation.versionObservations.length}</summary>
+                {#each state.inspector.packageRelation.versionObservations as observation}
+                  <p class="provenance-line">
+                    {formatLabel(observation.sourceKind)} · {observation.rawValue || 'Missing'} · {formatLabel(observation.scheme)} · {observation.source.relativePath}
+                  </p>
+                {/each}
+                {#if state.inspector.packageRelation.sourceArtifacts.length > 0}
+                  <p class="provenance-line">Source artifacts are related to the package.</p>
+                  {#each state.inspector.packageRelation.sourceArtifacts as artifact}
+                    <p class="provenance-line">{artifact.artifactId} · {artifact.kind} · {artifact.source.relativePath}</p>
+                  {/each}
+                {/if}
+                {#if state.inspector.packageRelation.diagnostics.length > 0}
+                  {#each state.inspector.packageRelation.diagnostics as diagnostic}
+                    <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+                  {/each}
+                {/if}
+              </details>
+            </div>
+          {/if}
+
           {#if state.inspector.modInfo}
             <div class="drawer-section">
               <span class="eyebrow">METADATA</span>

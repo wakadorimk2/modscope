@@ -15,6 +15,7 @@ public sealed class DesktopSessionController
     private readonly SemaphoreSlim _analysisGate = new(1, 1);
     private KnowledgeSessionReadModel? _session;
     private PageObservation? _observation;
+    private VersionObservationReadModel? _sessionWebVersionObservation;
     private IReadOnlyList<ModCandidateSummary> _candidates = Array.Empty<ModCandidateSummary>();
     private IReadOnlyList<ProfileSummaryReadModel> _profiles = Array.Empty<ProfileSummaryReadModel>();
     private SourceDiscoveryReadModel? _sourceDiscovery;
@@ -430,6 +431,29 @@ public sealed class DesktopSessionController
         StartBackgroundProfilePreload();
     }
 
+    public async Task<bool> LoadVersionEvidenceManifestAsync(string manifestPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(manifestPath);
+        var source = _query.GetCurrentSource();
+        if (source is null)
+        {
+            _statusMessage = "Load an explicit MO2 source before selecting a version evidence manifest.";
+            return false;
+        }
+
+        var fullPath = Path.GetFullPath(manifestPath);
+        if (!File.Exists(fullPath))
+        {
+            _statusMessage = "The selected version evidence manifest does not exist.";
+            return false;
+        }
+
+        return await LoadSourceAsync(source with
+        {
+            VersionEvidenceManifestPath = fullPath
+        });
+    }
+
     public void SwitchProfile(string profileName)
     {
         ThrowIfAnalysisBusy();
@@ -634,11 +658,55 @@ public sealed class DesktopSessionController
     {
         ArgumentNullException.ThrowIfNull(observation);
         _observation = observation;
+        _sessionWebVersionObservation = null;
         _candidateIdentity = string.Empty;
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
         RefreshPageRecognition();
+    }
+
+    public void SetSessionWebVersionObservation(string rawValue)
+    {
+        if (_observation is null || _inspector is null)
+        {
+            _statusMessage = "Open a local MOD Inspector before adding a Web version observation.";
+            return;
+        }
+
+        var trimmed = rawValue.Trim();
+        if (trimmed.Length == 0)
+        {
+            _sessionWebVersionObservation = null;
+            _statusMessage = "The session Web version observation was cleared.";
+            return;
+        }
+
+        if (trimmed.Length > 100)
+        {
+            _statusMessage = "The Web version observation is too long.";
+            return;
+        }
+
+        var normalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(trimmed, out var scheme);
+        _sessionWebVersionObservation = new VersionObservationReadModel(
+            _inspector.ModKey,
+            "Release",
+            "WebObservation",
+            trimmed,
+            normalized,
+            scheme switch
+            {
+                ModScope.LocalKnowledge.VersionScheme.Semver => QueryVersionScheme.Semver,
+                ModScope.LocalKnowledge.VersionScheme.NumericDotted => QueryVersionScheme.NumericDotted,
+                _ => QueryVersionScheme.Unknown
+            },
+            new SourceReferenceReadModel(
+                QuerySourceReferenceKind.WebObservation,
+                $"web-session/{_observation.Url.Host}"),
+            DateTimeOffset.UtcNow,
+            Array.Empty<DiagnosticReadModel>());
+        _statusMessage = "The session Web version observation was added.";
     }
 
     public void ConfirmIdentity(string candidateIdentity, string? localModKey)
@@ -714,7 +782,8 @@ public sealed class DesktopSessionController
             _deploymentPlan,
             _deploymentStatus,
             _canLaunchGame,
-            _deploymentDiagnostics);
+            _deploymentDiagnostics,
+            _sessionWebVersionObservation);
     }
 
     private async Task<bool> LoadSourceCandidateCoreAsync(
@@ -1139,6 +1208,7 @@ public sealed class DesktopSessionController
     private void ApplyLoadedSession(KnowledgeSessionReadModel session, string? candidateId)
     {
         _session = session;
+        _sessionWebVersionObservation = null;
         _candidates = _query.GetModCandidates();
         _profiles = _query.GetProfiles();
         InitializeProfileLoadStates(session.ProfileName);

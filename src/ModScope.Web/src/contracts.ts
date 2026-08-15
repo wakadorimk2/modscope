@@ -61,6 +61,14 @@ export type KnowledgeSessionUiState = {
   parserVersion: string;
   schemaVersion: number;
   diagnostics: DiagnosticUiState[];
+  versionEvidenceManifest?: VersionEvidenceManifestUiState | null;
+};
+
+export type VersionEvidenceManifestUiState = {
+  isLoaded: boolean;
+  displayName?: string | null;
+  status?: string | null;
+  diagnostics: DiagnosticUiState[];
 };
 
 export type ModRoleEvidenceUiState = {
@@ -89,6 +97,7 @@ export type ModCandidateUiState = {
   priorityEvidence?: EvidenceReferenceUiState | null;
   diagnostics: DiagnosticUiState[];
   role?: ModRoleUiState | null;
+  packageRelation?: PackageRelationUiState | null;
 };
 
 export type ProfileUiState = {
@@ -254,6 +263,52 @@ export type InspectorUiState = {
   xmlFiles: XmlFileUiState[];
   diagnostics: DiagnosticUiState[];
   source: SourceReferenceUiState;
+  packageRelation?: PackageRelationUiState | null;
+};
+
+export type SourceArtifactUiState = {
+  artifactId: string;
+  kind: string;
+  name?: string | null;
+  modId?: string | null;
+  fileId?: string | null;
+  sourceUrl?: string | null;
+  source: SourceReferenceUiState;
+};
+
+export type VersionObservationUiState = {
+  ownerKey: string;
+  role: string;
+  sourceKind: string;
+  rawValue?: string | null;
+  normalizedValue?: string | null;
+  scheme: string;
+  source: SourceReferenceUiState;
+  observedAtUtc: string;
+  diagnostics: DiagnosticUiState[];
+};
+
+export type VersionComparisonUiState = {
+  status: string;
+  reason: string;
+  observations: VersionObservationUiState[];
+};
+
+export type PackageRelationUiState = {
+  packageDirectoryName: string;
+  modletCount: number;
+  sharedAcrossModlets: boolean;
+  identityState: string;
+  identityReason: string;
+  metadataStatus: string;
+  packageModId?: string | null;
+  packageFileId?: string | null;
+  packageVersion?: string | null;
+  packageSource: SourceReferenceUiState;
+  sourceArtifacts: SourceArtifactUiState[];
+  versionObservations: VersionObservationUiState[];
+  comparison: VersionComparisonUiState;
+  diagnostics: DiagnosticUiState[];
 };
 
 export type BaseDataFileUiState = {

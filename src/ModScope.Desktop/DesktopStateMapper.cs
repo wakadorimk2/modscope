@@ -27,7 +27,8 @@ internal static class DesktopStateMapper
         DeploymentPlan? deploymentPlan = null,
         string deploymentStatus = "idle",
         bool canLaunch = false,
-        IReadOnlyList<DeploymentDiagnostic>? deploymentDiagnostics = null)
+        IReadOnlyList<DeploymentDiagnostic>? deploymentDiagnostics = null,
+        VersionObservationReadModel? sessionWebVersionObservation = null)
     {
         return new UiState(
             browser,
@@ -45,7 +46,7 @@ internal static class DesktopStateMapper
                 operation),
             identity,
             localContext is null ? null : LocalContext(localContext),
-            inspector is null ? null : Inspector(inspector),
+            inspector is null ? null : Inspector(inspector, sessionWebVersionObservation),
             analysis,
             Deployment(
                 session?.ProfileName ?? string.Empty,
@@ -207,7 +208,16 @@ internal static class DesktopStateMapper
             value.CreatedAtUtc,
             value.ParserVersion,
             value.SchemaVersion,
-            Diagnostics(value.Diagnostics));
+            Diagnostics(value.Diagnostics))
+        {
+            VersionEvidenceManifest = value.VersionEvidenceManifest is null
+                ? null
+                : new VersionEvidenceManifestUiState(
+                    value.VersionEvidenceManifest.IsLoaded,
+                    value.VersionEvidenceManifest.DisplayName,
+                    value.VersionEvidenceManifest.Status,
+                    Diagnostics(value.VersionEvidenceManifest.Diagnostics))
+        };
     }
 
     private static ModCandidateUiState Candidate(ModCandidateSummary value)
@@ -224,7 +234,10 @@ internal static class DesktopStateMapper
             Source(value.Source),
             value.PriorityEvidence is null ? null : Evidence(value.PriorityEvidence),
             Diagnostics(value.Diagnostics),
-            Role(value.Role));
+            Role(value.Role))
+        {
+            PackageRelation = value.PackageRelation is null ? null : PackageRelation(value.PackageRelation)
+        };
     }
 
     private static ModRoleUiState Role(ModRoleReadModel value)
@@ -270,7 +283,9 @@ internal static class DesktopStateMapper
             Diagnostics(value.Diagnostics));
     }
 
-    private static InspectorUiState Inspector(InspectorReadModel value)
+    private static InspectorUiState Inspector(
+        InspectorReadModel value,
+        VersionObservationReadModel? sessionWebVersionObservation)
     {
         return new InspectorUiState(
             value.ModKey,
@@ -282,7 +297,12 @@ internal static class DesktopStateMapper
             value.Files.Select(File).ToList().AsReadOnly(),
             value.XmlFiles.Select(XmlFile).ToList().AsReadOnly(),
             Diagnostics(value.Diagnostics),
-            Source(value.Source));
+            Source(value.Source))
+        {
+            PackageRelation = value.PackageRelation is null
+                ? null
+                : PackageRelation(value.PackageRelation, value.ModKey, sessionWebVersionObservation)
+        };
     }
 
     private static ModInfoUiState ModInfo(ModInfoReadModel value)
@@ -374,6 +394,110 @@ internal static class DesktopStateMapper
             value.AttributeCandidates.Select(ReferenceCandidate).ToList().AsReadOnly(),
             Diagnostics(value.Diagnostics),
             Source(value.Source));
+    }
+
+    private static PackageRelationUiState PackageRelation(
+        PackageRelationReadModel value,
+        string? modKey = null,
+        VersionObservationReadModel? sessionWebVersionObservation = null)
+    {
+        var applicableSessionObservation = sessionWebVersionObservation is not null
+            && string.Equals(sessionWebVersionObservation.OwnerKey, modKey, StringComparison.OrdinalIgnoreCase)
+            ? new[] { sessionWebVersionObservation }
+            : Array.Empty<VersionObservationReadModel>();
+        var observations = value.VersionObservations
+            .Concat(applicableSessionObservation)
+            .ToList()
+            .AsReadOnly();
+        return new PackageRelationUiState(
+            value.PackageDirectoryName,
+            value.ModletCount,
+            value.SharedAcrossModlets,
+            EnumText(value.IdentityState),
+            value.IdentityReason,
+            value.MetadataStatus,
+            value.PackageModId,
+            value.PackageFileId,
+            value.PackageVersion,
+            Source(value.PackageSource),
+            value.SourceArtifacts.Select(artifact => new SourceArtifactUiState(
+                    artifact.ArtifactId,
+                    artifact.Kind,
+                    artifact.Name,
+                    artifact.ModId,
+                    artifact.FileId,
+                    artifact.SourceUrl,
+                    Source(artifact.Source)))
+                .ToList()
+                .AsReadOnly(),
+            observations.Select(VersionObservation).ToList().AsReadOnly(),
+            VersionComparison(value, observations),
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static VersionObservationUiState VersionObservation(VersionObservationReadModel value)
+    {
+        return new VersionObservationUiState(
+            value.OwnerKey,
+            value.Role,
+            value.SourceKind,
+            value.RawValue,
+            value.NormalizedValue,
+            EnumText(value.Scheme),
+            Source(value.Source),
+            value.ObservedAtUtc,
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static VersionComparisonUiState VersionComparison(
+        PackageRelationReadModel package,
+        IReadOnlyList<VersionObservationReadModel> observations)
+    {
+        var status = package.Comparison.Status;
+        var reason = package.Comparison.Reason;
+        if (observations.Count != package.VersionObservations.Count)
+        {
+            if (package.IdentityState != QueryIdentityResolutionState.Exact)
+            {
+                status = QueryVersionComparisonStatus.NotAssessed;
+                reason = "Identity is not exact, so the session Web observation was not assessed.";
+            }
+            else
+            {
+                var comparable = observations
+                    .Where(observation => !string.IsNullOrWhiteSpace(observation.NormalizedValue))
+                    .ToList();
+                var schemes = comparable.Select(observation => observation.Scheme).Distinct().ToList();
+                if (comparable.Count < 2)
+                {
+                    status = QueryVersionComparisonStatus.NotComparable;
+                    reason = "At least two version observations are required.";
+                }
+                else if (schemes.Count != 1
+                    || schemes[0] is not (QueryVersionScheme.Semver or QueryVersionScheme.NumericDotted))
+                {
+                    status = QueryVersionComparisonStatus.NotComparable;
+                    reason = "The observations do not use one supported version scheme.";
+                }
+                else
+                {
+                    var first = comparable[0].NormalizedValue;
+                    var equal = comparable.All(observation =>
+                        string.Equals(observation.NormalizedValue, first, StringComparison.OrdinalIgnoreCase));
+                    status = equal
+                        ? QueryVersionComparisonStatus.Equal
+                        : QueryVersionComparisonStatus.Mismatch;
+                    reason = equal
+                        ? "All supported observations have the same normalized value."
+                        : "Supported observations have different normalized values.";
+                }
+            }
+        }
+
+        return new VersionComparisonUiState(
+            EnumText(status),
+            reason,
+            observations.Select(VersionObservation).ToList().AsReadOnly());
     }
 
     private static BaseDataFileUiState BaseDataFile(BaseDataFileReadModel value)

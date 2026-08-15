@@ -46,6 +46,11 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         diagnostics.AddRange(staticCatalog.Diagnostics);
         progress?.Report(new LocalKnowledgeProgress("projecting-profile"));
         var records = ProjectRecords(staticCatalog, profileEntries, diagnostics, cancellationToken);
+        var evidenceManifest = VersionEvidenceManifestReader.Read(source.VersionEvidenceManifestPath);
+        diagnostics.AddRange(evidenceManifest.Diagnostics);
+        var recordsWithEvidence = VersionEvidenceAssembler.Attach(
+            records,
+            evidenceManifest.IsLoaded ? evidenceManifest.Document : null);
 
         var manifestFiles = new List<InputManifestFile>
         {
@@ -62,11 +67,22 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                 file.Sha256));
         }
 
+        if (evidenceManifest.Sha256 is not null && evidenceManifest.Size is not null)
+        {
+            manifestFiles.Add(new InputManifestFile(
+                $"evidence-manifest/{evidenceManifest.DisplayName}",
+                evidenceManifest.Size.Value,
+                evidenceManifest.Sha256));
+        }
+
         var manifest = new InputManifest(
             modListHash,
             CollectionHelpers.ReadOnly(manifestFiles.OrderBy(file => file.RelativePath, StringComparer.Ordinal)),
             ParserMetadata.ParserVersion,
-            ParserMetadata.SchemaVersion);
+            ParserMetadata.SchemaVersion)
+        {
+            VersionEvidenceManifestSha256 = evidenceManifest.Sha256
+        };
 
         var snapshotId = CreateSnapshotId(source, manifest);
         return new LocalModSnapshot(
@@ -77,11 +93,12 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             ParserMetadata.ParserVersion,
             ParserMetadata.SchemaVersion,
             CollectionHelpers.ReadOnly(profileEntries),
-            CollectionHelpers.ReadOnly(records),
+            CollectionHelpers.ReadOnly(recordsWithEvidence),
             manifest,
             CollectionHelpers.ReadOnly(diagnostics))
         {
-            Index = staticCatalog.Index
+            Index = staticCatalog.Index,
+            VersionEvidenceManifest = evidenceManifest
         };
     }
 
@@ -556,6 +573,8 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
     {
         var discovery = DiscoverModRoots(outerDirectory, cancellationToken);
         var diagnostics = discovery.Diagnostics.ToList();
+        var packageMetadata = Mo2MetaIniReader.Read(outerDirectory.FullName, outerDirectory.Name);
+        diagnostics.AddRange(packageMetadata.Diagnostics);
         var records = new List<LocalModRecord>();
         var inventory = new List<FileInventoryItem>();
 
@@ -584,6 +603,7 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             var parsed = BuildModRecord(
                 outerDirectory,
                 root,
+                packageMetadata,
                 cancellationToken);
             records.Add(parsed.Record);
             inventory.AddRange(parsed.Inventory);
@@ -761,6 +781,7 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
     private static (LocalModRecord Record, IReadOnlyList<FileInventoryItem> Inventory) BuildModRecord(
         DirectoryInfo outerDirectory,
         ModRootCandidate root,
+        Mo2PackageMetadata packageMetadata,
         CancellationToken cancellationToken)
     {
         var scan = ScanFiles(root.Directory, root.InnerSource.RelativePath, cancellationToken);
@@ -801,7 +822,8 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
             {
                 Mo2OuterDirectoryName = outerDirectory.Name,
                 Mo2OuterSource = root.OuterSource,
-                RootResolution = rootResolution
+                RootResolution = rootResolution,
+                PackageMetadata = packageMetadata
             },
             scan.Files);
     }

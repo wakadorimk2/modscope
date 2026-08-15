@@ -141,7 +141,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             candidate.Source.ModsPath)
         {
             ProfilesPath = candidate.Source.ProfilesPath,
-            GamePath = candidate.Source.GamePath
+            GamePath = candidate.Source.GamePath,
+            VersionEvidenceManifestPath = _source?.VersionEvidenceManifestPath
         };
         var session = Load(source, cancellationToken, progress);
         TryWritePreference(source);
@@ -160,7 +161,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
 
         _source = source with
         {
-            GamePath = definition.GamePath
+            GamePath = definition.GamePath,
+            VersionEvidenceManifestPath = definition.VersionEvidenceManifestPath
         };
         _snapshot = snapshot;
         _profiles = OrderProfiles(profiles, snapshot.ProfileName);
@@ -432,7 +434,10 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             record.Files.Select(QueryProjection.ModFile).ToList().AsReadOnly(),
             record.XmlFiles.Select(QueryProjection.XmlFile).ToList().AsReadOnly(),
             QueryProjection.Diagnostics(record.Diagnostics),
-            QueryProjection.Source(record.Source));
+            QueryProjection.Source(record.Source))
+        {
+            PackageRelation = QueryProjection.PackageRelation(record.PackageEvidence)
+        };
     }
 
     public IReadOnlyList<KnowledgeReferenceReadModel> FindReferences(
@@ -903,7 +908,8 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
         {
             ProfilesPath = source.ProfilesPath,
             GamePath = source.GamePath
-                ?? Mo2SourceDiscovery.ReadConfiguredGamePath(source.InstanceRootPath)
+                ?? Mo2SourceDiscovery.ReadConfiguredGamePath(source.InstanceRootPath),
+            VersionEvidenceManifestPath = source.VersionEvidenceManifestPath
         };
     }
 
@@ -973,7 +979,10 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             snapshot.CreatedAtUtc,
             snapshot.ParserVersion,
             snapshot.SchemaVersion,
-            QueryProjection.Diagnostics(snapshot.Diagnostics));
+            QueryProjection.Diagnostics(snapshot.Diagnostics))
+        {
+            VersionEvidenceManifest = QueryProjection.VersionEvidenceManifest(snapshot.VersionEvidenceManifest)
+        };
     }
 
     private static LocalContextReadModel BuildUnresolvedContext(
@@ -1244,7 +1253,10 @@ internal static class QueryProjection
                 ? null
                 : new EvidenceReferenceReadModel(QueryEvidenceKind.Source, Source(profileEntry.Source)),
             role,
-            Diagnostics(record.Diagnostics));
+            Diagnostics(record.Diagnostics))
+        {
+            PackageRelation = PackageRelation(record.PackageEvidence)
+        };
     }
 
     public static ModReferenceContextReadModel ModReferenceContext(
@@ -1301,6 +1313,105 @@ internal static class QueryProjection
         return new EvidenceReferenceReadModel(
             MapEvidenceKind(evidence.Kind),
             Source(evidence.Source));
+    }
+
+    public static VersionEvidenceManifestReadModel? VersionEvidenceManifest(
+        VersionEvidenceManifestLoadResult? manifest)
+    {
+        if (manifest is null)
+        {
+            return null;
+        }
+
+        var status = manifest.IsLoaded
+            ? "loaded"
+            : manifest.Diagnostics.Count == 0
+                ? "not-selected"
+                : "invalid";
+        return new VersionEvidenceManifestReadModel(
+            manifest.IsLoaded,
+            manifest.DisplayName,
+            status,
+            Diagnostics(manifest.Diagnostics));
+    }
+
+    public static PackageRelationReadModel? PackageRelation(PackageVersionEvidence? evidence)
+    {
+        if (evidence is null)
+        {
+            return null;
+        }
+
+        return new PackageRelationReadModel(
+            evidence.Package.DirectoryName,
+            evidence.Package.ModletCount,
+            evidence.Package.ModletCount > 1,
+            evidence.IdentityState switch
+            {
+                IdentityResolutionState.Exact => QueryIdentityResolutionState.Exact,
+                IdentityResolutionState.Ambiguous => QueryIdentityResolutionState.Ambiguous,
+                IdentityResolutionState.Missing => QueryIdentityResolutionState.Missing,
+                IdentityResolutionState.Conflicting => QueryIdentityResolutionState.Conflicting,
+                IdentityResolutionState.Unresolved => QueryIdentityResolutionState.Unresolved,
+                _ => throw new ArgumentOutOfRangeException(nameof(evidence), evidence.IdentityState, null)
+            },
+            evidence.IdentityReason,
+            evidence.Package.Metadata.ParseStatus.ToString(),
+            evidence.Package.Metadata.ModId,
+            evidence.Package.Metadata.FileId,
+            evidence.Package.Metadata.Version,
+            Source(evidence.Package.Source),
+            evidence.SourceArtifacts.Select(SourceArtifact).ToList().AsReadOnly(),
+            evidence.VersionObservations.Select(VersionObservation).ToList().AsReadOnly(),
+            VersionComparison(evidence.Comparison),
+            Diagnostics(evidence.Diagnostics));
+    }
+
+    private static SourceArtifactReadModel SourceArtifact(SourceArtifact value)
+    {
+        return new SourceArtifactReadModel(
+            value.ArtifactId,
+            value.Kind,
+            value.Name,
+            value.ModId,
+            value.FileId,
+            value.SourceUrl,
+            Source(value.Source));
+    }
+
+    private static VersionObservationReadModel VersionObservation(VersionObservation value)
+    {
+        return new VersionObservationReadModel(
+            value.OwnerKey,
+            value.Role.ToString(),
+            value.SourceKind.ToString(),
+            value.RawValue,
+            value.NormalizedValue,
+            value.Scheme switch
+            {
+                VersionScheme.Unknown => QueryVersionScheme.Unknown,
+                VersionScheme.Semver => QueryVersionScheme.Semver,
+                VersionScheme.NumericDotted => QueryVersionScheme.NumericDotted,
+                _ => throw new ArgumentOutOfRangeException(nameof(value), value.Scheme, null)
+            },
+            Source(value.Source),
+            value.ObservedAtUtc,
+            Diagnostics(value.Diagnostics));
+    }
+
+    private static VersionComparisonReadModel VersionComparison(VersionComparison value)
+    {
+        return new VersionComparisonReadModel(
+            value.Status switch
+            {
+                VersionComparisonStatus.Equal => QueryVersionComparisonStatus.Equal,
+                VersionComparisonStatus.Mismatch => QueryVersionComparisonStatus.Mismatch,
+                VersionComparisonStatus.NotComparable => QueryVersionComparisonStatus.NotComparable,
+                VersionComparisonStatus.NotAssessed => QueryVersionComparisonStatus.NotAssessed,
+                _ => throw new ArgumentOutOfRangeException(nameof(value), value.Status, null)
+            },
+            value.Reason,
+            value.Observations.Select(VersionObservation).ToList().AsReadOnly());
     }
 
     public static XmlPatchOperationReadModel PatchOperation(
@@ -1593,7 +1704,7 @@ internal static class QueryProjection
 
     public static SourceReferenceReadModel Source(SourceReference source)
     {
-            return new SourceReferenceReadModel(
+        return new SourceReferenceReadModel(
             source.Kind switch
             {
                 SourceReferenceKind.ProfileFile => QuerySourceReferenceKind.ProfileFile,
@@ -1602,6 +1713,10 @@ internal static class QueryProjection
                 SourceReferenceKind.ModFile => QuerySourceReferenceKind.ModFile,
                 SourceReferenceKind.GameDataFile => QuerySourceReferenceKind.GameDataFile,
                 SourceReferenceKind.RuntimeLog => QuerySourceReferenceKind.RuntimeLog,
+                SourceReferenceKind.PackageFile => QuerySourceReferenceKind.PackageFile,
+                SourceReferenceKind.EvidenceManifest => QuerySourceReferenceKind.EvidenceManifest,
+                SourceReferenceKind.WebObservation => QuerySourceReferenceKind.WebObservation,
+                SourceReferenceKind.Diagnostic => QuerySourceReferenceKind.Diagnostic,
                 _ => throw new ArgumentOutOfRangeException(nameof(source), source.Kind, null)
             },
             source.RelativePath,
