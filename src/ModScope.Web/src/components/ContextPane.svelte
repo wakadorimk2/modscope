@@ -1,0 +1,222 @@
+<script lang="ts">
+  import type { BridgeErrorPayload, DiagnosticUiState, ModCandidateUiState, UiState } from '../contracts';
+
+  import type { ContextMode } from './ui-types';
+
+  export let state: UiState;
+  export let mode: ContextMode = 'context';
+  export let contextPanelMode: 'context' | 'inspector' = 'context';
+  export let operationBlocksInteraction = false;
+  export let error: BridgeErrorPayload | null = null;
+  export let pageDetailsOpen = false;
+  export let developerToolsOpen = false;
+  export let runtimeToolVersion = '';
+  export let runtimeGameVersion = '';
+  export let modSearchOpen = false;
+  export let modSearchMode: 'browse' | 'recognition' = 'browse';
+  export let modSearchQuery = '';
+  export let modSearchResults: ModCandidateUiState[] = [];
+  export let onSetContextMode: (mode: ContextMode) => void;
+  export let onDiscoverSources: () => void;
+  export let onSelectRoot: () => void;
+  export let onSelectSource: (candidateId: string) => void;
+  export let onUseFixture: () => void;
+  export let onSelectEvidenceManifest: () => void;
+  export let onObserve: () => void;
+  export let onOpenAnalysis: () => void;
+  export let onOpenInspector: () => void;
+  export let onOpenModSearch: (mode?: 'browse' | 'recognition') => void;
+  export let onCloseModSearch: () => void;
+  export let onOpenModPage: (candidate: ModCandidateUiState) => void;
+  export let onChooseModForRecognition: (candidate: ModCandidateUiState) => void;
+  export let onConfirmIdentity: (localModKey: string | null) => void;
+  export let onStartStaticAnalysis: () => void;
+  export let onSelectBaseData: () => void;
+  export let onSelectRuntimeLogs: () => void;
+  export let onAnalyzeConflicts: () => void;
+  export let onCompareRuntimeEvidence: () => void;
+  export let onUseAnalysisFixture: () => void;
+  export let onOpenInspectorForMod: (modKey: string) => void;
+
+  $: analysisBusy = state.analysis.operation.isBusy;
+  $: analysisGroups = state.analysis.conflict?.groups ?? [];
+  $: candidateAnalysisGroups = state.analysis.conflict && state.localContext?.localModKey
+    ? state.analysis.conflict.groups.filter((group) => group.operations.some((operation) => operation.modKey === state.localContext?.localModKey))
+    : [];
+  $: hasConclusion = state.localContext?.status === 'installed' || state.localContext?.status === 'notInstalled';
+
+  type DiagnosticGroup = { diagnostic: DiagnosticUiState; count: number };
+
+  function groupDiagnostics(diagnostics: DiagnosticUiState[]): DiagnosticGroup[] {
+    const groups = new Map<string, DiagnosticGroup>();
+    for (const diagnostic of diagnostics) {
+      const key = [diagnostic.code, diagnostic.severity, diagnostic.message, diagnostic.rawValue ?? ''].join('\u0000');
+      const existing = groups.get(key);
+      if (existing) existing.count += 1;
+      else groups.set(key, { diagnostic, count: 1 });
+    }
+    return Array.from(groups.values());
+  }
+
+  function diagnosticClass(severity: string): string {
+    return `diagnostic diagnostic-${severity.toLowerCase()}`;
+  }
+
+  function formatLabel(value: string | null | undefined): string {
+    if (!value) return 'Unknown';
+    return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/:/g, ' · ').replace(/^./, (character) => character.toUpperCase());
+  }
+
+  function statusClass(status: string | undefined): string {
+    return 'status-' + (status ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
+  }
+
+  function analysisLabel(value: string | null | undefined): string {
+    const normalized = (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+    if (normalized === 'match') return 'Match';
+    if (normalized === 'different' || normalized === 'conflict') return 'Different';
+    if (normalized === 'possible') return 'Possible';
+    if (normalized === 'notassessed' || normalized === 'staticonly' || normalized === 'runtimeonly') return 'Not assessed';
+    if (normalized.includes('inferred')) return 'Inferred';
+    if (!normalized || normalized === 'unknown') return 'Unknown';
+    return formatLabel(value);
+  }
+
+  function analysisStatusClass(value: string | null | undefined): string {
+    return 'analysis-status-' + (value ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
+  }
+
+  function analysisSummaryStatus(): string {
+    if (analysisBusy) return 'Running';
+    if (state.analysis.diagnostics.some((diagnostic) => diagnostic.severity.toLowerCase() === 'error')) return 'Issue';
+    return state.analysis.conflict ? 'Assessed' : 'Not assessed';
+  }
+
+  function analysisSummaryStatusClass(): string {
+    if (analysisBusy) return 'analysis-status-possible';
+    if (state.analysis.diagnostics.some((diagnostic) => diagnostic.severity.toLowerCase() === 'error')) return 'analysis-status-different';
+    return state.analysis.conflict ? 'analysis-status-ready' : 'analysis-status-not-assessed';
+  }
+
+  function analysisOperationLabel(): string {
+    return state.analysis.operation.kind === 'conflict-analysis'
+      ? 'Analyzing static XML conflicts'
+      : state.analysis.operation.kind === 'runtime-comparison'
+        ? 'Comparing runtime evidence'
+        : 'Analysis idle';
+  }
+
+  function baseDataStatusLabel(): string {
+    switch (state.analysis.inputs.baseDataStatus) {
+      case 'inferred': return 'MO2 gamePathからData\\Configを検出済み';
+      case 'manual': return '別のData\\Configを選択済み';
+      default: return 'Data\\Configが見つかりません';
+    }
+  }
+
+  function sizeLabel(size: number): string {
+    return size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KB`;
+  }
+</script>
+
+{#if error}<p class="error-notice"><strong>{error.code}</strong> {error.message}</p>{/if}
+
+{#if mode === 'settings' || !state.knowledge.session}
+  <section class="panel source-discovery-panel">
+    <div class="summary-header"><div><span class="eyebrow">{state.knowledge.session ? 'SETTINGS' : 'ONBOARDING'}</span><h2>{state.knowledge.session ? 'MO2 source' : 'Choose a local source'}</h2><p class="summary-meta">ModScope checks known MO2 locations and keeps this read-only.</p></div><span class="muted-badge">No absolute paths sent to Web</span></div>
+    {#if state.knowledge.session}<p class="source-status-line">Active source · {state.knowledge.session.instanceName || 'Unknown instance'} · {state.knowledge.session.profileName || 'Profile unknown'}</p><div class="action-row"><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onDiscoverSources}>Reload source discovery</button><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onSelectRoot}>Change MO2 source</button></div>{/if}
+    {#if state.sourceDiscovery.candidates.length === 0}
+      <p class="notice">No MO2 source is ready. Scan again or choose an MO2 instance folder.</p>
+    {:else}
+      <div class="source-candidate-list">
+        {#each state.sourceDiscovery.candidates as candidate (candidate.candidateId)}
+          <article class="source-candidate-card"><div class="source-candidate-header"><div><strong>{candidate.instanceName || 'Unknown instance'} · {candidate.profileName || 'Profile unknown'}</strong><p class="subtle">{candidate.gameName || 'Game unknown'}</p></div><span class="status-chip {statusClass(candidate.readiness)}">{formatLabel(candidate.readiness)}</span></div>
+            {#if candidate.evidence.length > 0}<div class="evidence-strip">{#each candidate.evidence as evidence}<span class="evidence-tag">{formatLabel(evidence)}</span>{/each}</div>{/if}
+            {#if candidate.diagnostics.length > 0}<div class="diagnostic-list">{#each groupDiagnostics(candidate.diagnostics) as group}<p class={diagnosticClass(group.diagnostic.severity)}><strong>{group.diagnostic.code}</strong>{#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}{group.diagnostic.message}</p>{/each}</div>{/if}
+            {#if candidate.isReady}<button class="primary-button action-button" disabled={operationBlocksInteraction} onclick={() => onSelectSource(candidate.candidateId)}>Use this source</button>{/if}
+          </article>
+        {/each}
+      </div>
+    {/if}
+    <div class="action-row"><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onDiscoverSources}>Scan again</button><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onSelectRoot}>Select MO2 folder</button></div>
+  </section>
+{/if}
+
+{#if mode === 'context' && state.knowledge.session && contextPanelMode === 'context'}
+  <section class="panel context-summary-panel" aria-labelledby="recognize-title">
+    <div class="recognize-header"><div><span class="eyebrow">RECOGNIZE</span>{#if hasConclusion}<h2 id="recognize-title">{state.localContext?.candidateIdentity || state.identity.candidateIdentity || state.observation?.title || 'Current page'}</h2>{:else if state.observation}<h2 id="recognize-title">Couldn’t recognize this page</h2>{:else}<h2 id="recognize-title">Browse a MOD page</h2>{/if}</div><button class="analysis-lamp" class:analysis-lamp-issue={analysisSummaryStatusClass() === 'analysis-status-different'} class:analysis-lamp-ready={analysisSummaryStatusClass() === 'analysis-status-ready'} disabled={operationBlocksInteraction} title={`Open analysis · ${analysisSummaryStatus()}`} aria-label={`Open analysis · ${analysisSummaryStatus()}`} onclick={onOpenAnalysis}><span class="analysis-lamp-dot" aria-hidden="true"></span><span>{analysisSummaryStatus()}</span></button></div>
+    {#if hasConclusion && state.localContext}
+      <div class="local-summary-line" aria-label="Local MOD summary"><span class="status-chip {statusClass(state.localContext.status)}">{formatLabel(state.localContext.status)}</span><span class="status-chip {statusClass(state.localContext.enabledState)}">{formatLabel(state.localContext.enabledState)}</span></div>
+      {#if state.localContext.status === 'installed' && state.localContext.localModKey}<button class="secondary-button action-button" disabled={operationBlocksInteraction} onclick={onOpenInspector}>Inspect MOD</button>{/if}
+    {:else if state.observation}
+      <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
+      {#if state.identity.matches.length > 0}
+        <div class="recognition-candidate-list" aria-label="Local MOD recognition candidates">
+          {#each state.identity.matches.slice(0, 6) as match}
+            <article class="recognition-candidate">
+              <button
+                type="button"
+                class="recognition-candidate-action"
+                disabled={operationBlocksInteraction}
+                aria-label={`Use ${match.displayName || match.directoryName || match.modKey} as the local MOD`}
+                onclick={() => onConfirmIdentity(match.modKey)}
+              >
+                <span class="recognition-candidate-heading">
+                  <strong>{match.displayName || match.directoryName || match.modKey}</strong>
+                  <span class="status-chip {match.strength === 'strong' ? 'status-ready' : 'status-unknown'}">{formatLabel(match.strength)}</span>
+                </span>
+                <span class="analysis-meta">{match.evidence}</span>
+                <span class="subtle">{match.profileState} · {match.enabledState} · {match.modKey}</span>
+                <span class="recognition-candidate-action-label">Use this MOD</span>
+              </button>
+            </article>
+          {/each}
+        </div>
+      {/if}
+      {#if state.knowledge.candidates.length > 0}<p class="subtle">Search the local MOD catalog to confirm the page identity.</p><div class="action-row"><button class="primary-button" type="button" disabled={operationBlocksInteraction} onclick={() => onOpenModSearch('recognition')}>Search local MODs</button><button class="secondary-button" type="button" disabled={operationBlocksInteraction} onclick={() => onConfirmIdentity(null)}>Mark as not installed</button></div>{:else}<p class="notice">No local MOD candidates are loaded. Open Debug to load a profile.</p><div class="action-row"><button class="secondary-button" type="button" onclick={() => onSetContextMode('debug')}>Open Debug</button><button class="secondary-button" type="button" onclick={() => onConfirmIdentity(null)}>Mark as not installed</button></div>{/if}
+    {:else}<p class="subtle">ModScope will observe the current page and show local context here.</p>{/if}
+  </section>
+{/if}
+
+{#if mode === 'analysis' && state.knowledge.session}
+  <section class="panel analysis-panel" aria-labelledby="analysis-title">
+    <div class="summary-header"><div><span class="eyebrow">ANALYSIS</span><h2 id="analysis-title">Compare &amp; Diagnose</h2><p class="summary-meta">Static evidence and runtime evidence stay separate.</p></div><span class="status-chip {analysisSummaryStatusClass()}" role="status">{analysisSummaryStatus()}</span></div>
+    <div class="analysis-input-status" aria-label="Analysis input status"><span class="status-chip {state.analysis.inputs.baseDataReady ? 'status-ready' : 'status-unknown'}">Base Data/Config · {state.analysis.inputs.baseDataReady ? 'Ready' : 'Not selected'}</span><span class="status-chip {state.analysis.inputs.runtimeLogsReady ? 'status-ready' : 'status-unknown'}">Runtime logs · {state.analysis.inputs.runtimeLogsReady ? 'Ready' : 'Not selected'}</span>{#if analysisBusy}<span class="subtle" role="status">{analysisOperationLabel()}…</span>{/if}</div>
+    <div class="analysis-summary-actions"><button class="primary-button" disabled={operationBlocksInteraction} onclick={onStartStaticAnalysis}>{state.analysis.inputs.baseDataReady ? (state.analysis.conflict ? 'Re-run static analysis' : 'Analyze static') : '別のData\\Configを選択'}</button><span class="subtle">Static XML analysis uses the selected base Data/Config folder.</span></div>
+    {#if state.analysis.diagnostics.length > 0}<div class="diagnostic-list">{#each state.analysis.diagnostics as diagnostic}<p class={diagnosticClass(diagnostic.severity)}><strong>{diagnostic.code}</strong> {diagnostic.message}</p>{/each}</div>{/if}
+
+    <details class="analysis-section" open><summary><span>Compare</span><span class="subtle">Confirmed candidate MOD</span></summary>
+      {#if !state.analysis.conflict}<p class="notice">未確認。静的解析を実行してください。</p>{:else if !state.localContext?.localModKey}<p class="notice">確認済みcandidate MODがありません。Compareは未確認です。</p>{:else if candidateAnalysisGroups.length === 0}<p class="notice">確認済みcandidate MODに関係する評価がありません。競合なしとは判定していません。</p>{:else}<div class="analysis-card-list">{#each candidateAnalysisGroups as group}<article class="analysis-card"><div class="analysis-card-heading"><div><strong>{group.targetXml || 'Target XML unknown'}</strong><code>{group.xPath || 'XPath unknown'}</code></div><div class="analysis-badges"><span class="status-chip {analysisStatusClass(group.assessment)}">{analysisLabel(group.assessment)}</span><span class="status-chip {analysisStatusClass(group.confidence)}">Confidence · {analysisLabel(group.confidence)}</span></div></div><p class="analysis-meta">Effective status · {analysisLabel(group.effectiveStatus)}</p><div class="evidence-card static-evidence-card"><span class="eyebrow">STATIC EVIDENCE</span><ol class="operation-sequence">{#each group.operations as operation, index}<li><div class="operation-heading"><strong>{index + 1}. {operation.modKey}</strong><span>Priority {operation.priority ?? 'Unknown'}</span></div><div class="analysis-meta">{operation.xmlFileRelativePath} · {operation.elementPath} · {operation.rawOperationName}</div><p class="provenance-line">Source · {operation.source.kind} · {operation.source.relativePath}</p></li>{/each}</ol></div></article>{/each}</div>{/if}
+    </details>
+
+    <details class="analysis-section" open><summary><span>Diagnosis</span><span class="subtle">Active profile · {state.knowledge.session.profileName}</span></summary>{#if !state.analysis.conflict}<p class="notice">未確認。active profile全体のDiagnosisは解析後に表示します。</p>{:else if analysisGroups.length === 0}<p class="notice">解析結果の評価groupがありません。評価は未確認です。</p>{:else}<div class="diagnosis-list">{#each analysisGroups as group}<article class="diagnosis-row"><div><strong>{group.targetXml || 'Target XML unknown'}</strong><code>{group.xPath || 'XPath unknown'}</code></div><div class="analysis-badges"><span class="status-chip {analysisStatusClass(group.assessment)}">{analysisLabel(group.assessment)}</span><span class="status-chip {analysisStatusClass(group.confidence)}">{analysisLabel(group.confidence)}</span></div><p class="analysis-meta">{group.operations.length} operations · {group.operations.map((operation) => `${operation.modKey} (${operation.priority ?? 'Unknown'})`).join(' / ')}</p></article>{/each}</div>{/if}</details>
+
+    <details class="analysis-section"><summary><span>Static evidence</span><span class="subtle">Base files · {state.analysis.conflict?.baseFiles.length ?? 0}</span></summary>{#if state.analysis.conflict}{#each state.analysis.conflict.baseFiles as file}<article class="evidence-row"><div><strong>{file.targetXml}</strong><p class="analysis-meta">{sizeLabel(file.size)} · SHA-256 {file.sha256}</p></div><span class="status-chip {statusClass(file.parseStatus || 'unknown')}">{formatLabel(file.parseStatus)}</span><p class="provenance-line">Source · {file.source.kind} · {file.source.relativePath}</p></article>{/each}{:else}<p class="notice">未確認。静的解析を実行してください。</p>{/if}</details>
+
+    <details class="analysis-section"><summary><span>Runtime evidence</span><span class="subtle">RuntimeOCD comparison</span></summary>{#if !state.analysis.runtimeComparison}<p class="notice">未確認。runtime logを選択して比較を実行してください。</p>{:else}{@const runtimeEvidence = state.analysis.runtimeComparison.runtimeEvidence}<div class="evidence-card runtime-evidence-card"><span class="eyebrow">RUNTIME EVIDENCE</span><div class="summary-grid"><div><span>Tool</span><strong>{runtimeEvidence.toolName}</strong></div><div><span>Tool version</span><strong>{runtimeEvidence.toolVersion || 'Unknown'}</strong></div><div><span>Game version</span><strong>{runtimeEvidence.gameVersion || 'Unknown'}</strong></div><div><span>Captured</span><strong>{runtimeEvidence.capturedAtUtc}</strong></div></div>{#each state.analysis.runtimeComparison.items as item}<article class="runtime-comparison-row"><div class="analysis-card-heading"><div><strong>{item.targetXml || 'Target XML unknown'}</strong><code>{item.xPath || 'XPath unknown'}</code></div><span class="status-chip {analysisStatusClass(item.status)}">{analysisLabel(item.status)}</span></div>{#each item.observations as observation}<p class="analysis-meta">{observation.modKey || 'MOD unknown'} · {observation.observedOperation || 'Operation unknown'} · {analysisLabel(observation.normalizedAssessment)}</p>{/each}</article>{/each}</div>{/if}</details>
+  </section>
+{/if}
+
+{#if mode === 'debug' && state.knowledge.session && state.diagnostics.length > 0}
+  {@const diagnosticGroups = groupDiagnostics(state.diagnostics)}
+  <section class="panel diagnostics-panel"><span class="eyebrow">DIAGNOSTICS</span><p class="diagnostic-summary">{diagnosticGroups.length} types · {state.diagnostics.length} occurrences</p>{#each diagnosticGroups as group}<p class={diagnosticClass(group.diagnostic.severity)}><strong>{group.diagnostic.code}</strong>{#if group.count > 1}<span class="diagnostic-count">× {group.count}</span>{/if}{group.diagnostic.message}</p>{/each}</section>
+{/if}
+
+{#if mode === 'debug' && state.observation}
+  <details class="panel page-details" bind:open={pageDetailsOpen}><summary><span>Page details</span><span class="status-chip {statusClass(state.observation.extractionStatus)}">{formatLabel(state.observation.extractionStatus)}</span></summary><div class="page-details-grid"><div><span>Title</span><strong>{state.observation.title || 'Untitled page'}</strong></div><div><span>Observed</span><strong>{state.observation.observedAtUtc}</strong></div></div><p class="subtle">Page body stays in the Desktop session and is not sent to Web state.</p>{#each state.observation.diagnostics as diagnostic}<p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>{/each}</details>
+{/if}
+
+{#if mode === 'debug'}
+  <details class="panel developer-tools" bind:open={developerToolsOpen}><summary><span><span class="eyebrow">DEVELOPER</span><strong>Developer tools</strong></span><span class="muted-badge">Read-only</span></summary>
+    <div class="developer-actions"><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onUseFixture}>Use fixture</button><button class="secondary-button" disabled={operationBlocksInteraction || !state.knowledge.session} onclick={onSelectEvidenceManifest}>Select version manifest</button><button class="primary-button" disabled={operationBlocksInteraction} onclick={onSelectRoot}>Select MO2 source</button><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onObserve}>Observe now</button></div>
+    <div class="analysis-developer-tools"><div class="analysis-tool-header"><div><span class="eyebrow">PHASE6 ANALYSIS</span><strong>Static and runtime evidence inputs</strong></div><div class="analysis-badges"><span class="status-chip {state.analysis.inputs.baseDataReady ? 'status-ready' : 'status-unknown'}">{baseDataStatusLabel()}</span><span class="status-chip {state.analysis.inputs.runtimeLogsReady ? 'status-ready' : 'status-unknown'}">Logs {state.analysis.inputs.runtimeLogsReady ? 'ready' : 'missing'}</span></div></div><div class="developer-actions"><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onSelectBaseData}>別のData\Configを選択</button><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onSelectRuntimeLogs}>Select runtime logs</button><button class="primary-button" disabled={operationBlocksInteraction || !state.analysis.inputs.baseDataReady} onclick={onAnalyzeConflicts}>Analyze conflicts</button><button class="primary-button" disabled={operationBlocksInteraction || !state.analysis.inputs.baseDataReady || !state.analysis.inputs.runtimeLogsReady} onclick={onCompareRuntimeEvidence}>Compare runtime</button><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onUseAnalysisFixture}>Use Phase6 fixture</button></div><div class="source-grid analysis-version-grid"><label>Tool version<input bind:value={runtimeToolVersion} placeholder="Unknown" disabled={analysisBusy} /></label><label>Game version<input bind:value={runtimeGameVersion} placeholder="Unknown" disabled={analysisBusy} /></label></div><p class="subtle developer-status">Paths stay in the Desktop session. Runtime log bodies and raw results stay out of Web state.</p></div>
+    {#if state.knowledge.session}<p class="subtle developer-status">{state.knowledge.session.instanceName} / {state.knowledge.session.profileName} · {state.knowledge.candidates.length} MOD records · {state.knowledge.profiles.length} profiles</p>{/if}<p class="subtle developer-status">{state.statusMessage}</p>
+  </details>
+{/if}
+
+{#if modSearchOpen}
+  <button type="button" class="drawer-backdrop" aria-label="Close MOD search" onclick={onCloseModSearch}></button>
+  <aside class="mod-search-drawer" aria-labelledby="mod-search-title"><div class="drawer-heading"><div><span class="eyebrow">MOD CATALOG</span><h2 id="mod-search-title">{modSearchMode === 'recognition' ? 'Choose a local MOD' : 'Search all MODs'}</h2></div><button class="icon-button" type="button" title="Close MOD search" aria-label="Close MOD search" onclick={onCloseModSearch}>×</button></div><p class="subtle mod-search-description">Search by display name, directory name, or MOD key. Website links use verified values or inferred Nexus destinations.</p><label class="mod-search-field"><span>Search MODs</span><input bind:value={modSearchQuery} aria-label="Search MODs" placeholder="e.g. Alpha Mod" /></label>
+    {#if modSearchQuery.trim().length === 0}<p class="empty-state mod-search-empty">Enter a search term to show matching MODs.</p>{:else if modSearchResults.length === 0}<p class="empty-state mod-search-empty">No matching MODs were found.</p>{:else}<div class="mod-search-results" aria-live="polite"><p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>{#each modSearchResults as candidate (candidate.modKey)}<article class="mod-search-card"><button type="button" class="mod-card-main" aria-label={`Inspect ${candidate.displayName || candidate.modKey}`} onclick={() => onOpenModPage(candidate)}><strong>{candidate.displayName || candidate.directoryName || candidate.modKey}</strong><span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span></button><div class="mod-card-meta"><span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span><span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span><span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span></div>{#if modSearchMode === 'recognition'}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onChooseModForRecognition(candidate)}>Use for recognition</button>{/if}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onOpenInspectorForMod(candidate.modKey)}>Inspect evidence</button></article>{/each}</div>{/if}
+  </aside>
+{/if}

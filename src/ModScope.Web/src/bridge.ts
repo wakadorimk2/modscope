@@ -14,6 +14,7 @@ type WebViewPort = {
 };
 
 export type Bridge = {
+  isDesktopHost: boolean;
   connect(): () => void;
   send(command: string, payload?: unknown): void;
 };
@@ -617,10 +618,25 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
     if (typeof visible === 'boolean') {
       next.layout = { ...next.layout, modListVisible: visible };
     }
+  } else if (command === 'layout.setMoreOpen' && typeof payload === 'object' && payload !== null) {
+    const open = (payload as { open?: unknown }).open;
+    if (typeof open === 'boolean') {
+      next.layout = { ...next.layout, moreOpen: open };
+    }
   } else if (command === 'layout.setToolbarExpanded' && typeof payload === 'object' && payload !== null) {
     const expanded = (payload as { expanded?: unknown }).expanded;
     if (typeof expanded === 'boolean') {
       next.statusMessage = expanded ? 'History opened.' : 'History closed.';
+    }
+  } else if (command === 'layout.setContextMode' && typeof payload === 'object' && payload !== null) {
+    const mode = (payload as { mode?: unknown }).mode;
+    if (mode === 'context' || mode === 'settings' || mode === 'debug' || mode === 'analysis') {
+      next.layout = { ...next.layout, contextMode: mode };
+    }
+  } else if (command === 'layout.setModListMode' && typeof payload === 'object' && payload !== null) {
+    const mode = (payload as { mode?: unknown }).mode;
+    if (mode === 'browse' || mode === 'deployment-edit') {
+      next.layout = { ...next.layout, modListMode: mode };
     }
   }
   return next;
@@ -700,6 +716,7 @@ export function createBridge(onMessage: (message: HostMessage) => void): Bridge 
   };
 
   return {
+    isDesktopHost: webview !== null,
     connect() {
       if (webview) {
         webview.addEventListener('message', handleMessage);
