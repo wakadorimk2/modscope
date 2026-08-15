@@ -46,6 +46,7 @@
   let deploymentPreviewSearch = '';
   let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
+  let showHtmlMoreMenu = false;
   let runtimeToolVersion = '';
   let runtimeGameVersion = '';
   let webObservedVersion = '';
@@ -66,6 +67,7 @@
 
   onMount(() => {
     bridge = createBridge(handleHostMessage);
+    showHtmlMoreMenu = !bridge.isDesktopHost;
     const disconnect = bridge.connect();
     window.addEventListener('keydown', handleShortcut);
     return () => {
@@ -227,6 +229,7 @@
   function closeTab(tabId: string) { send('browser.closeTab', { tabId }); }
   function openHome() { send('browser.home'); }
   function openHistory() { send('browser.history'); }
+  function setMoreOpen(open: boolean) { send('layout.setMoreOpen', { open }); }
 
   function handleShortcut(event: KeyboardEvent) {
     if (event.key === 'Escape' && modSearchOpen) {
@@ -266,13 +269,14 @@
   }
 
   function openInspectorForMod(modKey: string) {
-    if (inspectorModKey !== modKey) webObservedVersion = '';
+    const inspectorChanged = inspectorModKey !== modKey;
+    if (inspectorChanged) webObservedVersion = '';
     contextMode = 'context';
     contextPanelMode = 'inspector';
     inspectorView = 'mod';
     inspectorModKey = modKey;
     dismissedInspectorModKey = null;
-    inspectorFilesOpen = false;
+    if (inspectorChanged) inspectorFilesOpen = false;
     send('layout.setContextMode', { mode: 'context' });
     send('inspector.open', { modKey });
   }
@@ -372,6 +376,7 @@
     bind:address
     {state}
     disabled={operationBlocksInteraction}
+    {showHtmlMoreMenu}
     error={lastError}
     onNavigate={navigate}
     onBack={() => send('browser.back')}
@@ -386,6 +391,7 @@
     onToggleContext={toggleContext}
     onSetContextMode={setContextMode}
     onSetModListMode={setModListMode}
+    onSetMoreOpen={setMoreOpen}
   />
 {:else if surface === 'mod-list'}
   <ModLibraryPane

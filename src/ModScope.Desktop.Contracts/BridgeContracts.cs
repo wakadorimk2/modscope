@@ -54,6 +54,7 @@ public static class BridgeProtocol
         "analysis.useFixture",
         "layout.setContextVisible",
         "layout.setModListVisible",
+        "layout.setMoreOpen",
         "layout.setToolbarExpanded",
         "layout.setContextMode",
         "layout.setModListMode"
@@ -199,6 +200,17 @@ public static class BridgeProtocol
         return value;
     }
 
+    public static SetMoreOpenPayload ReadMoreOpenPayload(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("open", out var open)
+            || open.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            throw new BridgeProtocolException("The More popup state must be a boolean.");
+        }
+
+        return ReadPayload<SetMoreOpenPayload>(payload);
+    }
+
     public static bool IsContextMode(string? value)
     {
         return value is "context" or "settings" or "debug" or "analysis";
@@ -264,6 +276,8 @@ public sealed record DeploymentApplyPayload(
 public sealed record SetContextVisiblePayload(bool Visible);
 
 public sealed record SetModListVisiblePayload(bool Visible);
+
+public sealed record SetMoreOpenPayload(bool Open);
 
 public sealed record SetToolbarExpandedPayload(bool Expanded);
 
@@ -764,7 +778,8 @@ public sealed record LayoutUiState(
     bool ContextVisible,
     bool ModListVisible,
     string ContextMode = "context",
-    string ModListMode = "browse");
+    string ModListMode = "browse",
+    bool MoreOpen = false);
 
 public sealed record UiState(
     BrowserUiState Browser,

@@ -6,6 +6,7 @@
   export let state: UiState;
   export let address = '';
   export let disabled = false;
+  export let showHtmlMoreMenu = false;
   export let error: BridgeErrorPayload | null = null;
   export let onNavigate: () => void;
   export let onBack: () => void;
@@ -20,6 +21,7 @@
   export let onToggleContext: () => void;
   export let onSetContextMode: (mode: ContextMode) => void;
   export let onSetModListMode: (mode: ModListMode) => void;
+  export let onSetMoreOpen: (open: boolean) => void;
 </script>
 
 <main class="toolbar-surface">
@@ -75,11 +77,13 @@
         layout={state.layout}
         historyCount={state.browser.history.length}
         {disabled}
+        showHtmlFallback={showHtmlMoreMenu}
         onOpenHistory={onOpenHistory}
         onToggleModList={onToggleModList}
         onToggleContext={onToggleContext}
         onSetContextMode={onSetContextMode}
         onSetModListMode={onSetModListMode}
+        onSetMoreOpen={onSetMoreOpen}
       />
       <span class="shortcut-hint">Ctrl/Cmd+I</span>
     </div>

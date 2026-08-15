@@ -198,6 +198,17 @@ public sealed class BridgeProtocolTests
             """);
         var toolbarPayload = BridgeProtocol.ReadPayload<SetToolbarExpandedPayload>(toolbarEnvelope.Payload);
 
+        var moreEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 2,
+              "requestId": "more-layout-1",
+              "command": "layout.setMoreOpen",
+              "payload": { "open": true }
+            }
+            """);
+        var morePayload = BridgeProtocol.ReadMoreOpenPayload(moreEnvelope.Payload);
+
         var contextModeEnvelope = BridgeProtocol.ParseCommand(
             """
             {
@@ -224,6 +235,7 @@ public sealed class BridgeProtocolTests
         Assert.False(layoutPayload.Visible);
         Assert.False(modListPayload.Visible);
         Assert.True(toolbarPayload.Expanded);
+        Assert.True(morePayload.Open);
         Assert.Equal("analysis", contextModePayload.Mode);
         Assert.Equal("deployment-edit", modListModePayload.Mode);
     }
@@ -262,6 +274,37 @@ public sealed class BridgeProtocolTests
             BridgeProtocol.JsonOptions);
 
         Assert.Equal("{\"expanded\":true}", json);
+    }
+
+    [Fact]
+    public void SerializesMoreOpenPayloadInCamelCase()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new SetMoreOpenPayload(true),
+            BridgeProtocol.JsonOptions);
+
+        Assert.Equal("{\"open\":true}", json);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"open\":null}")]
+    [InlineData("{\"open\":\"true\"}")]
+    [InlineData("{\"open\":1}")]
+    public void RejectsInvalidMoreOpenPayload(string payload)
+    {
+        var envelope = BridgeProtocol.ParseCommand(
+            $$"""
+            {
+              "contractVersion": 2,
+              "requestId": "more-layout-invalid",
+              "command": "layout.setMoreOpen",
+              "payload": {{payload}}
+            }
+            """);
+
+        Assert.Throws<BridgeProtocolException>(
+            () => BridgeProtocol.ReadMoreOpenPayload(envelope.Payload));
     }
 
     [Fact]
@@ -364,7 +407,7 @@ public sealed class BridgeProtocolTests
             BridgeProtocol.JsonOptions);
 
         Assert.Equal("{\"name\":\"default\",\"loadState\":\"pending\"}", profile);
-        Assert.Equal("{\"contextVisible\":true,\"modListVisible\":false,\"contextMode\":\"context\",\"modListMode\":\"browse\"}", layout);
+        Assert.Equal("{\"contextVisible\":true,\"modListVisible\":false,\"contextMode\":\"context\",\"modListMode\":\"browse\",\"moreOpen\":false}", layout);
         Assert.Contains("\"isBackground\":true", operation);
     }
 

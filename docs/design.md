@@ -690,6 +690,12 @@ Inspectorは、Local contextから根拠へ進むためのread modelまたは画
 5. 未確認事項
 6. 必要な場合だけraw XML、XPath、attribute、patch fragment
 
+通常のInspectorは`CONCLUSION`だけを初期表示します。
+Metadata、Role、related evidence、Version、Compatibility、Analysis、Files、XML、Diagnostics、Provenanceは`details`で表示します。
+これらの`details`は初期状態で閉じます。
+同じMODを表示している間は、ユーザーが開いた`details`を維持します。
+別MODへ切り替えた場合は、InspectorのMOD keyを境界に表示DOMを再生成し、すべて閉じます。
+
 InspectorはMO2 directoryを直接source of truthとして扱いません。query layerの派生データと、明示されたsource referenceを利用します。
 
 ### 11.3 Searchとreverse index
@@ -1164,11 +1170,18 @@ Deployment preview tabは`?surface=deployment-preview`を使用します。
 `surface=mod-list`、`layout.setModListVisible`、既存のBridge contract v2は互換性のため維持します。
 
 任意サイトをfrontendのiframeへ移しません。
-Browser WebView2へWPF panelを重ねません。
-WPFはwindow、WebView2 host、native bridgeに限定します。
+Browser WebView2へLocal context用のWPF panelを重ねません。
+WPFはwindow、WebView2 host、Toolbar用のnative More Popup、native bridgeを担当します。
 
 下段は、左からMod Library (`mod-list`) `280px`、Browser `3*`、Context `2*`です。
 Toolbarは全列にまたがります。通常は76pxの短い2段構成で表示します。History pageを開いてもhost rowは拡張しません。
+Moreの展開内容はToolbar rowの高さを変更しません。
+Desktop executableでは、MoreのWPF Popupを`ToolbarHost`の下側へ配置し、Browser、Mod Library、Contextへ重ねて表示します。
+WPF Popupの`StaysOpen`は`False`です。
+Popupの右端は、Toolbar action groupのMore trigger右端へ合わせます。
+外側クリック、Escape、loading開始でWPF Popupを閉じます。
+Window resize時は`ToolbarHost`をplacement targetとして位置を再計算します。
+WebView2がない開発用frontendだけは、同じ項目をHTML fallback menuで表示します。
 Mod Libraryを閉じるとBrowser columnが広がります。
 Mod Libraryの見出しにprofile load stateとscanning progressを表示します。
 Mod Libraryのresult tableだけをスクロール可能にします。Library rowはcompact表示にし、disabled rowは灰色系で表示します。
@@ -1218,6 +1231,7 @@ frontendからhostへ送るcommandは次です。
 - analysis.useFixture
 - layout.setContextVisible
 - layout.setModListVisible
+- layout.setMoreOpen
 - layout.setToolbarExpanded
 - layout.setContextMode
 - layout.setModListMode
@@ -1226,6 +1240,9 @@ hostからfrontendへ送るmessageは、state、error、readyです。
 Toolbar、Mod Library、Context、Deployment previewの各App WebViewへ同じmessageをbroadcastします。
 More menuから変更したContext modeとMod Library modeも、同じstate snapshotで全WebViewへbroadcastします。
 stateはUI stateの完全なsnapshotです。
+`LayoutUiState.moreOpen`はWPF Popupの一時的な開閉stateです。
+`moreOpen`は永続化しません。
+`layout.setMoreOpen`のpayloadは`{ open: boolean }`です。
 
 Hostは次を検証します。
 
@@ -1368,6 +1385,8 @@ Inspectorは右ペイン内の置換modeです。
 固定overlayと背景backdropは使用しません。
 Inspectorの上部に`Back to Context`を表示します。
 結論は最初から表示し、static evidence、runtime evidence、raw XML、patch operation、raw diagnosticは閉じた状態にします。
+Metadata、Role、related evidence、Version、Compatibility、Analysis、Files、XML、Diagnostics、Provenanceも`details`へ統一し、初期状態を閉じます。
+同じMODの再描画では開閉状態を維持し、別MODの表示では開閉状態をリセットします。
 FilesはInspectorの初期状態で閉じ、展開時だけ全ファイルを表示します。
 Mod Roleはrole chip、assessment chip、短い`Reason:`要約だけを初期表示し、詳細reasonとrole evidenceはdisclosureへ移します。
 profile、MO2 source、analysis inputの変更時は古いInspector表示を閉じます。
@@ -1411,7 +1430,9 @@ new tab buttonはtab listの末尾へ置き、tabと一緒に横スクロール�
 navigation rowのURL入力はomniboxとして表示し、Goはcompactな`↵` iconで表示します。
 History、Mod Library、Context、shortcut hintは右側のaction groupへまとめます。
 History、Settings、Debug、Analysis、profile編集はMore menuへ集約します。
-ToolbarのMore menuはEscape、外側クリック、再表示で閉じます。
+DesktopのMore triggerは`layout.setMoreOpen`だけを送ります。
+WPF Popupの項目選択は、WebView commandと同じhost処理を実行します。
+ToolbarのMore PopupはEscape、外側クリック、再表示、loading開始で閉じます。
 
 Mod Libraryは選択したViewの結果だけを表示します。
 View countとSearch後のresult countを分けて表示します。

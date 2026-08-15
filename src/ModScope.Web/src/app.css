@@ -120,6 +120,8 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+/* Desktop host renders the expanded More surface in a WPF Popup below ToolbarHost. */
+/* This HTML popover is only the no-WebView2 development fallback. */
 .more-button {
   display: inline-flex;
   align-items: center;
@@ -2429,6 +2431,10 @@ label select {
 .inspector-disclosure {
   border-top: 1px solid rgba(148, 163, 184, 0.12);
   padding-top: 10px;
+}
+
+.inspector-related-evidence-group + .inspector-related-evidence-group {
+  margin-top: 12px;
 }
 
 .inspector-disclosure-summary {
