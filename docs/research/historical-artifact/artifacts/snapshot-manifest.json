@@ -1,0 +1,35 @@
+{
+  "schema_version": "modscope.historical_artifact.snapshot_manifest.v1",
+  "snapshot_id": "historical-artifact-20260815-164742",
+  "run_id": "run-2026-08-15T16-47-42Z-historical-artifact-pilot",
+  "observed_at_utc": "2026-08-15T16:47:42Z",
+  "hash_algorithm": "SHA-256",
+  "manifest_scope": "All files in this directory except snapshot-manifest.json",
+  "files": [
+    {
+      "path": "artifacts/case-evidence.json",
+      "bytes": 16940,
+      "sha256": "2a908c138e136a054d6f348d209d98260e7b67e81d5c7c897caf7b6d656512eb"
+    },
+    {
+      "path": "artifacts/dirty-cases.csv",
+      "bytes": 5624,
+      "sha256": "5300748ad8ec5e8654fd10b91f93a85f0ea08ba9210a5e923629feb6b2d2b782"
+    },
+    {
+      "path": "artifacts/sanitization-check.json",
+      "bytes": 948,
+      "sha256": "aff47ea393803513be4d921cbdc43b5bb36b1398e4aa31d7122bc6050aa1e781"
+    },
+    {
+      "path": "artifacts/source-inventory.json",
+      "bytes": 4036,
+      "sha256": "dd218ecb26250e587199ef848bb15435c1048bd418229263baf606c9e8b5960c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 8249,
+      "sha256": "73c6f7a8bbcc19b39a0063efbfcd386ef269cb8bf2d8a478b98abb0797fd0b35"
+    }
+  ]
+}

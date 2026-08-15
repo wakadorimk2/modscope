@@ -1,0 +1,29 @@
+{
+  "schema_version": "modscope.historical_artifact.sanitization_check.v1",
+  "run_id": "run-2026-08-15T16-47-42Z-historical-artifact-pilot",
+  "checked_at_utc": "2026-08-15T16:47:42Z",
+  "status": "pass",
+  "scope": "docs/research/historical-artifact and linked synthetic fixtures",
+  "checks": {
+    "absolute_path": "pass",
+    "user_name": "pass",
+    "cookie": "pass",
+    "token": "pass",
+    "private_url": "pass",
+    "raw_binary": "pass",
+    "raw_archive": "pass",
+    "unbounded_source_locator": "pass"
+  },
+  "violations": [],
+  "blocked_input_is_not_violation": "owner-local Wabbajack input is missing and is recorded as a diagnostic",
+  "checked_files": [
+    "README.md",
+    "artifacts/source-inventory.json",
+    "artifacts/dirty-cases.csv",
+    "artifacts/case-evidence.json",
+    "artifacts/sanitization-check.json",
+    "artifacts/snapshot-manifest.json"
+  ],
+  "raw_sources_retained": false,
+  "raw_archives_retained": false
+}
