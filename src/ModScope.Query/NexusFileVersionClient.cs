@@ -140,8 +140,8 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
             {
                 await using var content = await response.Content.ReadAsStreamAsync(cancellationToken);
                 using var document = await JsonDocument.ParseAsync(content, cancellationToken: cancellationToken);
-                var root = document.RootElement;
-                if (root.ValueKind != JsonValueKind.Object)
+                var envelope = document.RootElement;
+                if (envelope.ValueKind != JsonValueKind.Object)
                 {
                     return CreateObservation(
                         artifact,
@@ -158,7 +158,25 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
                         });
                 }
 
-                if (!TryReadPositiveId(root, "game_scoped_id", out var responseGameScopedFileId))
+                if (!envelope.TryGetProperty("data", out var data)
+                    || data.ValueKind != JsonValueKind.Object)
+                {
+                    return CreateObservation(
+                        artifact,
+                        endpoint,
+                        observedAt,
+                        null,
+                        new[]
+                        {
+                            new Diagnostic(
+                                "nexus.response.data.missing",
+                                DiagnosticSeverity.Warning,
+                                "The Nexus API response has no valid data object. The version was not adopted.",
+                                source)
+                        });
+                }
+
+                if (!TryReadPositiveId(data, "game_scoped_id", out var responseGameScopedFileId))
                 {
                     return CreateObservation(
                         artifact,
@@ -193,7 +211,7 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
                         });
                 }
 
-                if (!root.TryGetProperty("version", out var versionElement)
+                if (!data.TryGetProperty("version", out var versionElement)
                     || versionElement.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                 {
                     return CreateObservation(

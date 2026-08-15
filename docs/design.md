@@ -566,7 +566,7 @@ Nexus File observationは、明示操作で1 packageずつ取得します。
 endpointは7DTDのFile info APIへ限定します。
 自動refresh、bulk crawler、retry、page scrapingは行いません。
 API failure diagnosticとidentity failure diagnosticは分離します。
-responseの`game_scoped_id`が要求したgame-scoped File IDと異なる場合はversionを採用しません。
+responseの`data.game_scoped_id`が要求したgame-scoped File IDと異なる場合はversionを採用しません。
 JSON全体、API key、cookieは保持しません。
 
 API keyはDesktop起動前に`MODSCOPE_NEXUS_API_KEY`環境変数から読みます。

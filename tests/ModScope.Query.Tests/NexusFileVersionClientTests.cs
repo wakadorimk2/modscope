@@ -13,7 +13,7 @@ public sealed class NexusFileVersionClientTests
     {
         var handler = new RecordingHandler(_ => Response(
             HttpStatusCode.OK,
-            "{\"game_scoped_id\":456,\"version\":\"v1.2.3\",\"file\":{\"id\":123}}"));
+            "{\"data\":{\"game_scoped_id\":456,\"version\":\"v1.2.3\",\"file\":{\"id\":123}}}"));
         using var httpClient = new HttpClient(handler);
         var client = new NexusFileVersionClient(httpClient, "test-api-key", "ModScope.Tests", "0.1.0");
 
@@ -44,7 +44,7 @@ public sealed class NexusFileVersionClientTests
     {
         var handler = new RecordingHandler(_ => Response(
             HttpStatusCode.OK,
-            "{\"game_scoped_id\":457,\"version\":\"1.2.3\",\"file\":{\"id\":456}}"));
+            "{\"data\":{\"game_scoped_id\":457,\"version\":\"1.2.3\",\"file\":{\"id\":456}}}"));
         using var httpClient = new HttpClient(handler);
         var client = new NexusFileVersionClient(httpClient, "test-api-key");
 
@@ -57,9 +57,9 @@ public sealed class NexusFileVersionClientTests
     }
 
     [Theory]
-    [InlineData("{\"version\":\"1.2.3\"}")]
-    [InlineData("{\"game_scoped_id\":\"not-a-number\",\"version\":\"1.2.3\"}")]
-    [InlineData("{\"game_scoped_id\":0,\"version\":\"1.2.3\"}")]
+    [InlineData("{\"data\":{\"version\":\"1.2.3\"}}")]
+    [InlineData("{\"data\":{\"game_scoped_id\":\"not-a-number\",\"version\":\"1.2.3\"}}")]
+    [InlineData("{\"data\":{\"game_scoped_id\":0,\"version\":\"1.2.3\"}}")]
     public async Task RejectsMissingNonNumericOrZeroGameScopedFileId(string body)
     {
         var handler = new RecordingHandler(_ => Response(HttpStatusCode.OK, body));
@@ -106,7 +106,7 @@ public sealed class NexusFileVersionClientTests
             Assert.Contains(malformed.Diagnostics, diagnostic => diagnostic.Code == "nexus.response.invalid_json");
         }
 
-        var missingVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456}"));
+        var missingVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"data\":{\"game_scoped_id\":456}}"));
         using (var missingVersionHttpClient = new HttpClient(missingVersionHandler))
         {
             var missingVersion = await new NexusFileVersionClient(missingVersionHttpClient, "test-api-key").ObserveAsync(Artifact());
@@ -114,7 +114,7 @@ public sealed class NexusFileVersionClientTests
             Assert.Contains(missingVersion.Diagnostics, diagnostic => diagnostic.Code == "nexus.file.version.missing");
         }
 
-        var emptyVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456,\"version\":\" \"}"));
+        var emptyVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"data\":{\"game_scoped_id\":456,\"version\":\" \"}}"));
         using (var emptyVersionHttpClient = new HttpClient(emptyVersionHandler))
         {
             var emptyVersion = await new NexusFileVersionClient(emptyVersionHttpClient, "test-api-key").ObserveAsync(Artifact());
@@ -122,7 +122,7 @@ public sealed class NexusFileVersionClientTests
             Assert.Contains(emptyVersion.Diagnostics, diagnostic => diagnostic.Code == "nexus.file.version.missing");
         }
 
-        var nonStringVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456,\"version\":123}"));
+        var nonStringVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"data\":{\"game_scoped_id\":456,\"version\":123}}"));
         using (var nonStringVersionHttpClient = new HttpClient(nonStringVersionHandler))
         {
             var nonStringVersion = await new NexusFileVersionClient(nonStringVersionHttpClient, "test-api-key").ObserveAsync(Artifact());
@@ -134,7 +134,7 @@ public sealed class NexusFileVersionClientTests
     [Fact]
     public async Task DoesNotRequestWithoutApiKeyOrExactArtifactIdentity()
     {
-        var missingKeyHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456,\"version\":\"1.2.3\"}"));
+        var missingKeyHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"data\":{\"game_scoped_id\":456,\"version\":\"1.2.3\"}}"));
         using (var missingKeyHttpClient = new HttpClient(missingKeyHandler))
         {
             var missingKey = await new NexusFileVersionClient(missingKeyHttpClient, null).ObserveAsync(Artifact());
@@ -143,7 +143,7 @@ public sealed class NexusFileVersionClientTests
             Assert.Equal(0, missingKeyHandler.RequestCount);
         }
 
-        var invalidArtifactHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456,\"version\":\"1.2.3\"}"));
+        var invalidArtifactHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"data\":{\"game_scoped_id\":456,\"version\":\"1.2.3\"}}"));
         using (var invalidArtifactHttpClient = new HttpClient(invalidArtifactHandler))
         {
             var invalidArtifact = Artifact() with { FileId = "not-a-number" };
@@ -161,7 +161,7 @@ public sealed class NexusFileVersionClientTests
         const string rawSecret = "raw-response-secret";
         var handler = new RecordingHandler(_ => Response(
             HttpStatusCode.OK,
-            $"{{\"game_scoped_id\":457,\"version\":\"1.2.3\",\"secret\":\"{rawSecret}\"}}"));
+            $"{{\"data\":{{\"game_scoped_id\":457,\"version\":\"1.2.3\",\"secret\":\"{rawSecret}\"}}}}"));
         using var httpClient = new HttpClient(handler);
         var observation = await new NexusFileVersionClient(httpClient, apiKey).ObserveAsync(Artifact());
 
