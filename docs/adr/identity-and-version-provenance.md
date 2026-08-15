@@ -72,7 +72,23 @@ identityがresolvedでも、version observationが一致するとは限りませ
 - observationはsource site、対象URL、観測時刻、source referenceとともにsession evidenceへ保存します。
 - identityが`Ambiguous`、`Missing`、`Conflicting`、`Unresolved`の場合、latestは表示できますがupdate statusは`Not assessed`です。
 - exact identityかつ比較可能な場合だけ、`Update available`、`Up to date`、`Installed newer`を表示します。
-- game compatibilityは独立軸です。release observationから互換性を推測せず、今回の表示は`Unknown`です。
+- game compatibilityは独立軸です。release version observationから互換性を推測しません。
+
+### GitHub / Nexusの限定Web compatibility observation
+
+release version observationとは別に、現在のDesktop sessionで表示中のWebView2 DOMから互換性labelを観測します。
+対象surfaceはGitHub Releases、Nexus MODのFiles surface、Nexus MODのDescription surfaceです。
+対象labelは`Game Version`、`Supported Game Version`、`Supported for`、`Compatible with`、`Requires Game Version`です。
+
+- raw line、raw value、normalized game version、optional build、relation、game context、source site、対象URL、観測時刻、diagnosticを保持します。
+- `v3.1.0 (b14)`はraw valueを保持し、normalized version `3.1.0`とbuild `b14`へ分離します。
+- game名がないlabelは、現在の7DTD adapter contextへ関連付けます。
+- 他game名が明示された値はraw evidenceとして保持しますが、7DTD compatibilityへ変換しません。
+- `Requires Game Version`はcondition evidenceです。単独ではpositive compatibility statusを生成しません。
+- positive targetが1つだけの場合はsource claimとして`Observed`を表示します。
+- positive targetが複数あり内容が異なる場合はwinnerを選ばず、`Unknown`とconflict diagnosticを保持します。
+- `Observed`はsource claimの観測結果です。runtime compatibilityを保証しません。
+- network API、login情報、汎用site parser、自動更新は使いません。
 
 観測はpage navigationと既存の`Observe now`で実行します。
 既存の手動Web version入力はAdvanced evidenceのfallbackとして残します。

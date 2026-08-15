@@ -31,11 +31,27 @@ public sealed class InspectorConclusionContractTests
                 "ambiguous",
                 "Medium",
                 "GitHub release list first visible release from GitHub.",
-                new SourceReferenceUiState("modFile", "mods/SCore/ModInfo.xml"),
-                new SourceReferenceUiState("webObservation", "web-session/github/Sperell/Sperell.Mods/releases"),
-                "GitHub",
-                "https://github.com/Sperell/Sperell.Mods/releases",
-                DateTimeOffset.Parse("2026-08-15T00:00:00Z"))
+            new SourceReferenceUiState("modFile", "mods/SCore/ModInfo.xml"),
+            new SourceReferenceUiState("webObservation", "web-session/github/Sperell/Sperell.Mods/releases"),
+            "GitHub",
+            "https://github.com/Sperell/Sperell.Mods/releases",
+            DateTimeOffset.Parse("2026-08-15T00:00:00Z"))
+            {
+                Summary = "Newer SCore release found",
+                CompatibilityTarget = "7DTD v3.1.0 (b14)",
+                CompatibilityRelation = "GameVersion",
+                CompatibilityEvidence = "Game Version: v3.1.0 (b14)",
+                CompatibilitySourceSite = "GitHub",
+                CompatibilityTargetUrl = "https://github.com/Sperell/Sperell.Mods/releases",
+                CompatibilityObservedAtUtc = DateTimeOffset.Parse("2026-08-15T00:00:00Z"),
+                CompatibilityDiagnostics = new[]
+                {
+                    new DiagnosticUiState(
+                        "web.compatibility.conflict",
+                        "Warning",
+                        "Conflicting Web compatibility observations were preserved.")
+                }
+            }
         };
 
         var serialized = JsonSerializer.Serialize(state);
@@ -43,5 +59,8 @@ public sealed class InspectorConclusionContractTests
         Assert.Contains("LatestObservedVersion", serialized, StringComparison.Ordinal);
         Assert.Contains("updateAvailable", serialized, StringComparison.Ordinal);
         Assert.Contains("Medium", serialized, StringComparison.Ordinal);
+        Assert.Contains("CompatibilityTarget", serialized, StringComparison.Ordinal);
+        Assert.Contains("3.1.0 (b14)", serialized, StringComparison.Ordinal);
+        Assert.Contains("web.compatibility.conflict", serialized, StringComparison.Ordinal);
     }
 }

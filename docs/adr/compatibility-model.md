@@ -48,6 +48,12 @@ Compatibility Graphやruntime判定機能は、この変更では実装しませ
 - Unknownは正常なterminal resultです。空欄で表しません。
 - runtime_verifiedは、実際のgameまたはserver/client runtime observationがある場合だけtrueにします。
 
+現在のDesktop vertical sliceでは、GitHub Releases、Nexus Files、Nexus Descriptionのvisible DOMだけを限定観測します。
+`Game Version`などの明示labelはrelease version observationと分離したWeb compatibility evidenceとして保持します。
+`Requires Game Version`はcondition evidenceであり、positive compatibility assertionへ自動変換しません。
+positive targetが複数あり内容が異なる場合はwinnerを選択せず、conflictとしてUnknownを返します。
+Web source claimの`Observed`はruntime compatibilityの保証ではありません。
+
 confirmed_compatibleとconfirmed_incompatibleは、保存したsource claimの確認を示します。
 ModScopeがruntimeを確認していない場合、runtime guaranteeとして表示しません。
 

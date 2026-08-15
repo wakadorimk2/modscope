@@ -1171,7 +1171,8 @@ h2 {
 .status-enabled,
 .status-ready,
 .status-updateavailable,
-.status-uptodate {
+.status-uptodate,
+.status-observed {
   background: rgba(34, 197, 94, 0.15);
   color: #86efac;
 }
@@ -1681,6 +1682,24 @@ select:focus {
 .inspector-conclusion-source {
   margin-bottom: 0;
   overflow-wrap: anywhere;
+}
+
+.compatibility-evidence-item {
+  display: grid;
+  gap: 3px;
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid rgba(56, 189, 248, 0.16);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.compatibility-evidence-item:first-of-type {
+  margin-top: 12px;
+}
+
+.compatibility-evidence-item .provenance-line {
+  margin: 0;
 }
 
 .analysis-input-status,

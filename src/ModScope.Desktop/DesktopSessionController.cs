@@ -17,6 +17,11 @@ public sealed class DesktopSessionController
     private PageObservation? _observation;
     private VersionObservationReadModel? _sessionWebVersionObservation;
     private PendingWebVersionObservation? _pendingWebVersionObservation;
+    private IReadOnlyList<CompatibilityObservationReadModel> _sessionWebCompatibilityObservations =
+        Array.Empty<CompatibilityObservationReadModel>();
+    private IReadOnlyList<DiagnosticReadModel> _sessionWebCompatibilityDiagnostics =
+        Array.Empty<DiagnosticReadModel>();
+    private PendingWebCompatibilityObservation? _pendingWebCompatibilityObservation;
     private IReadOnlyList<ModCandidateSummary> _candidates = Array.Empty<ModCandidateSummary>();
     private IReadOnlyList<ProfileSummaryReadModel> _profiles = Array.Empty<ProfileSummaryReadModel>();
     private SourceDiscoveryReadModel? _sourceDiscovery;
@@ -661,6 +666,9 @@ public sealed class DesktopSessionController
         _observation = observation;
         _sessionWebVersionObservation = null;
         _pendingWebVersionObservation = null;
+        _sessionWebCompatibilityObservations = Array.Empty<CompatibilityObservationReadModel>();
+        _sessionWebCompatibilityDiagnostics = Array.Empty<DiagnosticReadModel>();
+        _pendingWebCompatibilityObservation = null;
         _candidateIdentity = string.Empty;
         _selectedLocalModKey = null;
         _localContext = null;
@@ -676,6 +684,20 @@ public sealed class DesktopSessionController
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(targetUrl);
         _pendingWebVersionObservation = new PendingWebVersionObservation(result, targetUrl, observedAtUtc);
+        AttachPendingWebVersionObservation();
+    }
+
+    public void SetDetectedWebCompatibilityObservations(
+        WebCompatibilityObservationResult result,
+        Uri targetUrl,
+        DateTimeOffset observedAtUtc)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(targetUrl);
+        _pendingWebCompatibilityObservation = new PendingWebCompatibilityObservation(
+            result,
+            targetUrl,
+            observedAtUtc);
         AttachPendingWebVersionObservation();
     }
 
@@ -792,7 +814,9 @@ public sealed class DesktopSessionController
             _deploymentStatus,
             _canLaunchGame,
             _deploymentDiagnostics,
-            _sessionWebVersionObservation);
+            _sessionWebVersionObservation,
+            _sessionWebCompatibilityObservations,
+            _sessionWebCompatibilityDiagnostics);
     }
 
     private async Task<bool> LoadSourceCandidateCoreAsync(
@@ -1218,6 +1242,10 @@ public sealed class DesktopSessionController
     {
         _session = session;
         _sessionWebVersionObservation = null;
+        _pendingWebVersionObservation = null;
+        _sessionWebCompatibilityObservations = Array.Empty<CompatibilityObservationReadModel>();
+        _sessionWebCompatibilityDiagnostics = Array.Empty<DiagnosticReadModel>();
+        _pendingWebCompatibilityObservation = null;
         _candidates = _query.GetModCandidates();
         _profiles = _query.GetProfiles();
         InitializeProfileLoadStates(session.ProfileName);
@@ -1275,19 +1303,42 @@ public sealed class DesktopSessionController
 
     private void AttachPendingWebVersionObservation()
     {
-        if (_inspector is null || _pendingWebVersionObservation is null)
+        if (_inspector is null)
         {
             return;
         }
 
-        _sessionWebVersionObservation = CreateVersionObservation(
-            _inspector.ModKey,
-            _pendingWebVersionObservation);
-        var pending = _pendingWebVersionObservation;
-        _pendingWebVersionObservation = null;
-        _statusMessage = pending.Result.HasVersion
-            ? $"{pending.Result.Site} release version observed for this session."
-            : $"{pending.Result.Site} release observation kept with diagnostics for this session.";
+        var messages = new List<string>();
+        if (_pendingWebVersionObservation is not null)
+        {
+            _sessionWebVersionObservation = CreateVersionObservation(
+                _inspector.ModKey,
+                _pendingWebVersionObservation);
+            var pendingVersion = _pendingWebVersionObservation;
+            _pendingWebVersionObservation = null;
+            messages.Add(pendingVersion.Result.HasVersion
+                ? $"{pendingVersion.Result.Site} release version observed for this session."
+                : $"{pendingVersion.Result.Site} release observation kept with diagnostics for this session.");
+        }
+
+        if (_pendingWebCompatibilityObservation is not null)
+        {
+            _sessionWebCompatibilityObservations = CreateCompatibilityObservations(
+                _inspector.ModKey,
+                _pendingWebCompatibilityObservation);
+            _sessionWebCompatibilityDiagnostics = CreateCompatibilityDiagnostics(
+                _pendingWebCompatibilityObservation);
+            var pendingCompatibility = _pendingWebCompatibilityObservation;
+            _pendingWebCompatibilityObservation = null;
+            messages.Add(pendingCompatibility.Result.Observations.Count > 0
+                ? $"{pendingCompatibility.Result.Site} compatibility evidence observed for this session."
+                : $"{pendingCompatibility.Result.Site} compatibility observation kept with diagnostics for this session.");
+        }
+
+        if (messages.Count > 0)
+        {
+            _statusMessage = string.Join(" ", messages);
+        }
     }
 
     private static VersionObservationReadModel CreateVersionObservation(
@@ -1335,8 +1386,56 @@ public sealed class DesktopSessionController
         };
     }
 
+    private static IReadOnlyList<CompatibilityObservationReadModel> CreateCompatibilityObservations(
+        string ownerKey,
+        PendingWebCompatibilityObservation pending)
+    {
+        var targetUrl = pending.TargetUrl.GetLeftPart(UriPartial.Query);
+        var source = new SourceReferenceReadModel(
+            QuerySourceReferenceKind.WebObservation,
+            $"web-session/{pending.Result.Site.ToLowerInvariant()}/{pending.TargetUrl.AbsolutePath.TrimStart('/')}");
+        return pending.Result.Observations
+            .Select(observation => new CompatibilityObservationReadModel(
+                ownerKey,
+                observation.Relation.ToString(),
+                observation.GameContext,
+                observation.RawValue,
+                observation.NormalizedVersion,
+                observation.Build,
+                observation.MatchedLine,
+                source,
+                pending.ObservedAtUtc,
+                observation.Diagnostics
+                    .Select(diagnostic => diagnostic with { Source = source })
+                    .ToList()
+                    .AsReadOnly())
+            {
+                SourceSite = pending.Result.Site,
+                TargetUrl = targetUrl
+            })
+            .ToList()
+            .AsReadOnly();
+    }
+
+    private static IReadOnlyList<DiagnosticReadModel> CreateCompatibilityDiagnostics(
+        PendingWebCompatibilityObservation pending)
+    {
+        var source = new SourceReferenceReadModel(
+            QuerySourceReferenceKind.WebObservation,
+            $"web-session/{pending.Result.Site.ToLowerInvariant()}/{pending.TargetUrl.AbsolutePath.TrimStart('/')}");
+        return pending.Result.Diagnostics
+            .Select(diagnostic => diagnostic with { Source = source })
+            .ToList()
+            .AsReadOnly();
+    }
+
     private sealed record PendingWebVersionObservation(
         WebVersionObservationResult Result,
+        Uri TargetUrl,
+        DateTimeOffset ObservedAtUtc);
+
+    private sealed record PendingWebCompatibilityObservation(
+        WebCompatibilityObservationResult Result,
         Uri TargetUrl,
         DateTimeOffset ObservedAtUtc);
 

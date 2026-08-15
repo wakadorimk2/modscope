@@ -28,7 +28,9 @@ internal static class DesktopStateMapper
         string deploymentStatus = "idle",
         bool canLaunch = false,
         IReadOnlyList<DeploymentDiagnostic>? deploymentDiagnostics = null,
-        VersionObservationReadModel? sessionWebVersionObservation = null)
+        VersionObservationReadModel? sessionWebVersionObservation = null,
+        IReadOnlyList<CompatibilityObservationReadModel>? sessionWebCompatibilityObservations = null,
+        IReadOnlyList<DiagnosticReadModel>? sessionWebCompatibilityDiagnostics = null)
     {
         return new UiState(
             browser,
@@ -46,7 +48,13 @@ internal static class DesktopStateMapper
                 operation),
             identity,
             localContext is null ? null : LocalContext(localContext),
-            inspector is null ? null : Inspector(inspector, sessionWebVersionObservation),
+            inspector is null
+                ? null
+                : Inspector(
+                    inspector,
+                    sessionWebVersionObservation,
+                    sessionWebCompatibilityObservations ?? Array.Empty<CompatibilityObservationReadModel>(),
+                    sessionWebCompatibilityDiagnostics ?? Array.Empty<DiagnosticReadModel>()),
             analysis,
             Deployment(
                 session?.ProfileName ?? string.Empty,
@@ -285,11 +293,20 @@ internal static class DesktopStateMapper
 
     private static InspectorUiState Inspector(
         InspectorReadModel value,
-        VersionObservationReadModel? sessionWebVersionObservation)
+        VersionObservationReadModel? sessionWebVersionObservation,
+        IReadOnlyList<CompatibilityObservationReadModel> sessionWebCompatibilityObservations,
+        IReadOnlyList<DiagnosticReadModel> sessionWebCompatibilityDiagnostics)
     {
         var packageRelation = value.PackageRelation is null
             ? null
             : PackageRelation(value.PackageRelation, value.ModKey, sessionWebVersionObservation);
+        var applicableCompatibilityObservations = sessionWebCompatibilityObservations
+            .Where(observation => string.Equals(observation.OwnerKey, value.ModKey, StringComparison.OrdinalIgnoreCase))
+            .ToList()
+            .AsReadOnly();
+        var applicableCompatibilityDiagnostics = sessionWebCompatibilityDiagnostics
+            .ToList()
+            .AsReadOnly();
         return new InspectorUiState(
             value.ModKey,
             value.DirectoryName,
@@ -303,7 +320,16 @@ internal static class DesktopStateMapper
             Source(value.Source))
         {
             PackageRelation = packageRelation,
-            Conclusion = Conclusion(value, packageRelation)
+            CompatibilityObservations = applicableCompatibilityObservations
+                .Select(CompatibilityObservation)
+                .ToList()
+                .AsReadOnly(),
+            CompatibilityDiagnostics = Diagnostics(applicableCompatibilityDiagnostics),
+            Conclusion = Conclusion(
+                value,
+                packageRelation,
+                applicableCompatibilityObservations,
+                applicableCompatibilityDiagnostics)
         };
     }
 
@@ -456,9 +482,31 @@ internal static class DesktopStateMapper
         };
     }
 
+    private static CompatibilityObservationUiState CompatibilityObservation(
+        CompatibilityObservationReadModel value)
+    {
+        return new CompatibilityObservationUiState(
+            value.OwnerKey,
+            value.Relation,
+            value.GameContext,
+            value.RawValue,
+            value.NormalizedValue,
+            value.Build,
+            value.MatchedLine,
+            Source(value.Source),
+            value.ObservedAtUtc,
+            Diagnostics(value.Diagnostics))
+        {
+            SourceSite = value.SourceSite,
+            TargetUrl = value.TargetUrl
+        };
+    }
+
     private static InspectorConclusionUiState Conclusion(
         InspectorReadModel inspector,
-        PackageRelationUiState? packageRelation)
+        PackageRelationUiState? packageRelation,
+        IReadOnlyList<CompatibilityObservationReadModel> compatibilityObservations,
+        IReadOnlyList<DiagnosticReadModel> compatibilityDiagnostics)
     {
         var identityState = packageRelation?.IdentityState ?? "unresolved";
         var identityConfidence = identityState switch
@@ -549,6 +597,19 @@ internal static class DesktopStateMapper
             }
         }
 
+        var compatibility = BuildCompatibilityConclusion(
+            compatibilityObservations,
+            compatibilityDiagnostics);
+        var displayName = string.IsNullOrWhiteSpace(inspector.ModInfo?.DisplayName)
+            ? inspector.DirectoryName
+            : inspector.ModInfo!.DisplayName!;
+        var summary = versionStatus switch
+        {
+            "updateAvailable" => $"Newer {displayName} release found",
+            "upToDate" => "Installed release is current",
+            "installedNewer" => "Installed release is newer than observed",
+            _ => "Release comparison not assessed"
+        };
         var why = latest is null
             ? versionReason
             : latest.RawValue is null
@@ -559,8 +620,8 @@ internal static class DesktopStateMapper
             latestVersion,
             versionStatus,
             versionReason,
-            "unknown",
-            "No game compatibility evidence was observed. Version status does not imply game compatibility.",
+            compatibility.Status,
+            compatibility.Reason,
             identityState,
             identityConfidence,
             why,
@@ -568,8 +629,148 @@ internal static class DesktopStateMapper
             latest?.Source,
             latest?.SourceSite,
             latest?.TargetUrl,
-            latest?.ObservedAtUtc);
+            latest?.ObservedAtUtc)
+        {
+            Summary = summary,
+            CompatibilityTarget = compatibility.Target,
+            CompatibilityRelation = compatibility.Relation,
+            CompatibilityEvidence = compatibility.Evidence,
+            CompatibilityCondition = compatibility.Condition,
+            CompatibilitySource = compatibility.Source,
+            CompatibilitySourceSite = compatibility.SourceSite,
+            CompatibilityTargetUrl = compatibility.TargetUrl,
+            CompatibilityObservedAtUtc = compatibility.ObservedAtUtc,
+            CompatibilityDiagnostics = compatibility.Diagnostics
+        };
     }
+
+    private static CompatibilityConclusionResult BuildCompatibilityConclusion(
+        IReadOnlyList<CompatibilityObservationReadModel> observations,
+        IReadOnlyList<DiagnosticReadModel> diagnostics)
+    {
+        var positive = observations
+            .Where(observation => IsPositiveCompatibilityRelation(observation.Relation))
+            .Where(observation => string.Equals(observation.GameContext, "7DTD", StringComparison.OrdinalIgnoreCase))
+            .Where(observation => !string.IsNullOrWhiteSpace(observation.NormalizedValue))
+            .ToList();
+        var targetGroups = positive
+            .GroupBy(
+                observation => string.Join(
+                    "|",
+                    observation.GameContext,
+                    observation.NormalizedValue,
+                    observation.Build ?? string.Empty),
+                StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var conditions = observations
+            .Where(observation => string.Equals(
+                observation.Relation,
+                nameof(WebCompatibilityRelation.RequiresGameVersion),
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var uiDiagnostics = diagnostics.Select(Diagnostic).ToList();
+
+        if (targetGroups.Count == 1)
+        {
+            var selected = targetGroups[0].First();
+            return new CompatibilityConclusionResult(
+                "observed",
+                "One explicit 7DTD compatibility target was observed. This is Web evidence, not a runtime compatibility guarantee.",
+                FormatCompatibilityTarget(selected),
+                selected.Relation,
+                selected.MatchedLine,
+                conditions.Count == 0 ? null : string.Join(" · ", conditions.Select(condition => condition.MatchedLine)),
+                Source(selected.Source),
+                selected.SourceSite,
+                selected.TargetUrl,
+                selected.ObservedAtUtc,
+                uiDiagnostics.AsReadOnly());
+        }
+
+        if (targetGroups.Count > 1)
+        {
+            var firstConflictObservation = positive[0];
+            uiDiagnostics.Add(new DiagnosticUiState(
+                "web.compatibility.conflict",
+                "Warning",
+                "Conflicting Web compatibility observations were preserved. No winner was selected."));
+            return new CompatibilityConclusionResult(
+                "unknown",
+                "Conflicting Web compatibility observations",
+                null,
+                null,
+                null,
+                conditions.Count == 0 ? null : string.Join(" · ", conditions.Select(condition => condition.MatchedLine)),
+                Source(firstConflictObservation.Source),
+                firstConflictObservation.SourceSite,
+                firstConflictObservation.TargetUrl,
+                firstConflictObservation.ObservedAtUtc,
+                uiDiagnostics.AsReadOnly());
+        }
+
+        if (conditions.Count > 0)
+        {
+            var condition = conditions[0];
+            return new CompatibilityConclusionResult(
+                "unknown",
+                "Only a game-version requirement was observed; compatibility was not asserted.",
+                null,
+                null,
+                null,
+                string.Join(" · ", conditions.Select(condition => condition.MatchedLine)),
+                Source(condition.Source),
+                condition.SourceSite,
+                condition.TargetUrl,
+                condition.ObservedAtUtc,
+                uiDiagnostics.AsReadOnly());
+        }
+
+        var reason = observations.Count > 0
+            ? "No supported 7DTD compatibility target was observed. Raw Web evidence remains available below."
+            : "No Web compatibility evidence was observed.";
+        var firstObservation = observations.FirstOrDefault();
+        return new CompatibilityConclusionResult(
+            "unknown",
+            reason,
+            null,
+            null,
+            null,
+            null,
+            firstObservation is null ? null : Source(firstObservation.Source),
+            firstObservation?.SourceSite,
+            firstObservation?.TargetUrl,
+            firstObservation?.ObservedAtUtc,
+            uiDiagnostics.AsReadOnly());
+    }
+
+    private static bool IsPositiveCompatibilityRelation(string relation)
+    {
+        return relation.Equals(nameof(WebCompatibilityRelation.GameVersion), StringComparison.OrdinalIgnoreCase)
+            || relation.Equals(nameof(WebCompatibilityRelation.SupportedGameVersion), StringComparison.OrdinalIgnoreCase)
+            || relation.Equals(nameof(WebCompatibilityRelation.SupportedFor), StringComparison.OrdinalIgnoreCase)
+            || relation.Equals(nameof(WebCompatibilityRelation.CompatibleWith), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatCompatibilityTarget(CompatibilityObservationReadModel observation)
+    {
+        var target = $"{observation.GameContext} v{observation.NormalizedValue}";
+        return string.IsNullOrWhiteSpace(observation.Build)
+            ? target
+            : $"{target} ({observation.Build})";
+    }
+
+    private sealed record CompatibilityConclusionResult(
+        string Status,
+        string Reason,
+        string? Target,
+        string? Relation,
+        string? Evidence,
+        string? Condition,
+        SourceReferenceUiState? Source,
+        string? SourceSite,
+        string? TargetUrl,
+        DateTimeOffset? ObservedAtUtc,
+        IReadOnlyList<DiagnosticUiState> Diagnostics);
 
     private static VersionComparisonUiState VersionComparison(
         PackageRelationReadModel package,
