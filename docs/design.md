@@ -1049,6 +1049,39 @@ GUIはQuery layerのprojectionだけを読みます。
 調査対象、snapshot、source、未確認事項は[Research map](research/README.md)と各research recordで管理します。
 現在の実装に影響するunknownは、`Risksとunknowns`、ADR、Query resultのdiagnosticへ分けて記録します。
 
+### 20.1 Current active backlog
+
+現在のactive backlogは、Evidence-first Local Knowledgeの4軸です。
+
+- P0: [Version provenanceを強くする (#28)](https://github.com/wakadorimk2/modscope/issues/28)
+- P0: [Historical artifact / old versionを説明できるevidence modelを調査する (#29)](https://github.com/wakadorimk2/modscope/issues/29)
+- P1: [大規模real-world profileでevidence coverageを検証する (#30)](https://github.com/wakadorimk2/modscope/issues/30)
+- P1: [Web pageとlocal modのidentity resolution境界を詰める (#31)](https://github.com/wakadorimk2/modscope/issues/31)
+
+既存のDeployment、Browser、Runtime、multi-game実装は削除しません。
+これらは回帰対象として保持します。
+新しい機能拡張はfreezeします。
+
+- Deploymentは、既存のcontrolled write契約と安全境界を保持します。
+- Browserは、既存のWebView2とpage observationの境界を保持します。
+- Runtimeは、既存のevidence modelとcomparisonを保持します。
+- multi-gameは、7DTDの説明精度を優先し、第二Game AdapterをDeferredとします。
+
+active backlogでは、co-presence、list membership、manifest membership、名前の類似だけからdependency、compatibility、runtime保証を推測しません。
+
+### 20.2 v0.1の5問
+
+v0.1のpass criteriaは、次の5問です。
+
+1. このprofileで何が有効か。
+2. このModletはどのpackage directoryにあるか。
+3. このpackageまたはarchiveは、どのsource recordに対応するか。
+4. 各sourceはどのversionを主張しているか。
+5. なぜ一致、mismatch、Unknown、Not comparableになったか。
+
+1つの明示されたMO2 source、1つのprofile、1つのModletまたはarchiveで、この5問へevidence付きで答えられることをv0.1の検証単位とします。
+Browser、Deployment、Runtime、multi-gameの拡張は、この検証単位へ追加しません。
+
 ## 21. Conceptual repository architecture
 
 実装開始後の候補です。現在この構成を作成しません。
