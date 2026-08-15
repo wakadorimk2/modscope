@@ -69,6 +69,7 @@ public static class KnownSiteCompatibilityObserver
 {
     private const string GitHubReleaseScope = "GitHubRelease";
     private const string NexusFileScope = "NexusFile";
+    private const string NexusModPageScope = "NexusModPage";
     private const string PageScope = "Page";
 
     private static readonly Regex LabelPattern = new(
@@ -235,13 +236,22 @@ public static class KnownSiteCompatibilityObserver
 
         if (scopes is { Count: > 0 })
         {
-            return scopes
-                .Select(scope => new ScopeText(
-                    scope,
-                    ScopeRequiresResolution(scope),
-                    scope.VisibleText ?? string.Empty))
-                .ToList()
-                .AsReadOnly();
+            var compatibilityScopes = scopes
+                .Where(scope => !string.Equals(
+                    scope.Kind,
+                    NexusModPageScope,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (compatibilityScopes.Count > 0)
+            {
+                return compatibilityScopes
+                    .Select(scope => new ScopeText(
+                        scope,
+                        ScopeRequiresResolution(scope),
+                        scope.VisibleText ?? string.Empty))
+                    .ToList()
+                    .AsReadOnly();
+            }
         }
 
         if (!isReleaseSurface
@@ -556,6 +566,11 @@ public static class KnownSiteCompatibilityObserver
         if (string.Equals(kind, NexusFileScope, StringComparison.OrdinalIgnoreCase))
         {
             return NexusFileScope;
+        }
+
+        if (string.Equals(kind, NexusModPageScope, StringComparison.OrdinalIgnoreCase))
+        {
+            return NexusModPageScope;
         }
 
         if (string.Equals(kind, PageScope, StringComparison.OrdinalIgnoreCase))

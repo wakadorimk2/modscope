@@ -160,6 +160,21 @@ public sealed class VersionEvidenceTests
     }
 
     [Fact]
+    public void ComparesInstalledVersionWithPrefixedNexusModPageVersion()
+    {
+        var latest = VersionNormalizer.Normalize("v8.0.1", out var scheme);
+
+        Assert.Equal("8.0.1", latest);
+        Assert.Equal(VersionScheme.Semver, scheme);
+        Assert.True(VersionComparator.TryCompareNormalized(
+            "8.0.1",
+            latest,
+            scheme,
+            out var comparison));
+        Assert.Equal(0, comparison);
+    }
+
+    [Fact]
     public void RetainsUnsupportedManifestRoleAsDiagnosticAndDoesNotCompareIt()
     {
         using var directory = TemporaryDirectory.Create();

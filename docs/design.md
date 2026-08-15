@@ -517,14 +517,18 @@ GitHub Releasesでは、visibleなrelease tag linkと同じrelease blockのvisib
 GitHubのtag pageは1つのrelease scopeとして保持します。
 Nexus Filesでは、visibleなFile versionと同じrowまたはcardのvisible textを1つのFile scopeとして保持します。
 Nexus Descriptionでは、page全体をPage scopeとして保持します。
-scopeには、kind、raw releaseまたはFile version、normalized version、releaseまたはFile URL、matched line、scope内のvisible textを保持します。
+Nexus MOD pageでは、visibleな`Version` labelと同じDOM範囲のvisible textを1つの`NexusModPage` scopeとして保持します。
+`NexusModPage` scopeは、update statusとrelease associationへだけ使用します。
+Nexus Descriptionのcompatibility claimは、既存の`Page` scopeへ関連付けます。
+`NexusModPage`のversion observationは、7DTD game compatibilityの保証ではありません。
+scopeには、kind、raw version、normalized version、releaseまたはFile URL、matched line、scope内のvisible textを保持します。
 hidden DOM、network API、login情報はscope観測へ使いません。
 互換性観測では、`Game Version`、`Supported Game Version`、`Supported for`、`Compatible with`、`Requires Game Version`のvisible labelだけを読みます。
 `Game Version: v3.1.0 (b14)`はraw value、normalized version `3.1.0`、build `b14`、matched lineを分離して保持します。
 `Requires Game Version`はcondition evidenceです。positive compatibility observationへ自動変換しません。
 positive targetが1つだけの場合は、source claimとして`Observed`を表示します。
 positive targetが複数あり内容が異なる場合は、winnerを選ばず`Unknown`とdiagnosticを表示します。
-compatibility claimはrelease scopeまたはFile scopeへ関連付けます。
+compatibility claimはGitHub release scope、Nexus File scope、またはNexus DescriptionのPage scopeへ関連付けます。
 latest scopeのpositive targetだけを結論へ使います。
 過去scopeのclaimはhistoryとして保持します。
 latest scopeにevidenceがない場合は、過去scopeへfallbackしません。

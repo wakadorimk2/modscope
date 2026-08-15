@@ -58,4 +58,36 @@ public sealed class VersionEvidenceContractTests
         Assert.DoesNotContain("C:\\\\", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("secret-local-content", serialized, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SerializesNexusModPageVersionScopeInTheExistingContractFields()
+    {
+        var observation = new VersionObservationUiState(
+            "Quartz",
+            "Release",
+            "WebObservation",
+            "v8.0.1",
+            "8.0.1",
+            "semver",
+            new SourceReferenceUiState("webObservation", "web-session/nexus/mods/2409"),
+            DateTimeOffset.UnixEpoch,
+            Array.Empty<DiagnosticUiState>())
+        {
+            SourceSite = "Nexus",
+            TargetUrl = "https://www.nexusmods.com/7daystodie/mods/2409",
+            Evidence = "Nexus mod page visible Version label",
+            ReleaseScopeKind = "NexusModPage",
+            ReleaseScopeRawVersion = "v8.0.1",
+            ReleaseScopeVersion = "8.0.1",
+            ReleaseScopeUrl = "https://www.nexusmods.com/7daystodie/mods/2409",
+            ReleaseScopeMatchedLine = "Version v8.0.1"
+        };
+
+        var json = JsonSerializer.Serialize(observation, BridgeProtocol.JsonOptions);
+
+        Assert.Contains("\"releaseScopeKind\":\"NexusModPage\"", json);
+        Assert.Contains("\"releaseScopeRawVersion\":\"v8.0.1\"", json);
+        Assert.Contains("\"releaseScopeVersion\":\"8.0.1\"", json);
+        Assert.Contains("\"releaseScopeMatchedLine\":\"Version v8.0.1\"", json);
+    }
 }

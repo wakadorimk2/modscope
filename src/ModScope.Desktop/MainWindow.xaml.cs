@@ -60,6 +60,49 @@ public partial class MainWindow : Window
             const match = line.match(versionPattern);
             return match ? { rawVersion: match[0], matchedLine: line } : null;
           };
+          const nexusVersionLabelPattern = /^\s*version\b(?:\s*[:#-]?\s*(.*))?\s*$/i;
+          const nexusVersionFromElement = (element) => {
+            const elementText = textOf(element);
+            if (!elementText) return null;
+            const lines = linesOf(elementText);
+            for (let index = 0; index < lines.length; index += 1) {
+              const line = lines[index];
+              if (!nexusVersionLabelPattern.test(line)) continue;
+              const inlineMatch = line.match(versionPattern);
+              if (inlineMatch) {
+                return {
+                  rawVersion: inlineMatch[0],
+                  matchedLine: line,
+                  visibleText: elementText
+                };
+              }
+              const nextLine = lines[index + 1];
+              const nextMatch = nextLine ? nextLine.match(versionPattern) : null;
+              return {
+                rawVersion: nextMatch ? nextMatch[0] : null,
+                matchedLine: nextMatch ? line + ' ' + nextLine : line,
+                visibleText: elementText
+              };
+            }
+            return null;
+          };
+          const nexusVersionCandidates = () => {
+            const elements = [
+              document.body,
+              ...Array.from(document.querySelectorAll('dt,dd,div,span,p,li'))
+            ].filter(visible);
+            const seen = new Map();
+            elements.forEach(element => {
+              const candidate = nexusVersionFromElement(element);
+              if (!candidate) return;
+              const key = (candidate.rawVersion || '') + '|' + (candidate.matchedLine || '');
+              const existing = seen.get(key);
+              if (!existing || candidate.visibleText.length < existing.visibleText.length) {
+                seen.set(key, candidate);
+              }
+            });
+            return Array.from(seen.values());
+          };
           const decode = (value) => {
             try { return decodeURIComponent(value); } catch { return value; }
           };
@@ -155,6 +198,28 @@ public partial class MainWindow : Window
               });
             });
           } else if (nexusModPage) {
+            const versionCandidates = nexusVersionCandidates();
+            if (versionCandidates.length === 0) {
+              scopes.push({
+                kind: 'NexusModPage',
+                rawVersion: null,
+                normalizedVersion: null,
+                scopeUrl: pageUrl.href,
+                matchedLine: null,
+                visibleText: bodyText
+              });
+            } else {
+              versionCandidates.forEach(candidate => {
+                scopes.push({
+                  kind: 'NexusModPage',
+                  rawVersion: candidate.rawVersion,
+                  normalizedVersion: normalizedVersion(candidate.rawVersion),
+                  scopeUrl: pageUrl.href,
+                  matchedLine: candidate.matchedLine,
+                  visibleText: candidate.visibleText
+                });
+              });
+            }
             scopes.push({
               kind: 'Page',
               rawVersion: null,
