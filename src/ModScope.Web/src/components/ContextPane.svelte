@@ -150,7 +150,29 @@
       {#if state.localContext.status === 'installed' && state.localContext.localModKey}<button class="secondary-button action-button" disabled={operationBlocksInteraction} onclick={onOpenInspector}>Inspect MOD</button>{/if}
     {:else if state.observation}
       <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
-      {#if state.identity.matches.length > 0}<div class="recognition-candidate-list" aria-label="Local MOD recognition candidates">{#each state.identity.matches.slice(0, 6) as match}<article class="recognition-candidate"><div class="recognition-candidate-heading"><strong>{match.displayName || match.directoryName || match.modKey}</strong><span class="status-chip {match.strength === 'strong' ? 'status-ready' : 'status-unknown'}">{formatLabel(match.strength)}</span></div><p class="analysis-meta">{match.evidence}</p><p class="subtle">{match.profileState} · {match.enabledState} · {match.modKey}</p></article>{/each}</div>{/if}
+      {#if state.identity.matches.length > 0}
+        <div class="recognition-candidate-list" aria-label="Local MOD recognition candidates">
+          {#each state.identity.matches.slice(0, 6) as match}
+            <article class="recognition-candidate">
+              <button
+                type="button"
+                class="recognition-candidate-action"
+                disabled={operationBlocksInteraction}
+                aria-label={`Use ${match.displayName || match.directoryName || match.modKey} as the local MOD`}
+                onclick={() => onConfirmIdentity(match.modKey)}
+              >
+                <span class="recognition-candidate-heading">
+                  <strong>{match.displayName || match.directoryName || match.modKey}</strong>
+                  <span class="status-chip {match.strength === 'strong' ? 'status-ready' : 'status-unknown'}">{formatLabel(match.strength)}</span>
+                </span>
+                <span class="analysis-meta">{match.evidence}</span>
+                <span class="subtle">{match.profileState} · {match.enabledState} · {match.modKey}</span>
+                <span class="recognition-candidate-action-label">Use this MOD</span>
+              </button>
+            </article>
+          {/each}
+        </div>
+      {/if}
       {#if state.knowledge.candidates.length > 0}<p class="subtle">Search the local MOD catalog to confirm the page identity.</p><div class="action-row"><button class="primary-button" type="button" disabled={operationBlocksInteraction} onclick={() => onOpenModSearch('recognition')}>Search local MODs</button><button class="secondary-button" type="button" disabled={operationBlocksInteraction} onclick={() => onConfirmIdentity(null)}>Mark as not installed</button></div>{:else}<p class="notice">No local MOD candidates are loaded. Open Debug to load a profile.</p><div class="action-row"><button class="secondary-button" type="button" onclick={() => onSetContextMode('debug')}>Open Debug</button><button class="secondary-button" type="button" onclick={() => onConfirmIdentity(null)}>Mark as not installed</button></div>{/if}
     {:else}<p class="subtle">ModScope will observe the current page and show local context here.</p>{/if}
   </section>

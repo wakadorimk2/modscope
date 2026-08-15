@@ -52,6 +52,8 @@ internal static class DesktopStateMapper
                 ? null
                 : Inspector(
                     inspector,
+                    identity,
+                    localContext,
                     sessionWebVersionObservation,
                     sessionWebCompatibilityObservations ?? Array.Empty<CompatibilityObservationReadModel>(),
                     sessionWebCompatibilityDiagnostics ?? Array.Empty<DiagnosticReadModel>()),
@@ -293,6 +295,8 @@ internal static class DesktopStateMapper
 
     private static InspectorUiState Inspector(
         InspectorReadModel value,
+        IdentityUiState identity,
+        LocalContextReadModel? localContext,
         VersionObservationReadModel? sessionWebVersionObservation,
         IReadOnlyList<CompatibilityObservationReadModel> sessionWebCompatibilityObservations,
         IReadOnlyList<DiagnosticReadModel> sessionWebCompatibilityDiagnostics)
@@ -328,6 +332,8 @@ internal static class DesktopStateMapper
             Conclusion = Conclusion(
                 value,
                 packageRelation,
+                identity,
+                localContext,
                 applicableCompatibilityObservations,
                 applicableCompatibilityDiagnostics)
         };
@@ -478,7 +484,12 @@ internal static class DesktopStateMapper
         {
             SourceSite = value.SourceSite,
             TargetUrl = value.TargetUrl,
-            Evidence = value.Evidence
+            Evidence = value.Evidence,
+            ReleaseScopeKind = value.ReleaseScopeKind,
+            ReleaseScopeRawVersion = value.ReleaseScopeRawVersion,
+            ReleaseScopeVersion = value.ReleaseScopeVersion,
+            ReleaseScopeUrl = value.ReleaseScopeUrl,
+            ReleaseScopeMatchedLine = value.ReleaseScopeMatchedLine
         };
     }
 
@@ -498,13 +509,20 @@ internal static class DesktopStateMapper
             Diagnostics(value.Diagnostics))
         {
             SourceSite = value.SourceSite,
-            TargetUrl = value.TargetUrl
+            TargetUrl = value.TargetUrl,
+            ReleaseScopeKind = value.ReleaseScopeKind,
+            ReleaseScopeRawVersion = value.ReleaseScopeRawVersion,
+            ReleaseScopeVersion = value.ReleaseScopeVersion,
+            ReleaseScopeUrl = value.ReleaseScopeUrl,
+            ReleaseScopeMatchedLine = value.ReleaseScopeMatchedLine
         };
     }
 
     private static InspectorConclusionUiState Conclusion(
         InspectorReadModel inspector,
         PackageRelationUiState? packageRelation,
+        IdentityUiState identity,
+        LocalContextReadModel? localContext,
         IReadOnlyList<CompatibilityObservationReadModel> compatibilityObservations,
         IReadOnlyList<DiagnosticReadModel> compatibilityDiagnostics)
     {
@@ -527,16 +545,22 @@ internal static class DesktopStateMapper
             ? null
             : Source(inspector.ModInfo!.Source);
         var latestVersion = latest?.RawValue;
+        var releaseAssociation = DetermineReleaseAssociation(
+            inspector,
+            identity,
+            localContext,
+            latest,
+            packageRelation);
         var versionStatus = "notAssessed";
-        var versionReason = "No GitHub Releases or Nexus Files version was observed in this session.";
+        var versionReason = "No GitHub Releases, Nexus Files, or Nexus mod page version was observed in this session.";
 
         if (packageRelation is null)
         {
             versionReason = "Package identity and version evidence are not available.";
         }
-        else if (!string.Equals(identityState, "exact", StringComparison.OrdinalIgnoreCase))
+        else if (!releaseAssociation.IsConfirmed)
         {
-            versionReason = "Identity is not exact, so the latest observation is shown without an update assessment.";
+            versionReason = releaseAssociation.Reason;
         }
         else if (latest is not null && latest.RawValue is null)
         {
@@ -599,15 +623,13 @@ internal static class DesktopStateMapper
 
         var compatibility = BuildCompatibilityConclusion(
             compatibilityObservations,
-            compatibilityDiagnostics);
-        var displayName = string.IsNullOrWhiteSpace(inspector.ModInfo?.DisplayName)
-            ? inspector.DirectoryName
-            : inspector.ModInfo!.DisplayName!;
+            compatibilityDiagnostics,
+            latest);
         var summary = versionStatus switch
         {
-            "updateAvailable" => $"Newer {displayName} release found",
-            "upToDate" => "Installed release is current",
-            "installedNewer" => "Installed release is newer than observed",
+            "updateAvailable" => "Update available",
+            "upToDate" => "Up to date",
+            "installedNewer" => "Installed newer",
             _ => "Release comparison not assessed"
         };
         var why = latest is null
@@ -640,15 +662,79 @@ internal static class DesktopStateMapper
             CompatibilitySourceSite = compatibility.SourceSite,
             CompatibilityTargetUrl = compatibility.TargetUrl,
             CompatibilityObservedAtUtc = compatibility.ObservedAtUtc,
-            CompatibilityDiagnostics = compatibility.Diagnostics
+            CompatibilityDiagnostics = compatibility.Diagnostics,
+            ReleaseAssociationStatus = releaseAssociation.Status,
+            ReleaseAssociationReason = releaseAssociation.Reason,
+            ReleaseAssociationEvidence = releaseAssociation.Evidence,
+            SelectedLatestReleaseScopeKind = latest?.ReleaseScopeKind,
+            SelectedLatestReleaseScopeRawVersion = latest?.ReleaseScopeRawVersion,
+            SelectedLatestReleaseScopeVersion = latest?.ReleaseScopeVersion,
+            SelectedLatestReleaseUrl = latest?.ReleaseScopeUrl,
+            SelectedLatestReleaseScopeLine = latest?.ReleaseScopeMatchedLine
         };
+    }
+
+    private static ReleaseAssociationResult DetermineReleaseAssociation(
+        InspectorReadModel inspector,
+        IdentityUiState identity,
+        LocalContextReadModel? localContext,
+        VersionObservationUiState? latest,
+        PackageRelationUiState? packageRelation)
+    {
+        if (identity.RecognitionStatus is not ("auto-confirmed" or "manual-confirmed"))
+        {
+            return ReleaseAssociationResult.NotAssessed("Page identity is not confirmed.");
+        }
+
+        if (string.IsNullOrWhiteSpace(identity.SelectedLocalModKey)
+            || !string.Equals(identity.SelectedLocalModKey, inspector.ModKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return ReleaseAssociationResult.NotAssessed("The selected local MOD does not match the Inspector MOD.");
+        }
+
+        if (localContext is null
+            || !string.Equals(localContext.Status.ToString(), "Installed", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReleaseAssociationResult.NotAssessed("The current local context is not installed.");
+        }
+
+        if (packageRelation is null)
+        {
+            return ReleaseAssociationResult.NotAssessed("Package relation evidence is not available.");
+        }
+
+        if (latest is null
+            || !string.Equals(latest.SourceKind, "WebObservation", StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(latest.SourceSite, "GitHub", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(latest.SourceSite, "Nexus", StringComparison.OrdinalIgnoreCase)))
+        {
+            return ReleaseAssociationResult.NotAssessed("An automatic Web release observation is not available.");
+        }
+
+        if (!IsReleaseScope(latest))
+        {
+            return ReleaseAssociationResult.NotAssessed("The latest Web release scope is unresolved.");
+        }
+
+        var evidence = string.IsNullOrWhiteSpace(latest.ReleaseScopeMatchedLine)
+            ? $"{latest.ReleaseScopeKind} {latest.ReleaseScopeVersion}"
+            : $"{latest.ReleaseScopeKind} {latest.ReleaseScopeVersion} · {latest.ReleaseScopeMatchedLine}";
+        return new ReleaseAssociationResult(
+            true,
+            "confirmed",
+            $"Confirmed for {inspector.ModKey}",
+            evidence);
     }
 
     private static CompatibilityConclusionResult BuildCompatibilityConclusion(
         IReadOnlyList<CompatibilityObservationReadModel> observations,
-        IReadOnlyList<DiagnosticReadModel> diagnostics)
+        IReadOnlyList<DiagnosticReadModel> diagnostics,
+        VersionObservationUiState? latest)
     {
-        var positive = observations
+        var scopedObservations = SelectCompatibilityScope(
+            observations,
+            latest);
+        var positive = scopedObservations
             .Where(observation => IsPositiveCompatibilityRelation(observation.Relation))
             .Where(observation => string.Equals(observation.GameContext, "7DTD", StringComparison.OrdinalIgnoreCase))
             .Where(observation => !string.IsNullOrWhiteSpace(observation.NormalizedValue))
@@ -662,7 +748,7 @@ internal static class DesktopStateMapper
                     observation.Build ?? string.Empty),
                 StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var conditions = observations
+        var conditions = scopedObservations
             .Where(observation => string.Equals(
                 observation.Relation,
                 nameof(WebCompatibilityRelation.RequiresGameVersion),
@@ -684,7 +770,12 @@ internal static class DesktopStateMapper
                 selected.SourceSite,
                 selected.TargetUrl,
                 selected.ObservedAtUtc,
-                uiDiagnostics.AsReadOnly());
+                uiDiagnostics.AsReadOnly(),
+                selected.ReleaseScopeKind,
+                selected.ReleaseScopeRawVersion,
+                selected.ReleaseScopeVersion,
+                selected.ReleaseScopeUrl,
+                selected.ReleaseScopeMatchedLine);
         }
 
         if (targetGroups.Count > 1)
@@ -705,7 +796,12 @@ internal static class DesktopStateMapper
                 firstConflictObservation.SourceSite,
                 firstConflictObservation.TargetUrl,
                 firstConflictObservation.ObservedAtUtc,
-                uiDiagnostics.AsReadOnly());
+                uiDiagnostics.AsReadOnly(),
+                firstConflictObservation.ReleaseScopeKind,
+                firstConflictObservation.ReleaseScopeRawVersion,
+                firstConflictObservation.ReleaseScopeVersion,
+                firstConflictObservation.ReleaseScopeUrl,
+                firstConflictObservation.ReleaseScopeMatchedLine);
         }
 
         if (conditions.Count > 0)
@@ -722,13 +818,21 @@ internal static class DesktopStateMapper
                 condition.SourceSite,
                 condition.TargetUrl,
                 condition.ObservedAtUtc,
-                uiDiagnostics.AsReadOnly());
+                uiDiagnostics.AsReadOnly(),
+                condition.ReleaseScopeKind,
+                condition.ReleaseScopeRawVersion,
+                condition.ReleaseScopeVersion,
+                condition.ReleaseScopeUrl,
+                condition.ReleaseScopeMatchedLine);
         }
 
-        var reason = observations.Count > 0
-            ? "No supported 7DTD compatibility target was observed. Raw Web evidence remains available below."
+        var reason = observations.Count > 0 && scopedObservations.Count == 0
+            ? "No compatibility evidence was observed in the selected latest release scope. Earlier scope evidence remains in history."
+            : observations.Count > 0
+                ? "No supported 7DTD compatibility target was observed. Raw Web evidence remains available below."
             : "No Web compatibility evidence was observed.";
-        var firstObservation = observations.FirstOrDefault();
+        var firstObservation = scopedObservations.FirstOrDefault();
+        firstObservation ??= observations.FirstOrDefault();
         return new CompatibilityConclusionResult(
             "unknown",
             reason,
@@ -740,7 +844,69 @@ internal static class DesktopStateMapper
             firstObservation?.SourceSite,
             firstObservation?.TargetUrl,
             firstObservation?.ObservedAtUtc,
-            uiDiagnostics.AsReadOnly());
+            uiDiagnostics.AsReadOnly(),
+            firstObservation?.ReleaseScopeKind,
+            firstObservation?.ReleaseScopeRawVersion,
+            firstObservation?.ReleaseScopeVersion,
+            firstObservation?.ReleaseScopeUrl,
+            firstObservation?.ReleaseScopeMatchedLine);
+    }
+
+    private static IReadOnlyList<CompatibilityObservationReadModel> SelectCompatibilityScope(
+        IReadOnlyList<CompatibilityObservationReadModel> observations,
+        VersionObservationUiState? latest)
+    {
+        var latestScope = IsReleaseScope(latest)
+            && !string.Equals(
+                latest!.ReleaseScopeKind,
+                "NexusModPage",
+                StringComparison.OrdinalIgnoreCase)
+            ? new CompatibilityScopeKey(
+                latest!.ReleaseScopeKind!,
+                latest.ReleaseScopeVersion!,
+                latest.ReleaseScopeUrl)
+            : null;
+
+        if (latestScope is not null)
+        {
+            return observations
+                .Where(observation => latestScope.Matches(observation))
+                .ToList()
+                .AsReadOnly();
+        }
+
+        var pageScope = observations
+            .FirstOrDefault(observation =>
+                string.Equals(observation.ReleaseScopeKind, "Page", StringComparison.OrdinalIgnoreCase));
+        if (pageScope is null)
+        {
+            return Array.Empty<CompatibilityObservationReadModel>();
+        }
+
+        return observations
+            .Where(observation =>
+                string.Equals(observation.ReleaseScopeKind, "Page", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(observation.ReleaseScopeUrl, pageScope.ReleaseScopeUrl, StringComparison.OrdinalIgnoreCase))
+            .ToList()
+            .AsReadOnly();
+    }
+
+    private static bool IsReleaseScope(VersionObservationUiState? observation)
+    {
+        return observation is not null
+            && (string.Equals(observation.ReleaseScopeKind, "GitHubRelease", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(observation.ReleaseScopeKind, "NexusFile", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(observation.ReleaseScopeKind, "NexusModPage", StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrWhiteSpace(observation.ReleaseScopeVersion)
+            && !string.IsNullOrWhiteSpace(observation.ReleaseScopeUrl);
+    }
+
+    private static bool IsReleaseScope(CompatibilityObservationReadModel observation)
+    {
+        return (string.Equals(observation.ReleaseScopeKind, "GitHubRelease", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(observation.ReleaseScopeKind, "NexusFile", StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrWhiteSpace(observation.ReleaseScopeVersion)
+            && !string.IsNullOrWhiteSpace(observation.ReleaseScopeUrl);
     }
 
     private static bool IsPositiveCompatibilityRelation(string relation)
@@ -770,7 +936,37 @@ internal static class DesktopStateMapper
         string? SourceSite,
         string? TargetUrl,
         DateTimeOffset? ObservedAtUtc,
-        IReadOnlyList<DiagnosticUiState> Diagnostics);
+        IReadOnlyList<DiagnosticUiState> Diagnostics,
+        string? ReleaseScopeKind,
+        string? ReleaseScopeRawVersion,
+        string? ReleaseScopeVersion,
+        string? ReleaseScopeUrl,
+        string? ReleaseScopeMatchedLine);
+
+    private sealed record ReleaseAssociationResult(
+        bool IsConfirmed,
+        string Status,
+        string Reason,
+        string? Evidence)
+    {
+        public static ReleaseAssociationResult NotAssessed(string reason)
+        {
+            return new ReleaseAssociationResult(false, "not-assessed", reason, null);
+        }
+    }
+
+    private sealed record CompatibilityScopeKey(
+        string Kind,
+        string Version,
+        string? Url)
+    {
+        public bool Matches(CompatibilityObservationReadModel observation)
+        {
+            return string.Equals(observation.ReleaseScopeKind, Kind, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(observation.ReleaseScopeVersion, Version, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(observation.ReleaseScopeUrl, Url, StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     private static VersionComparisonUiState VersionComparison(
         PackageRelationReadModel package,

@@ -294,6 +294,14 @@ export type InspectorConclusionUiState = {
   compatibilityTargetUrl?: string | null;
   compatibilityObservedAtUtc?: string | null;
   compatibilityDiagnostics: DiagnosticUiState[];
+  releaseAssociationStatus: string;
+  releaseAssociationReason: string;
+  releaseAssociationEvidence?: string | null;
+  selectedLatestReleaseScopeKind?: string | null;
+  selectedLatestReleaseScopeRawVersion?: string | null;
+  selectedLatestReleaseScopeVersion?: string | null;
+  selectedLatestReleaseUrl?: string | null;
+  selectedLatestReleaseScopeLine?: string | null;
 };
 
 export type SourceArtifactUiState = {
@@ -319,6 +327,11 @@ export type VersionObservationUiState = {
   sourceSite?: string | null;
   targetUrl?: string | null;
   evidence?: string | null;
+  releaseScopeKind?: string | null;
+  releaseScopeRawVersion?: string | null;
+  releaseScopeVersion?: string | null;
+  releaseScopeUrl?: string | null;
+  releaseScopeMatchedLine?: string | null;
 };
 
 export type CompatibilityObservationUiState = {
@@ -334,6 +347,11 @@ export type CompatibilityObservationUiState = {
   diagnostics: DiagnosticUiState[];
   sourceSite?: string | null;
   targetUrl?: string | null;
+  releaseScopeKind?: string | null;
+  releaseScopeRawVersion?: string | null;
+  releaseScopeVersion?: string | null;
+  releaseScopeUrl?: string | null;
+  releaseScopeMatchedLine?: string | null;
 };
 
 export type VersionComparisonUiState = {
