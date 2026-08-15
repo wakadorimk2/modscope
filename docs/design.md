@@ -13,6 +13,23 @@ v0.1は、AI用index単体ではありません。7DTD + MO2のLocal Mod Knowled
 
 ## 2. Product definition
 
+### ModScope North Star
+
+> **使っていて気持ちいい上に、異様に賢いMODマネージャを作る。**
+>
+> 「気持ちいい」とは、複雑なMOD環境を見つけ、整理し、理解し、操作する日常の体験が速く自然であること。
+> 「異様に賢い」とは、単に情報を多く表示するのではなく、MOD・package・Modlet・archive・version・source・dependency・conflict・runtimeなどの関係を根拠付きで理解し、必要なときに説明できること。
+>
+> **既存Mod Managerとの機能重複は、それ自体をスコープ外の理由にしない。**
+> ModScopeを日常的に使うために必要なら、managerとして一般的な機能も実装対象になり得る。
+>
+> 一方で、機能追加は常に次のどちらかを明確に改善しなければならない。
+>
+> 1. **使っていて気持ちいいか**
+> 2. **異様に賢くなるか**
+>
+> どちらにも寄与しない抽象化・基盤・機能は作らない。
+
 ModScopeは、MODをWeb上で探し、吟味し、比較する作業を、ユーザーのローカルMOD環境の文脈付きで行うMOD Workspace / Browserです。
 
 画面の主役は、ユーザーが現在見ているWeb pageです。Local Mod Knowledgeは、必要なときにpageの横または下へ表示するcontextです。
