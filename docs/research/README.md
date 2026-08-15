@@ -18,6 +18,7 @@ Researchは、Web pageとLocal Mod Knowledgeの二つのprimary surfaceに関す
 | Requirements / Dependencies | [findings.md](requirements/findings.md) |
 | Requirementsのlocal resolution | [snapshot README](requirements/local-resolution/README.md) |
 | Version整合性 | [2026-08-14 snapshot README](version/snapshot-2026-08-14/README.md) |
+| Community trust conditions | [community-trust-conditions.md](community-trust-conditions.md) |
 | Smorgasbord local inventory | [local-inventory.md](snapshots/2026-08-14-smorgasbord/local-inventory.md) |
 | Scope audit 2026-08-15 | [scope-audit-2026-08-15.md](scope-audit-2026-08-15.md)（日付付き提案。accepted designではありません） |
 
