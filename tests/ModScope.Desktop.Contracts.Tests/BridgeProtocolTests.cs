@@ -198,10 +198,60 @@ public sealed class BridgeProtocolTests
             """);
         var toolbarPayload = BridgeProtocol.ReadPayload<SetToolbarExpandedPayload>(toolbarEnvelope.Payload);
 
+        var contextModeEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 2,
+              "requestId": "context-mode-1",
+              "command": "layout.setContextMode",
+              "payload": { "mode": "analysis" }
+            }
+            """);
+        var contextModePayload = BridgeProtocol.ReadContextModePayload(contextModeEnvelope.Payload);
+
+        var modListModeEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 2,
+              "requestId": "mod-list-mode-1",
+              "command": "layout.setModListMode",
+              "payload": { "mode": "deployment-edit" }
+            }
+            """);
+        var modListModePayload = BridgeProtocol.ReadModListModePayload(modListModeEnvelope.Payload);
+
         Assert.Equal("Alternate", profilePayload.ProfileName);
         Assert.False(layoutPayload.Visible);
         Assert.False(modListPayload.Visible);
         Assert.True(toolbarPayload.Expanded);
+        Assert.Equal("analysis", contextModePayload.Mode);
+        Assert.Equal("deployment-edit", modListModePayload.Mode);
+    }
+
+    [Fact]
+    public void RejectsUnknownLayoutModes()
+    {
+        var contextEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 2,
+              "requestId": "context-mode-invalid",
+              "command": "layout.setContextMode",
+              "payload": { "mode": "maintenance" }
+            }
+            """);
+        var modListEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 2,
+              "requestId": "mod-list-mode-invalid",
+              "command": "layout.setModListMode",
+              "payload": { "mode": "publish" }
+            }
+            """);
+
+        Assert.Throws<BridgeProtocolException>(() => BridgeProtocol.ReadContextModePayload(contextEnvelope.Payload));
+        Assert.Throws<BridgeProtocolException>(() => BridgeProtocol.ReadModListModePayload(modListEnvelope.Payload));
     }
 
     [Fact]
@@ -314,7 +364,7 @@ public sealed class BridgeProtocolTests
             BridgeProtocol.JsonOptions);
 
         Assert.Equal("{\"name\":\"default\",\"loadState\":\"pending\"}", profile);
-        Assert.Equal("{\"contextVisible\":true,\"modListVisible\":false}", layout);
+        Assert.Equal("{\"contextVisible\":true,\"modListVisible\":false,\"contextMode\":\"context\",\"modListMode\":\"browse\"}", layout);
         Assert.Contains("\"isBackground\":true", operation);
     }
 

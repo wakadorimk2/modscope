@@ -515,6 +515,8 @@ export type DeploymentUiState = {
 export type LayoutUiState = {
   contextVisible: boolean;
   modListVisible: boolean;
+  contextMode: 'context' | 'settings' | 'debug' | 'analysis' | string;
+  modListMode: 'browse' | 'deployment-edit' | string;
 };
 
 export type UiState = {
@@ -614,7 +616,9 @@ export const initialState: UiState = {
   },
   layout: {
     contextVisible: true,
-    modListVisible: true
+    modListVisible: true,
+    contextMode: 'context',
+    modListMode: 'browse'
   },
   statusMessage: 'Load a source and observe the current page.',
   diagnostics: []

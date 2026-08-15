@@ -76,9 +76,9 @@ button:disabled {
 }
 
 .toolbar-tabs-row {
-  flex: 0 0 40px;
+  flex: 0 0 32px;
   align-items: flex-end;
-  min-height: 40px;
+  min-height: 32px;
   gap: 0;
   padding: 0 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -96,7 +96,7 @@ button:disabled {
 
 .toolbar-controls-row {
   flex: 1 1 auto;
-  min-height: 56px;
+  min-height: 44px;
   overflow: hidden;
   padding: 0 12px;
   background: var(--chrome-navigation);
@@ -113,6 +113,94 @@ button:disabled {
   border: 1px solid var(--chrome-border);
   border-radius: 18px;
   background: var(--chrome-base);
+}
+
+.workspace-actions-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.more-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.45);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.more-button:hover:not(:disabled),
+.more-button.active {
+  border-color: rgba(125, 211, 252, 0.55);
+  background: rgba(14, 116, 144, 0.28);
+}
+
+.workspace-actions-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  width: 230px;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  border-radius: 10px;
+  background: #202124;
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.56);
+}
+
+.workspace-actions-menu-group {
+  display: grid;
+  gap: 2px;
+}
+
+.workspace-actions-menu-label {
+  padding: 5px 8px 3px;
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workspace-actions-menu-popover button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 11px;
+  text-align: left;
+}
+
+.workspace-actions-menu-popover button:hover:not(:disabled),
+.workspace-actions-menu-popover button.active {
+  background: rgba(56, 189, 248, 0.14);
+  color: #f8fafc;
+}
+
+.workspace-actions-menu-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.mod-list-compact-summary {
+  flex: 0 0 auto;
+  margin: 10px 0 0;
+  color: #94a3b8;
+  font-size: 10px;
 }
 
 .mod-list-surface {

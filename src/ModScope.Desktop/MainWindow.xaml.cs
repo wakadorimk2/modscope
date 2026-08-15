@@ -11,7 +11,7 @@ namespace ModScope.Desktop;
 
 public partial class MainWindow : Window
 {
-    private const double ToolbarCollapsedHeight = 96;
+    private const double ToolbarCollapsedHeight = 76;
     private const double ToolbarExpandedHeight = 440;
 
     private const string AppHostName = "appassets.modscope";
@@ -1037,6 +1037,20 @@ public partial class MainWindow : Window
                 var payload = BridgeProtocol.ReadPayload<SetToolbarExpandedPayload>(command.Payload);
                 ToolbarRow.Height = new GridLength(
                     payload.Expanded ? ToolbarExpandedHeight : ToolbarCollapsedHeight);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "layout.setContextMode":
+            {
+                var payload = BridgeProtocol.ReadContextModePayload(command.Payload);
+                _controller.SetContextMode(payload.Mode);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "layout.setModListMode":
+            {
+                var payload = BridgeProtocol.ReadModListModePayload(command.Payload);
+                _controller.SetModListMode(payload.Mode);
                 SendState(command.RequestId, sourceWebView);
                 break;
             }

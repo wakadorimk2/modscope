@@ -622,6 +622,16 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
     if (typeof expanded === 'boolean') {
       next.statusMessage = expanded ? 'History opened.' : 'History closed.';
     }
+  } else if (command === 'layout.setContextMode' && typeof payload === 'object' && payload !== null) {
+    const mode = (payload as { mode?: unknown }).mode;
+    if (mode === 'context' || mode === 'settings' || mode === 'debug' || mode === 'analysis') {
+      next.layout = { ...next.layout, contextMode: mode };
+    }
+  } else if (command === 'layout.setModListMode' && typeof payload === 'object' && payload !== null) {
+    const mode = (payload as { mode?: unknown }).mode;
+    if (mode === 'browse' || mode === 'deployment-edit') {
+      next.layout = { ...next.layout, modListMode: mode };
+    }
   }
   return next;
 }

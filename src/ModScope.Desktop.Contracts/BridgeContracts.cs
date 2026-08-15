@@ -54,7 +54,9 @@ public static class BridgeProtocol
         "analysis.useFixture",
         "layout.setContextVisible",
         "layout.setModListVisible",
-        "layout.setToolbarExpanded"
+        "layout.setToolbarExpanded",
+        "layout.setContextMode",
+        "layout.setModListMode"
     };
 
     public static JsonSerializerOptions JsonOptions { get; } = new()
@@ -174,6 +176,38 @@ public static class BridgeProtocol
             && string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase)
             && string.Equals(uri.Host, "appassets.modscope", StringComparison.OrdinalIgnoreCase);
     }
+
+    public static SetContextModePayload ReadContextModePayload(JsonElement payload)
+    {
+        var value = ReadPayload<SetContextModePayload>(payload);
+        if (!IsContextMode(value.Mode))
+        {
+            throw new BridgeProtocolException($"Unknown context mode: {value.Mode}.");
+        }
+
+        return value;
+    }
+
+    public static SetModListModePayload ReadModListModePayload(JsonElement payload)
+    {
+        var value = ReadPayload<SetModListModePayload>(payload);
+        if (!IsModListMode(value.Mode))
+        {
+            throw new BridgeProtocolException($"Unknown MOD list mode: {value.Mode}.");
+        }
+
+        return value;
+    }
+
+    public static bool IsContextMode(string? value)
+    {
+        return value is "context" or "settings" or "debug" or "analysis";
+    }
+
+    public static bool IsModListMode(string? value)
+    {
+        return value is "browse" or "deployment-edit";
+    }
 }
 
 public sealed record BridgeCommandEnvelope(
@@ -232,6 +266,10 @@ public sealed record SetContextVisiblePayload(bool Visible);
 public sealed record SetModListVisiblePayload(bool Visible);
 
 public sealed record SetToolbarExpandedPayload(bool Expanded);
+
+public sealed record SetContextModePayload(string Mode);
+
+public sealed record SetModListModePayload(string Mode);
 
 public sealed record BridgeErrorPayload(string Code, string Message);
 
@@ -722,7 +760,11 @@ public sealed record DeploymentUiState(
     IReadOnlyList<DeploymentJunctionChangeUiState> JunctionChanges,
     IReadOnlyList<DiagnosticUiState> Diagnostics);
 
-public sealed record LayoutUiState(bool ContextVisible, bool ModListVisible);
+public sealed record LayoutUiState(
+    bool ContextVisible,
+    bool ModListVisible,
+    string ContextMode = "context",
+    string ModListMode = "browse");
 
 public sealed record UiState(
     BrowserUiState Browser,
