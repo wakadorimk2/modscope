@@ -19,11 +19,15 @@
 
 ## プロジェクトの目的
 
-ModScopeは、MODをWeb上で探し、吟味し、比較する作業を、ユーザーのローカルMOD環境の文脈付きで行うWorkspaceです。
+ModScopeは、MODの発見、整理、理解、操作を、Web pageとLocal Mod Knowledgeの二つのprimary surfaceで支援するWorkspaceです。
 
-ModScopeはMod Managerではありません。MO2のenable、disable、priority、profile、virtual filesystem、launchを置き換えません。
+ModScopeはMO2のsource of truthを置き換えません。
+MO2のenable、disable、priority、profile、virtual filesystem、launchなどの成熟した責務は、機能ごとにPrior Artと相互運用性を確認して扱います。
+ModScopeの日常利用に必要なmanager機能は、実装対象になり得ます。
+その機能は、North Starの「気持ちよさ」または「賢さ」を明確に改善する必要があります。
 
-Web browsing workflowをprimary surfaceとします。Local Mod KnowledgeをModScopeの主要資産とします。
+Web pageはMODの発見と外部evidenceのprimary surfaceです。
+Local Mod Knowledgeは、MOD環境の整理、理解、比較、診断、必要な操作のprimary surfaceです。
 
 MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScopeが持つsnapshot、index、cache、normalized metadata、search result、conflict result、read modelは再生成可能な派生データです。
 
@@ -83,7 +87,9 @@ v0.1は、旧来の「source snapshotとAI用indexだけ」の縛りでは定義
 
 現在のフェーズに不要な機能は設計へ追加しません。将来機能を妨げる暫定的なsource boundaryも採用しません。
 
-Web browsing workflowを主役にします。高密度なMod Manager UIを主画面にしません。
+Web pageとLocal Mod Knowledgeを主役にします。
+初期画面は、情報量と認知負荷を制御します。
+高密度なMod Manager UIを既定の主画面にしません。
 
 Browser engineを自作しません。WebView2、既存ブラウザ連携、browser automationなどは候補として調査しますが、特定のengineを設計の前提にしません。
 
@@ -189,7 +195,9 @@ Requirements / Dependenciesでは、次の境界を維持します。
 
 ## GUIとInspectorの原則
 
-画面の主役は現在のWeb pageです。Local contextはprogressive disclosureで表示します。
+画面の主役はWeb pageとLocal Mod Knowledgeです。
+Web page上のLocal contextはprogressive disclosureで表示します。
+Local Mod Knowledge側では、Library、Inspector、Search、Compare、Diagnosisを必要な深さで表示します。
 
 - 最初にpageと重要なlocal contextを表示します。
 - installed、not installed、active profile、known version、known overlapなどを根拠付きで表示します。

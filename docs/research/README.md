@@ -5,6 +5,9 @@
 Researchは製品仕様の正本ではありません。
 調査結果は観測時刻、source、provenance、uncertaintyを維持します。
 snapshotは現在のWebやNexusの状態を意味しません。
+Researchは、North Starに関する判断材料を提供します。
+Researchは、Web pageとLocal Mod Knowledgeの二つのprimary surfaceに関する判断材料も提供します。
+現行の製品方針は、researchではなく`docs/design.md`と`docs/future-vision.md`で管理します。
 
 ## 調査テーマ
 
@@ -16,6 +19,7 @@ snapshotは現在のWebやNexusの状態を意味しません。
 | Requirementsのlocal resolution | [snapshot README](requirements/local-resolution/README.md) |
 | Version整合性 | [2026-08-14 snapshot README](version/snapshot-2026-08-14/README.md) |
 | Smorgasbord local inventory | [local-inventory.md](snapshots/2026-08-14-smorgasbord/local-inventory.md) |
+| Scope audit 2026-08-15 | [scope-audit-2026-08-15.md](scope-audit-2026-08-15.md)（日付付き提案。accepted designではありません） |
 
 ## 生成データ
 
@@ -42,3 +46,4 @@ snapshotは現在のWebやNexusの状態を意味しません。
 - 生成データは、対応するsnapshotまたは調査単位の`artifacts/`へ置きます。
 - privacy boundary、snapshot ID、観測時刻、未確認事項を変更しません。
 - Researchの結果だけで、dependency、compatibility、version、runtime behaviorを断定しません。
+- Scope auditの製品提案は、`docs/design.md`または`docs/future-vision.md`へ明示的に採用されない限り、現行仕様を変更しません。

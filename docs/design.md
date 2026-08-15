@@ -30,9 +30,12 @@ v0.1は、AI用index単体ではありません。7DTD + MO2のLocal Mod Knowled
 >
 > どちらにも寄与しない抽象化・基盤・機能は作らない。
 
-ModScopeは、MODをWeb上で探し、吟味し、比較する作業を、ユーザーのローカルMOD環境の文脈付きで行うMOD Workspace / Browserです。
+ModScopeは、MODの発見、整理、理解、操作を支援するMOD Workspaceです。
+Web pageとLocal Mod Knowledgeを、二つのprimary surfaceとして扱います。
 
-画面の主役は、ユーザーが現在見ているWeb pageです。Local Mod Knowledgeは、必要なときにpageの横または下へ表示するcontextです。
+Web pageはMODの発見と外部evidenceのprimary surfaceです。
+Local Mod Knowledgeは、現在のMOD環境の整理、理解、比較、診断、必要な操作のprimary surfaceです。
+Web page上のLocal contextと、Local Mod Knowledge側のInspectorは、必要な根拠を段階的に表示します。
 
 この文書では、次の用語を使います。
 
@@ -109,7 +112,10 @@ ModScopeは、確認したMOD identityを、現在のprofileと照合します�
 
 ### Library
 
-Mod Libraryは、現在のWeb pageに代わる主画面ではありません。ユーザーが必要なMOD集合を切り出すためのsecondary surfaceです。
+Mod Libraryは、Local Mod Knowledge側のprimary surfaceです。
+Web pageと役割を分けます。
+ユーザーが現在のMOD環境を整理、検索、比較するための入口を提供します。
+Inspector、Compare、Diagnosisは、必要な詳細へ進むprogressive disclosureです。
 
 Libraryの1行はstable local Modlet recordを基本単位にします。MO2 package、archive、Nexus Mod、Nexus Fileの件数をLibrary row数へ変換しません。active profileだけに残る対応directoryなしのentryは、`Profile unresolved` recordとして別状態で保持します。
 
@@ -139,19 +145,32 @@ Codexなどのagentは、Local Mod Knowledgeをqueryします。必要な場合�
 
 ## 5. Product boundaries
 
-### 5.1 Mod Managerではない理由
+### 5.1 MO2との責務境界
 
 MO2は、installation、enable / disable、priority、profile、virtual filesystem、launchを担当する既存ツールです。
 
-ModScopeは、MO2を置き換えません。初期段階ではMO2をread-onlyで読み取ります。
+MO2のmods、profiles、downloads、MO2本体はsource of truthです。
+ModScopeは、MO2のsource of truthや成熟したmanager責務を置き換えません。
 
-MO2操作は、read layerから独立したwrite layerに置きます。Phase 7のwrite planeはprofileの`modlist.txt`と、7DTD game rootの管理junctionだけを対象にします。Mod Manager全体は作りません。
+ModScopeは、MO2から再生成可能なLocal Mod Knowledgeを作ります。
+Web pageとlocal environmentを同じWorkspaceで扱います。
+一般的なmanager機能は一律に除外しません。
+North Starの「使っていて気持ちいい」または「異様に賢い」を明確に改善する機能だけを候補にします。
+その機能は、Prior Art、安全境界、検証計画も満たす必要があります。
 
-### 5.2 Browsingがprimary surfaceである理由
+MO2操作は、read layerから独立したwrite layerに置きます。
+Phase 7のwrite planeはprofileの`modlist.txt`と、7DTD game rootの管理junctionだけを対象にします。
+現在のwrite plane外のMO2操作は、明示的な仕様と安全検証がない限り実装対象にしません。
 
-MODの発見と評価は、MOD一覧から始まるとは限りません。ランキング、compatibility guide、issue、Wiki、作者説明、GitHubなどのWeb contentから始まります。
+### 5.2 二つのprimary surface
 
-したがって、最初に表示する対象はMOD一覧ではなく現在のWeb pageです。Mod Libraryは、Web pageの探索を補助するsecondary surfaceです。Local contextは、pageを理解するための補助情報としてprogressive disclosureします。
+Web pageは、MODの発見、作者の説明、compatibility guide、issue、Wiki、GitHubなどの外部evidenceを扱う入口です。
+Local Mod Knowledgeは、MO2 profile、package、Modlet、archive、version、source、dependency、conflict、runtimeなどの関係を整理し、説明する入口です。
+
+現在のv0.1 delivery shapeはBrowse-first vertical sliceです。
+これは現在の実装順序です。
+製品全体でLocal Mod Knowledgeを補助面へ限定する意味ではありません。
+二つのprimary surfaceは、同じevidence modelとread modelを共有します。
 
 ### 5.3 Goals
 
@@ -168,13 +187,13 @@ MODの発見と評価は、MOD一覧から始まるとは限りません。ラ�
 ### 5.4 Non-goalsとdeferred work
 
 - MO2本体の置き換え
-- 独自Mod Managerの機能一式
+- Prior Art、安全境界、検証計画なしで成熟したmanager機能を再実装すること
 - 初期からの複数game対応
 - Nexus Mods専用設計
 - Browser engineの自作
 - RuntimeOCDの再実装
 - 特定AI製品への密結合
-- 初期画面の高密度Mod一覧
+- 根拠と認知負荷を考慮せず、初期画面へ高密度なMOD管理情報を詰め込むこと
 - 手動membershipを正本とするCollection、Favorites、user tag
 - v0.1での完全なsemantic conflict判定
 - v0.1でのRuntimeOCD連携
@@ -193,6 +212,12 @@ ModScopeは、これらの成熟機能を置き換えません。
 - Vortexのdeployment、dependency resolver、manager-side conflict resolutionを再実装しません。
 
 ModScopeは、local stateとWeb observationをprovenance付きで比較・理解する補完層です。
+
+manager機能を候補化する前に、既存ツールが解決している範囲を確認します。
+ModScopeに残る利用者の痛みも確認します。
+source of truth、安全境界、検証方法も確認します。
+機能の重複だけを理由に除外しません。
+North Starへの寄与を説明できない機能は追加しません。
 
 VS Codeの状態filter、GitHub IssuesのSaved View、Steam LibraryのDynamic Collectionは、集合を検索・絞り込みするUIパターンの参考にします。これらのUIパターンを採用しても、MO2のprofile管理、Wabbajackのdistribution、Vortexのdeploymentを再実装しません。
 
@@ -847,7 +872,8 @@ ModScopeが管理したjunctionだけを削除します。既存junctionは、�
 - RuntimeOCD連携
 - 任意のMO2管理操作
 - controlled write plane外のMO2へのwrite
-- MO2管理操作を持つ高密度Mod Manager UI
+- North Starへの寄与と検証計画がないmanager機能
+- 根拠と認知負荷を考慮せず、初期画面へ高密度なMOD管理情報を詰め込むUI
 - 特定AI製品への専用統合
 - agent Web backendの固定
 - Browser engineの自作
@@ -866,7 +892,7 @@ WebView2は現在のDesktop hostです。ModScope独自のBrowser engineでは�
 - MO2はsource of truth
 - read-only first
 - Browser Layerは既存Web engineを利用する境界
-- Web pageはprimary surface
+- Web pageとLocal Mod Knowledgeは二つのprimary surface
 - Local Mod Knowledgeはcore asset
 - page observationとlocal contextを分離する
 - rawとnormalized valueを保持する
