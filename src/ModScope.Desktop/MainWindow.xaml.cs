@@ -11,8 +11,8 @@ namespace ModScope.Desktop;
 
 public partial class MainWindow : Window
 {
-    private const double ToolbarCollapsedHeight = 96;
-    private const double ToolbarExpandedHeight = 440;
+    private const double ToolbarCollapsedHeight = 76;
+    private const double MorePopupRightInset = 64;
 
     private const string AppHostName = "appassets.modscope";
     private readonly DesktopSessionController _controller = new();
@@ -27,6 +27,8 @@ public partial class MainWindow : Window
     private string? _activeBrowserTabId;
     private int _browserTabSequence;
     private string? _webAssetsPath;
+    private bool _moreOpen;
+    private LayoutUiState _lastLayout = new(true, true);
 
     private const string HomeHtml = """
         <!doctype html>
@@ -921,6 +923,225 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private void SetMoreOpenState(
+        bool open,
+        string? requestId = null,
+        Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
+    {
+        if (open && IsForegroundLoading())
+        {
+            open = false;
+        }
+
+        _moreOpen = open;
+        MorePopup.IsEnabled = !IsForegroundLoading();
+        if (open)
+        {
+            UpdateMorePopupPlacement();
+        }
+
+        MorePopup.IsOpen = open;
+        if (open)
+        {
+            _ = Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Input,
+                new Action(() => MoreHistoryButton.Focus()));
+        }
+
+        UpdateMorePopupState(_lastLayout with { MoreOpen = open });
+        SendState(requestId, targetWebView);
+    }
+
+    private void CloseMorePopupWithoutBroadcast()
+    {
+        _moreOpen = false;
+        MorePopup.IsOpen = false;
+        UpdateMorePopupState(_lastLayout with { MoreOpen = false });
+    }
+
+    private void UpdateMorePopupState(LayoutUiState layout)
+    {
+        _lastLayout = layout with { MoreOpen = _moreOpen };
+        MoreHistoryCount.Text = _browserHistory.Count.ToString(CultureInfo.InvariantCulture);
+        MoreModListVisibilityButton.Content = layout.ModListVisible
+            ? "Hide Mod Library"
+            : "Show Mod Library";
+        MoreContextVisibilityButton.Content = layout.ContextVisible
+            ? "Hide Context"
+            : "Show Context";
+
+        SetMorePopupButtonState(
+            MoreContextModeContextButton,
+            layout.ContextMode == "context");
+        SetMorePopupButtonState(
+            MoreContextModeSettingsButton,
+            layout.ContextMode == "settings");
+        SetMorePopupButtonState(
+            MoreContextModeDebugButton,
+            layout.ContextMode == "debug");
+        SetMorePopupButtonState(
+            MoreContextModeAnalysisButton,
+            layout.ContextMode == "analysis");
+        SetMorePopupButtonState(
+            MoreModListModeBrowseButton,
+            layout.ModListMode == "browse");
+        SetMorePopupButtonState(
+            MoreModListModeEditButton,
+            layout.ModListMode == "deployment-edit");
+    }
+
+    private static void SetMorePopupButtonState(
+        System.Windows.Controls.Button button,
+        bool active)
+    {
+        button.FontWeight = active ? FontWeights.Bold : FontWeights.Normal;
+        button.Opacity = active ? 1.0 : 0.78;
+    }
+
+    private void ApplyContextVisible(bool visible)
+    {
+        _controller.SetContextVisible(visible);
+        ContextColumn.Width = visible
+            ? new GridLength(2, GridUnitType.Star)
+            : new GridLength(0);
+        ContextShell.Visibility = visible
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void ApplyModListVisible(bool visible)
+    {
+        _controller.SetModListVisible(visible);
+        ModListColumn.Width = visible
+            ? new GridLength(280)
+            : new GridLength(0);
+        ModListShell.Visibility = visible
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void ApplyContextMode(string mode)
+    {
+        _controller.SetContextMode(mode);
+    }
+
+    private void ApplyModListMode(string mode)
+    {
+        _controller.SetModListMode(mode);
+    }
+
+    private async void MoreHistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        CloseMorePopupWithoutBroadcast();
+        try
+        {
+            await CreateBrowserTabAsync(null, "about:history", "History", activate: true);
+            SendState();
+        }
+        catch (Exception exception)
+        {
+            SendError("browser.history.failed", exception.Message);
+        }
+    }
+
+    private void MoreContextModeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button button
+            || button.Tag is not string mode
+            || !BridgeProtocol.IsContextMode(mode))
+        {
+            return;
+        }
+
+        CloseMorePopupWithoutBroadcast();
+        ApplyContextMode(mode);
+        SendState();
+    }
+
+    private void UpdateMorePopupPlacement()
+    {
+        var popupWidth = MorePopupContent.ActualWidth > 0
+            ? MorePopupContent.ActualWidth
+            : MorePopupContent.Width;
+        MorePopup.HorizontalOffset = Math.Max(
+            0,
+            ToolbarHost.ActualWidth - popupWidth - MorePopupRightInset);
+        MorePopup.VerticalOffset = 4;
+    }
+
+    private void MoreModListModeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button button
+            || button.Tag is not string mode
+            || !BridgeProtocol.IsModListMode(mode))
+        {
+            return;
+        }
+
+        CloseMorePopupWithoutBroadcast();
+        ApplyModListMode(mode);
+        SendState();
+    }
+
+    private void MoreModListVisibilityButton_Click(object sender, RoutedEventArgs e)
+    {
+        CloseMorePopupWithoutBroadcast();
+        ApplyModListVisible(!_lastLayout.ModListVisible);
+        SendState();
+    }
+
+    private void MoreContextVisibilityButton_Click(object sender, RoutedEventArgs e)
+    {
+        CloseMorePopupWithoutBroadcast();
+        ApplyContextVisible(!_lastLayout.ContextVisible);
+        SendState();
+    }
+
+    private void MorePopup_Closed(object? sender, EventArgs e)
+    {
+        if (!_moreOpen)
+        {
+            return;
+        }
+
+        _moreOpen = false;
+        UpdateMorePopupState(_lastLayout with { MoreOpen = false });
+        SendState();
+    }
+
+    private void MorePopup_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Escape)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        SetMoreOpenState(false);
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Escape || !MorePopup.IsOpen)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        SetMoreOpenState(false);
+    }
+
+    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!MorePopup.IsOpen)
+        {
+            return;
+        }
+
+        UpdateMorePopupPlacement();
+        MorePopupContent.UpdateLayout();
+    }
+
     private async Task HandleCommandAsync(
         Microsoft.Web.WebView2.Wpf.WebView2 sourceWebView,
         BridgeCommandEnvelope command)
@@ -1192,19 +1413,13 @@ public partial class MainWindow : Window
             case "layout.setContextVisible":
             {
                 if (!command.Payload.TryGetProperty("visible", out var visible)
-                    || visible.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                    || visible.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                 {
                     throw new BridgeProtocolException("The context visibility must be a boolean.");
                 }
 
                 var payload = BridgeProtocol.ReadPayload<SetContextVisiblePayload>(command.Payload);
-                _controller.SetContextVisible(payload.Visible);
-                ContextColumn.Width = payload.Visible
-                    ? new GridLength(2, GridUnitType.Star)
-                    : new GridLength(0);
-                ContextShell.Visibility = payload.Visible
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+                ApplyContextVisible(payload.Visible);
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
@@ -1217,14 +1432,14 @@ public partial class MainWindow : Window
                 }
 
                 var payload = BridgeProtocol.ReadPayload<SetModListVisiblePayload>(command.Payload);
-                _controller.SetModListVisible(payload.Visible);
-                ModListColumn.Width = payload.Visible
-                    ? new GridLength(280)
-                    : new GridLength(0);
-                ModListShell.Visibility = payload.Visible
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+                ApplyModListVisible(payload.Visible);
                 SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "layout.setMoreOpen":
+            {
+                var payload = BridgeProtocol.ReadMoreOpenPayload(command.Payload);
+                SetMoreOpenState(payload.Open, command.RequestId, sourceWebView);
                 break;
             }
             case "layout.setToolbarExpanded":
@@ -1235,9 +1450,22 @@ public partial class MainWindow : Window
                     throw new BridgeProtocolException("The toolbar expanded state must be a boolean.");
                 }
 
-                var payload = BridgeProtocol.ReadPayload<SetToolbarExpandedPayload>(command.Payload);
-                ToolbarRow.Height = new GridLength(
-                    payload.Expanded ? ToolbarExpandedHeight : ToolbarCollapsedHeight);
+                _ = BridgeProtocol.ReadPayload<SetToolbarExpandedPayload>(command.Payload);
+                ToolbarRow.Height = new GridLength(ToolbarCollapsedHeight);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "layout.setContextMode":
+            {
+                var payload = BridgeProtocol.ReadContextModePayload(command.Payload);
+                ApplyContextMode(payload.Mode);
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
+            case "layout.setModListMode":
+            {
+                var payload = BridgeProtocol.ReadModListModePayload(command.Payload);
+                ApplyModListMode(payload.Mode);
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
@@ -1525,6 +1753,16 @@ public partial class MainWindow : Window
             _activeBrowserTabId,
             _browserHistory);
         var state = _controller.BuildState(browserState);
+        if (IsForegroundLoading())
+        {
+            CloseMorePopupWithoutBroadcast();
+        }
+
+        state = state with
+        {
+            Layout = state.Layout with { MoreOpen = _moreOpen }
+        };
+        UpdateMorePopupState(state.Layout);
         SendMessage("state", state, requestId, targetWebView);
     }
 
@@ -1548,6 +1786,11 @@ public partial class MainWindow : Window
     {
         var operation = _controller.CurrentOperation;
         var showOverlay = IsForegroundLoading(operation);
+        if (showOverlay)
+        {
+            CloseMorePopupWithoutBroadcast();
+        }
+
         LoadingOverlay.Visibility = showOverlay ? Visibility.Visible : Visibility.Collapsed;
         SetClientInteractionEnabled(!showOverlay);
         if (!showOverlay)
@@ -1588,6 +1831,12 @@ public partial class MainWindow : Window
 
     private void SetClientInteractionEnabled(bool enabled)
     {
+        if (!enabled)
+        {
+            CloseMorePopupWithoutBroadcast();
+        }
+
+        MorePopup.IsEnabled = enabled;
         ToolbarHost.IsEnabled = enabled;
         ToolbarHost.IsHitTestVisible = enabled;
         ModListShell.IsEnabled = enabled;

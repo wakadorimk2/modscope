@@ -6,10 +6,33 @@
         MinWidth="1180"
         MinHeight="760"
         Width="1450"
-        Height="900">
+        Height="900"
+        PreviewKeyDown="MainWindow_PreviewKeyDown"
+        SizeChanged="MainWindow_SizeChanged">
+    <Window.Resources>
+        <Style x:Key="MorePopupButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#CBD5E1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3A4A5A" />
+                    <Setter Property="Foreground" Value="#F8FAFC" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.55" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
     <Grid Background="#202124">
         <Grid.RowDefinitions>
-            <RowDefinition x:Name="ToolbarRow" Height="96" />
+            <RowDefinition x:Name="ToolbarRow" Height="76" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -78,5 +101,98 @@
                 </StackPanel>
             </Border>
         </Border>
+
+        <Popup x:Name="MorePopup"
+               PlacementTarget="{Binding ElementName=ToolbarHost}"
+               Placement="Bottom"
+               VerticalOffset="4"
+               StaysOpen="False"
+               AllowsTransparency="True"
+               PopupAnimation="Fade"
+               Closed="MorePopup_Closed">
+            <Border x:Name="MorePopupContent"
+                    Width="260"
+                    Padding="8"
+                    Background="#292A2D"
+                    BorderBrush="#56616D"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Focusable="True"
+                    PreviewKeyDown="MorePopup_PreviewKeyDown">
+                <StackPanel>
+                    <TextBlock Margin="8,4,8,6"
+                               Foreground="#7DD3FC"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Text="BROWSER" />
+                    <Button x:Name="MoreHistoryButton"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreHistoryButton_Click"
+                            AutomationProperties.Name="Open browser history">
+                        <DockPanel LastChildFill="True">
+                            <TextBlock Text="History" />
+                            <TextBlock x:Name="MoreHistoryCount"
+                                       DockPanel.Dock="Right"
+                                       Margin="12,0,0,0"
+                                       Foreground="#94A3B8"
+                                       Text="0" />
+                        </DockPanel>
+                    </Button>
+
+                    <Separator Margin="4,6" Background="#56616D" />
+                    <TextBlock Margin="8,4,8,6"
+                               Foreground="#7DD3FC"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Text="CONTEXT MODE" />
+                    <Button x:Name="MoreContextModeContextButton"
+                            Tag="context"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreContextModeButton_Click"
+                            Content="Context" />
+                    <Button x:Name="MoreContextModeSettingsButton"
+                            Tag="settings"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreContextModeButton_Click"
+                            Content="Settings" />
+                    <Button x:Name="MoreContextModeDebugButton"
+                            Tag="debug"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreContextModeButton_Click"
+                            Content="Debug" />
+                    <Button x:Name="MoreContextModeAnalysisButton"
+                            Tag="analysis"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreContextModeButton_Click"
+                            Content="Analysis" />
+
+                    <TextBlock Margin="8,10,8,6"
+                               Foreground="#7DD3FC"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Text="MOD LIBRARY" />
+                    <Button x:Name="MoreModListModeBrowseButton"
+                            Tag="browse"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreModListModeButton_Click"
+                            Content="Browse" />
+                    <Button x:Name="MoreModListModeEditButton"
+                            Tag="deployment-edit"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreModListModeButton_Click"
+                            Content="Edit profile" />
+
+                    <Separator Margin="4,6" Background="#56616D" />
+                    <Button x:Name="MoreModListVisibilityButton"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreModListVisibilityButton_Click"
+                            Content="Hide Mod Library" />
+                    <Button x:Name="MoreContextVisibilityButton"
+                            Style="{StaticResource MorePopupButtonStyle}"
+                            Click="MoreContextVisibilityButton_Click"
+                            Content="Hide Context" />
+                </StackPanel>
+            </Border>
+        </Popup>
     </Grid>
 </Window>

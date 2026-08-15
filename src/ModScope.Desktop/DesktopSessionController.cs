@@ -37,6 +37,8 @@ public sealed class DesktopSessionController
     private string _statusMessage = "Load a source and observe the current page.";
     private bool _contextVisible = true;
     private bool _modListVisible = true;
+    private string _contextMode = "context";
+    private string _modListMode = "browse";
     private KnowledgeOperationUiState _operation = KnowledgeOperationUiState.Idle;
     private long _operationToken;
     private readonly Dictionary<string, string> _profileLoadStates =
@@ -660,6 +662,16 @@ public sealed class DesktopSessionController
         _modListVisible = visible;
     }
 
+    public void SetContextMode(string mode)
+    {
+        _contextMode = mode;
+    }
+
+    public void SetModListMode(string mode)
+    {
+        _modListMode = mode;
+    }
+
     public void SetObservation(PageObservation observation)
     {
         ArgumentNullException.ThrowIfNull(observation);
@@ -805,7 +817,7 @@ public sealed class DesktopSessionController
                 GetBaseDataStatus(),
                 _analysisOperation,
                 _analysisDiagnostics),
-            new LayoutUiState(_contextVisible, _modListVisible),
+            new LayoutUiState(_contextVisible, _modListVisible, _contextMode, _modListMode),
             _statusMessage,
             _operation,
             _profileLoadStates,
