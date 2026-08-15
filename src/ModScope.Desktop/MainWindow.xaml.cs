@@ -199,7 +199,11 @@ public partial class MainWindow : Window
             });
           } else if (nexusModPage) {
             const versionCandidates = nexusVersionCandidates();
-            if (versionCandidates.length === 0) {
+            const candidatesWithVersion = versionCandidates.filter(candidate => candidate.rawVersion);
+            const selectedVersionCandidates = candidatesWithVersion.length > 0
+              ? candidatesWithVersion
+              : versionCandidates;
+            if (selectedVersionCandidates.length === 0) {
               scopes.push({
                 kind: 'NexusModPage',
                 rawVersion: null,
@@ -209,7 +213,7 @@ public partial class MainWindow : Window
                 visibleText: bodyText
               });
             } else {
-              versionCandidates.forEach(candidate => {
+              selectedVersionCandidates.forEach(candidate => {
                 scopes.push({
                   kind: 'NexusModPage',
                   rawVersion: candidate.rawVersion,
