@@ -265,6 +265,8 @@ export type InspectorUiState = {
   source: SourceReferenceUiState;
   packageRelation?: PackageRelationUiState | null;
   conclusion?: InspectorConclusionUiState | null;
+  compatibilityObservations: CompatibilityObservationUiState[];
+  compatibilityDiagnostics: DiagnosticUiState[];
 };
 
 export type InspectorConclusionUiState = {
@@ -282,6 +284,16 @@ export type InspectorConclusionUiState = {
   latestSourceSite?: string | null;
   latestTargetUrl?: string | null;
   latestObservedAtUtc?: string | null;
+  summary: string;
+  compatibilityTarget?: string | null;
+  compatibilityRelation?: string | null;
+  compatibilityEvidence?: string | null;
+  compatibilityCondition?: string | null;
+  compatibilitySource?: SourceReferenceUiState | null;
+  compatibilitySourceSite?: string | null;
+  compatibilityTargetUrl?: string | null;
+  compatibilityObservedAtUtc?: string | null;
+  compatibilityDiagnostics: DiagnosticUiState[];
 };
 
 export type SourceArtifactUiState = {
@@ -307,6 +319,21 @@ export type VersionObservationUiState = {
   sourceSite?: string | null;
   targetUrl?: string | null;
   evidence?: string | null;
+};
+
+export type CompatibilityObservationUiState = {
+  ownerKey: string;
+  relation: string;
+  gameContext: string;
+  rawValue?: string | null;
+  normalizedValue?: string | null;
+  build?: string | null;
+  matchedLine: string;
+  source: SourceReferenceUiState;
+  observedAtUtc: string;
+  diagnostics: DiagnosticUiState[];
+  sourceSite?: string | null;
+  targetUrl?: string | null;
 };
 
 export type VersionComparisonUiState = {

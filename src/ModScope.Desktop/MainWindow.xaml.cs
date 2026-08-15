@@ -1146,6 +1146,10 @@ public partial class MainWindow : Window
                 KnownSiteVersionObserver.Observe(pageUri, content),
                 pageUri,
                 observedAtUtc);
+            _controller.SetDetectedWebCompatibilityObservations(
+                KnownSiteCompatibilityObserver.Observe(pageUri, content),
+                pageUri,
+                observedAtUtc);
             SendState(requestId, targetWebView);
         }
         catch (Exception exception)

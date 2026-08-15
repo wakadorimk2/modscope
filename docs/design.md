@@ -506,14 +506,22 @@ versionが欠落、schemeが異なる、または比較対象が不足する場�
 version observationのroleが一致しない場合も`Not comparable`です。
 一般的なlatest crawler、update通知、dependency、compatibility boolean、runtime保証はこのsliceへ追加しません。
 ただし、現在のDesktop sessionで表示中のWebView2 DOMだけを読む限定観測を例外として扱います。
-対象siteはGitHub ReleasesとNexus MODのFiles surfaceだけです。
+release version observationとWeb compatibility observationは別のevidence modelです。
+対象surfaceはGitHub Releases、Nexus MODのFiles surface、Nexus MODのDescription surfaceです。
 GitHubではrelease pageの最初のvisible release tagを読みます。
 NexusではFiles surfaceの最初のvisible File versionを読みます。
+互換性観測では、`Game Version`、`Supported Game Version`、`Supported for`、`Compatible with`、`Requires Game Version`のvisible labelだけを読みます。
+`Game Version: v3.1.0 (b14)`はraw value、normalized version `3.1.0`、build `b14`、matched lineを分離して保持します。
+`Requires Game Version`はcondition evidenceです。positive compatibility observationへ自動変換しません。
+positive targetが1つだけの場合は、source claimとして`Observed`を表示します。
+positive targetが複数あり内容が異なる場合は、winnerを選ばず`Unknown`とdiagnosticを表示します。
+Web compatibility observationの`Observed`は、7DTD runtimeでの互換性保証を意味しません。
 network API、login情報、任意site parser、推測による候補選択は使いません。
 欠落、複数候補、非対応page、非対応versionはversionを確定せず、diagnostic付きのsession evidenceとして保持します。
 identityが`Ambiguous`、`Missing`、`Conflicting`、`Unresolved`の場合はlatestを表示できますが、version statusは`Not assessed`です。
 exact identityで比較可能な場合だけ、`Update available`、`Up to date`、`Installed newer`を表示します。
-game compatibilityはversion comparisonと別軸です。今回の判定は常に`Unknown`です。
+game compatibilityはversion comparisonと別軸です。
+現在のgame versionとのmatchまたはmismatch比較は行いません。
 Web observationはpage navigationと既存の`Observe now`で実行し、現在のDesktop sessionにだけ保持します。
 既存の手動Web version入力は、Advanced evidence内のfallbackとして残します。
 

@@ -2058,7 +2058,7 @@
             <div class="inspector-conclusion-heading">
               <div>
                 <span class="eyebrow">CONCLUSION</span>
-                <h3 id="inspector-conclusion-title">Human-readable update summary</h3>
+                <h3 id="inspector-conclusion-title">{state.inspector.conclusion?.summary || 'Release comparison not assessed'}</h3>
               </div>
               <span class="status-chip {statusClass(state.inspector.conclusion?.versionStatus)}">
                 {formatLabel(state.inspector.conclusion?.versionStatus)}
@@ -2092,6 +2092,15 @@
               <p><span>Identity</span> {formatLabel(state.inspector.conclusion?.identityState)} · confidence {state.inspector.conclusion?.identityConfidence || 'Unknown'}</p>
               <p><span>Why</span> {state.inspector.conclusion?.why || 'Conclusion evidence is not available.'}</p>
               <p><span>Compatibility reason</span> {state.inspector.conclusion?.compatibilityReason || 'No compatibility evidence was observed.'}</p>
+              {#if state.inspector.conclusion?.compatibilityTarget}
+                <p><span>Observed target</span> {state.inspector.conclusion.compatibilityTarget}</p>
+              {/if}
+              {#if state.inspector.conclusion?.compatibilityEvidence}
+                <p><span>Evidence</span> {state.inspector.conclusion.compatibilityEvidence}</p>
+              {/if}
+              {#if state.inspector.conclusion?.compatibilityCondition}
+                <p><span>Condition observed</span> {state.inspector.conclusion.compatibilityCondition}</p>
+              {/if}
               {#if state.inspector.conclusion?.versionReason}
                 <p><span>Version reason</span> {state.inspector.conclusion.versionReason}</p>
               {/if}
@@ -2103,16 +2112,52 @@
               <span>Priority</span><strong>{state.inspector.priority ?? 'Unknown'}</strong>
             </div>
 
-            {#if state.inspector.conclusion?.latestSourceSite || state.inspector.conclusion?.latestTargetUrl}
+            {#if state.inspector.conclusion?.compatibilitySourceSite || state.inspector.conclusion?.compatibilityTargetUrl || state.inspector.conclusion?.latestSourceSite || state.inspector.conclusion?.latestTargetUrl}
               <p class="provenance-line inspector-conclusion-source">
-                Source · {state.inspector.conclusion.latestSourceSite || 'Web'} ·
-                {state.inspector.conclusion.latestTargetUrl || state.inspector.conclusion.latestSource?.relativePath || 'Unknown'}
+                Source · {state.inspector.conclusion.compatibilitySourceSite || state.inspector.conclusion.latestSourceSite || 'Web'} ·
+                {state.inspector.conclusion.compatibilityTargetUrl || state.inspector.conclusion.latestTargetUrl || state.inspector.conclusion.compatibilitySource?.relativePath || state.inspector.conclusion.latestSource?.relativePath || 'Unknown'}
+                {#if state.inspector.conclusion.compatibilityObservedAtUtc}
+                  · observed {state.inspector.conclusion.compatibilityObservedAtUtc}
+                {:else if state.inspector.conclusion.latestObservedAtUtc}
+                  · observed {state.inspector.conclusion.latestObservedAtUtc}
+                {/if}
               </p>
             {/if}
           </section>
         {/if}
 
         {#if state.inspector}
+          {#if state.inspector.compatibilityObservations.length > 0 || state.inspector.compatibilityDiagnostics.length > 0 || (state.inspector.conclusion?.compatibilityDiagnostics?.length || 0) > 0}
+            <details class="drawer-section inspector-evidence-conclusion inspector-disclosure" open>
+              <summary class="inspector-disclosure-summary">
+                <span class="eyebrow">COMPATIBILITY EVIDENCE</span>
+                <span class="subtle">Visible Web claims · not runtime verification</span>
+              </summary>
+              {#each state.inspector.compatibilityObservations as observation}
+                <div class="compatibility-evidence-item">
+                  <p class="provenance-line"><strong>{formatLabel(observation.relation)}</strong> · {observation.gameContext} · {observation.rawValue || 'Missing value'}</p>
+                  <p class="provenance-line">
+                    Normalized · {observation.normalizedValue || 'Unknown'}
+                    · Build · {observation.build || 'None'}
+                  </p>
+                  <p class="provenance-line">Matched line · {observation.matchedLine}</p>
+                  <p class="provenance-line">
+                    Source · {observation.sourceSite || 'Web'} · {observation.targetUrl || observation.source.relativePath} · observed {observation.observedAtUtc}
+                  </p>
+                  {#each observation.diagnostics as diagnostic}
+                    <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+                  {/each}
+                </div>
+              {/each}
+              {#each state.inspector.compatibilityDiagnostics as diagnostic}
+                <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+              {/each}
+              {#each state.inspector.conclusion?.compatibilityDiagnostics || [] as diagnostic}
+                <p class="diagnostic"><strong>{diagnostic.code}</strong> {diagnostic.message}</p>
+              {/each}
+            </details>
+          {/if}
+
           {#if state.inspector.packageRelation}
             <details class="drawer-section inspector-evidence-conclusion inspector-disclosure" open>
               <summary class="inspector-disclosure-summary">

@@ -481,6 +481,10 @@ public sealed record InspectorUiState(
 {
     public PackageRelationUiState? PackageRelation { get; init; }
     public InspectorConclusionUiState? Conclusion { get; init; }
+    public IReadOnlyList<CompatibilityObservationUiState> CompatibilityObservations { get; init; } =
+        Array.Empty<CompatibilityObservationUiState>();
+    public IReadOnlyList<DiagnosticUiState> CompatibilityDiagnostics { get; init; } =
+        Array.Empty<DiagnosticUiState>();
 }
 
 public sealed record VersionEvidenceManifestUiState(
@@ -514,6 +518,22 @@ public sealed record VersionObservationUiState(
     public string? Evidence { get; init; }
 }
 
+public sealed record CompatibilityObservationUiState(
+    string OwnerKey,
+    string Relation,
+    string GameContext,
+    string? RawValue,
+    string? NormalizedValue,
+    string? Build,
+    string MatchedLine,
+    SourceReferenceUiState Source,
+    DateTimeOffset ObservedAtUtc,
+    IReadOnlyList<DiagnosticUiState> Diagnostics)
+{
+    public string? SourceSite { get; init; }
+    public string? TargetUrl { get; init; }
+}
+
 public sealed record InspectorConclusionUiState(
     string? InstalledVersion,
     string? LatestObservedVersion,
@@ -528,7 +548,20 @@ public sealed record InspectorConclusionUiState(
     SourceReferenceUiState? LatestSource,
     string? LatestSourceSite,
     string? LatestTargetUrl,
-    DateTimeOffset? LatestObservedAtUtc);
+    DateTimeOffset? LatestObservedAtUtc)
+{
+    public string Summary { get; init; } = "Release comparison not assessed";
+    public string? CompatibilityTarget { get; init; }
+    public string? CompatibilityRelation { get; init; }
+    public string? CompatibilityEvidence { get; init; }
+    public string? CompatibilityCondition { get; init; }
+    public SourceReferenceUiState? CompatibilitySource { get; init; }
+    public string? CompatibilitySourceSite { get; init; }
+    public string? CompatibilityTargetUrl { get; init; }
+    public DateTimeOffset? CompatibilityObservedAtUtc { get; init; }
+    public IReadOnlyList<DiagnosticUiState> CompatibilityDiagnostics { get; init; } =
+        Array.Empty<DiagnosticUiState>();
+}
 
 public sealed record VersionComparisonUiState(
     string Status,
