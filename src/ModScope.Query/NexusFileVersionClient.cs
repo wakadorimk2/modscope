@@ -15,7 +15,7 @@ public interface INexusFileVersionClient
 public sealed class NexusFileVersionClient : INexusFileVersionClient
 {
     public const string ApiKeyEnvironmentVariable = "MODSCOPE_NEXUS_API_KEY";
-    public const string ApiBaseUrl = "https://api.nexusmods.com/v3/games/7daystodie/mods";
+    public const string ApiBaseUrl = "https://api.nexusmods.com/v3/games/7daystodie/mod-file-versions";
 
     private readonly HttpClient _httpClient;
     private readonly string? _apiKey;
@@ -41,12 +41,12 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
         ArgumentNullException.ThrowIfNull(artifact);
 
         var observedAt = DateTimeOffset.UtcNow;
-        if (!TryNormalizePositiveId(artifact.ModId, out var modId)
-            || !TryNormalizePositiveId(artifact.FileId, out var fileId))
+        if (!TryNormalizePositiveId(artifact.ModId, out _)
+            || !TryNormalizePositiveId(artifact.FileId, out var gameScopedFileId))
         {
             return CreateObservation(
                 artifact,
-                BuildEndpoint(artifact.ModId, artifact.FileId),
+                BuildEndpoint(artifact.FileId),
                 observedAt,
                 null,
                 new[]
@@ -54,12 +54,12 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
                     new Diagnostic(
                         "nexus.artifact.identity.invalid",
                         DiagnosticSeverity.Warning,
-                        "The SourceArtifact does not contain positive numeric Nexus modId and fileId values.",
+                        "The SourceArtifact does not contain positive numeric Nexus modId and gameScopedFileId values.",
                         artifact.Source)
                 });
         }
 
-        var endpoint = $"{ApiBaseUrl}/{modId}/files/{fileId}";
+        var endpoint = $"{ApiBaseUrl}/{gameScopedFileId}";
         var source = new SourceReference(SourceReferenceKind.NexusApi, endpoint);
         if (_apiKey is null)
         {
@@ -158,7 +158,7 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
                         });
                 }
 
-                if (!TryReadPositiveId(root, "file_id", out var responseFileId))
+                if (!TryReadPositiveId(root, "game_scoped_id", out var responseGameScopedFileId))
                 {
                     return CreateObservation(
                         artifact,
@@ -168,14 +168,14 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
                         new[]
                         {
                             new Diagnostic(
-                                "nexus.response.file_id.missing",
+                                "nexus.response.game_scoped_id.missing",
                                 DiagnosticSeverity.Warning,
-                                "The Nexus API response has no valid file_id. The version was not adopted.",
+                                "The Nexus API response has no valid game_scoped_id. The version was not adopted.",
                                 source)
                         });
                 }
 
-                if (!string.Equals(responseFileId, fileId, StringComparison.Ordinal))
+                if (!string.Equals(responseGameScopedFileId, gameScopedFileId, StringComparison.Ordinal))
                 {
                     return CreateObservation(
                         artifact,
@@ -185,11 +185,11 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
                         new[]
                         {
                             new Diagnostic(
-                                "nexus.response.file_id.mismatch",
+                                "nexus.response.game_scoped_id.mismatch",
                                 DiagnosticSeverity.Warning,
-                                "The Nexus API response file_id does not match the requested fileId. The version was not adopted.",
+                                "The Nexus API response game_scoped_id does not match the requested gameScopedFileId. The version was not adopted.",
                                 source,
-                                responseFileId)
+                                responseGameScopedFileId)
                         });
                 }
 
@@ -344,8 +344,8 @@ public sealed class NexusFileVersionClient : INexusFileVersionClient
         return true;
     }
 
-    private static string BuildEndpoint(string? modId, string? fileId)
+    private static string BuildEndpoint(string? gameScopedFileId)
     {
-        return $"{ApiBaseUrl}/{Uri.EscapeDataString(modId?.Trim() ?? "unknown")}/files/{Uri.EscapeDataString(fileId?.Trim() ?? "unknown")}";
+        return $"{ApiBaseUrl}/{Uri.EscapeDataString(gameScopedFileId?.Trim() ?? "unknown")}";
     }
 }

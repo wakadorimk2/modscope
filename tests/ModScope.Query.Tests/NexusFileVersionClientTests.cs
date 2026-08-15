@@ -13,7 +13,7 @@ public sealed class NexusFileVersionClientTests
     {
         var handler = new RecordingHandler(_ => Response(
             HttpStatusCode.OK,
-            "{\"file_id\":456,\"version\":\"v1.2.3\"}"));
+            "{\"game_scoped_id\":456,\"version\":\"v1.2.3\",\"file\":{\"id\":123}}"));
         using var httpClient = new HttpClient(handler);
         var client = new NexusFileVersionClient(httpClient, "test-api-key", "ModScope.Tests", "0.1.0");
 
@@ -26,11 +26,12 @@ public sealed class NexusFileVersionClientTests
         Assert.Equal(VersionObservationRole.Release, observation.Role);
         Assert.Equal(SourceReferenceKind.NexusApi, observation.Source.Kind);
         Assert.Equal(
-            "https://api.nexusmods.com/v3/games/7daystodie/mods/123/files/456",
+            "https://api.nexusmods.com/v3/games/7daystodie/mod-file-versions/456",
             observation.Source.RelativePath);
         Assert.Empty(observation.Diagnostics);
 
         var request = Assert.IsType<HttpRequestMessage>(handler.Request);
+        Assert.Equal(1, handler.RequestCount);
         Assert.Equal(HttpMethod.Get, request.Method);
         Assert.Equal(observation.Source.RelativePath, request.RequestUri!.ToString());
         Assert.Equal("test-api-key", request.Headers.GetValues("apikey").Single());
@@ -39,11 +40,11 @@ public sealed class NexusFileVersionClientTests
     }
 
     [Fact]
-    public async Task RejectsAResponseForAnotherFileId()
+    public async Task RejectsAResponseForAnotherGameScopedFileId()
     {
         var handler = new RecordingHandler(_ => Response(
             HttpStatusCode.OK,
-            "{\"file_id\":457,\"version\":\"1.2.3\"}"));
+            "{\"game_scoped_id\":457,\"version\":\"1.2.3\",\"file\":{\"id\":456}}"));
         using var httpClient = new HttpClient(handler);
         var client = new NexusFileVersionClient(httpClient, "test-api-key");
 
@@ -51,7 +52,23 @@ public sealed class NexusFileVersionClientTests
 
         Assert.Null(observation.RawValue);
         Assert.Null(observation.NormalizedValue);
-        Assert.Contains(observation.Diagnostics, diagnostic => diagnostic.Code == "nexus.response.file_id.mismatch");
+        Assert.Contains(observation.Diagnostics, diagnostic => diagnostic.Code == "nexus.response.game_scoped_id.mismatch");
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData("{\"version\":\"1.2.3\"}")]
+    [InlineData("{\"game_scoped_id\":\"not-a-number\",\"version\":\"1.2.3\"}")]
+    [InlineData("{\"game_scoped_id\":0,\"version\":\"1.2.3\"}")]
+    public async Task RejectsMissingNonNumericOrZeroGameScopedFileId(string body)
+    {
+        var handler = new RecordingHandler(_ => Response(HttpStatusCode.OK, body));
+        using var httpClient = new HttpClient(handler);
+        var observation = await new NexusFileVersionClient(httpClient, "test-api-key").ObserveAsync(Artifact());
+
+        Assert.Null(observation.RawValue);
+        Assert.Contains(observation.Diagnostics, diagnostic => diagnostic.Code == "nexus.response.game_scoped_id.missing");
+        Assert.Equal(1, handler.RequestCount);
     }
 
     [Theory]
@@ -89,34 +106,68 @@ public sealed class NexusFileVersionClientTests
             Assert.Contains(malformed.Diagnostics, diagnostic => diagnostic.Code == "nexus.response.invalid_json");
         }
 
-        var missingVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"file_id\":456}"));
+        var missingVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456}"));
         using (var missingVersionHttpClient = new HttpClient(missingVersionHandler))
         {
             var missingVersion = await new NexusFileVersionClient(missingVersionHttpClient, "test-api-key").ObserveAsync(Artifact());
             Assert.Null(missingVersion.RawValue);
             Assert.Contains(missingVersion.Diagnostics, diagnostic => diagnostic.Code == "nexus.file.version.missing");
         }
+
+        var emptyVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456,\"version\":\" \"}"));
+        using (var emptyVersionHttpClient = new HttpClient(emptyVersionHandler))
+        {
+            var emptyVersion = await new NexusFileVersionClient(emptyVersionHttpClient, "test-api-key").ObserveAsync(Artifact());
+            Assert.Null(emptyVersion.RawValue);
+            Assert.Contains(emptyVersion.Diagnostics, diagnostic => diagnostic.Code == "nexus.file.version.missing");
+        }
+
+        var nonStringVersionHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456,\"version\":123}"));
+        using (var nonStringVersionHttpClient = new HttpClient(nonStringVersionHandler))
+        {
+            var nonStringVersion = await new NexusFileVersionClient(nonStringVersionHttpClient, "test-api-key").ObserveAsync(Artifact());
+            Assert.Null(nonStringVersion.RawValue);
+            Assert.Contains(nonStringVersion.Diagnostics, diagnostic => diagnostic.Code == "nexus.file.version.invalid");
+        }
     }
 
     [Fact]
     public async Task DoesNotRequestWithoutApiKeyOrExactArtifactIdentity()
     {
-        var missingKeyHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"file_id\":456,\"version\":\"1.2.3\"}"));
+        var missingKeyHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456,\"version\":\"1.2.3\"}"));
         using (var missingKeyHttpClient = new HttpClient(missingKeyHandler))
         {
             var missingKey = await new NexusFileVersionClient(missingKeyHttpClient, null).ObserveAsync(Artifact());
             Assert.Contains(missingKey.Diagnostics, diagnostic => diagnostic.Code == "nexus.api-key.missing");
             Assert.Null(missingKeyHandler.Request);
+            Assert.Equal(0, missingKeyHandler.RequestCount);
         }
 
-        var invalidArtifactHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"file_id\":456,\"version\":\"1.2.3\"}"));
+        var invalidArtifactHandler = new RecordingHandler(_ => Response(HttpStatusCode.OK, "{\"game_scoped_id\":456,\"version\":\"1.2.3\"}"));
         using (var invalidArtifactHttpClient = new HttpClient(invalidArtifactHandler))
         {
             var invalidArtifact = Artifact() with { FileId = "not-a-number" };
             var observation = await new NexusFileVersionClient(invalidArtifactHttpClient, "test-api-key").ObserveAsync(invalidArtifact);
             Assert.Contains(observation.Diagnostics, diagnostic => diagnostic.Code == "nexus.artifact.identity.invalid");
             Assert.Null(invalidArtifactHandler.Request);
+            Assert.Equal(0, invalidArtifactHandler.RequestCount);
         }
+    }
+
+    [Fact]
+    public async Task DoesNotRetainApiKeyOrRawResponseInDiagnostics()
+    {
+        const string apiKey = "test-api-key";
+        const string rawSecret = "raw-response-secret";
+        var handler = new RecordingHandler(_ => Response(
+            HttpStatusCode.OK,
+            $"{{\"game_scoped_id\":457,\"version\":\"1.2.3\",\"secret\":\"{rawSecret}\"}}"));
+        using var httpClient = new HttpClient(handler);
+        var observation = await new NexusFileVersionClient(httpClient, apiKey).ObserveAsync(Artifact());
+
+        var messages = observation.Diagnostics.Select(diagnostic => diagnostic.Message);
+        Assert.DoesNotContain(apiKey, messages);
+        Assert.DoesNotContain(rawSecret, messages);
     }
 
     private static SourceArtifact Artifact()
@@ -145,9 +196,12 @@ public sealed class NexusFileVersionClientTests
 
         public HttpRequestMessage? Request { get; private set; }
 
+        public int RequestCount { get; private set; }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Request = request;
+            RequestCount++;
             return _responder(request);
         }
 
