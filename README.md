@@ -4,7 +4,9 @@ ModScope is a browse-first workspace for discovering, organizing, and understand
 
 It connects the web page a user is exploring with structured local Mod Knowledge. The result is an inspectable path from page observation to local context, evidence, and diagnostics.
 
-![ModScope inspecting POI Scourge](docs/assets/modscope-overview-poi-scourge.png)
+![ModScope version and compatibility observations for a 0-Score GitHub release](docs/assets/modscope-overview-0-score-github.png)
+
+A browse-first 7 Days to Die + MO2 workspace that connects the mod page you are viewing to local profile state, version evidence, and diagnostics.
 
 ## Why ModScope
 
@@ -36,9 +38,6 @@ MO2 remains the source of truth for mods, profiles, downloads, and MO2-managed s
 <table>
   <tr>
     <td><img src="docs/assets/modscope-overview-poi-scourge.png" alt="POI Scourge page with ModScope local context and Inspector"></td>
-    <td><img src="docs/assets/modscope-overview-0-score-github.png" alt="0-Score GitHub release page with ModScope version and compatibility observations"></td>
-  </tr>
-  <tr>
     <td><img src="docs/assets/modscope-overview-catui.png" alt="CATUI page with ModScope local context and Inspector"></td>
     <td><img src="docs/assets/modscope-overview-quartz.png" alt="Quartz page with ModScope local context and Inspector"></td>
   </tr>
