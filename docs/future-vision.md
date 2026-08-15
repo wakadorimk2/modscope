@@ -484,22 +484,40 @@ HistoryにはURL、title、訪問時刻だけを保存し、page本文、absolut
 7DTD Nexus検索から同一hostの数値MOD IDを候補化します。
 正規化後の完全一致が1件の場合だけ遷移し、空、曖昧、解析不能な結果は検索ページに残します。
 
-### Phase 7：Controlled write（実装）
+### Phase 7：Controlled write（実装済み・freeze）
 
 Controlled profile edit、junction deploy、Steam起動をwrite planeへ分離して実装しました。
 Preview、明示承認、backup、rollback、再読検証を必須にします。
 実環境owner Playcheckは、automated test、build、GUI evidenceとは別の証拠クラスです。
+既存実装は削除せず、安全境界と回帰対象として保持します。
+新しいDeployment拡張はfreezeします。
 
-### Phase 7.1：Installed version vs Web observed version（planned）
+### Active focus：Evidence-first Local Knowledge
 
-次のread-only vertical sliceは、Installed versionとWeb observed versionの比較です。
-identity未解決または比較不能なversion formatは、確定比較へ昇格しません。
-raw version、provenance、observed time、diagnosticを保持します。
-その後にrequirements evidence、dependency、load-order rule、file overlap、semantic / runtime evidenceを横断表示します。
+次のactive focusは、Evidence-first Local Knowledgeです。
+既存のBrowser、Runtime、Deploymentを削除せずにfreezeし、次の4軸へ集中します。
 
-### Phase 8：Game Adapter拡張
+1. **Version provenance**：
+   `ModInfo.xml`、MO2 `meta.ini`、archiveまたはdownload metadata、Nexus、GitHub、Wabbajack、game versionを別observationとして保持します。
+   identity未解決または比較不能なversion schemeは、確定比較へ昇格しません。
+2. **Historical artifact**：
+   old version、deprecated artifact、過去source recordを、current identityやcurrent versionと分離して説明します。
+   old binaryを保管しません。
+3. **Real-world validation**：
+   大規模real-world profileで、identity、version、missing source、deprecated artifactのevidence coverageと失敗率を測定します。
+   absolute path、account identifier、認証情報は保持しません。
+4. **Identity resolution**：
+   Web pageとlocal package、Modlet、archive、source recordのrelationを、AutoResolved、HumanReview、PartiallyResolved、Unresolvedへ分けます。
+   package identity、version agreement、release associationを別結果として保持します。
 
-第二gameの需要と共通性が確認できた場合だけ、Game Adapterを拡張します。
+active backlogは、[Evidence-first Local Knowledge milestone](https://github.com/wakadorimk2/modscope/milestone/6)の[Version provenance (#28)](https://github.com/wakadorimk2/modscope/issues/28)、[Historical artifact (#29)](https://github.com/wakadorimk2/modscope/issues/29)、[Real-world validation (#30)](https://github.com/wakadorimk2/modscope/issues/30)、[Identity resolution (#31)](https://github.com/wakadorimk2/modscope/issues/31)で管理します。
+
+co-presence、list membership、manifest membership、名前の類似だけからdependency、compatibility、runtime保証を推測しません。
+
+### Phase 8：Game Adapter拡張（Deferred）
+
+第二Game AdapterはDeferredのまま保持します。
+Evidence-first Local Knowledgeの4軸、需要、共通性、検証可能性が確認できるまで拡張しません。
 
 ## 13. 最終的な成功条件
 
