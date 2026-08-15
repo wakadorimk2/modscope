@@ -841,6 +841,35 @@ public static class VersionEvidenceAssembler
 
 public static class VersionComparator
 {
+    public static bool TryCompareNormalized(
+        string? left,
+        string? right,
+        VersionScheme scheme,
+        out int comparison)
+    {
+        comparison = 0;
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+
+        var leftNormalized = VersionNormalizer.Normalize(left, out var leftScheme);
+        var rightNormalized = VersionNormalizer.Normalize(right, out var rightScheme);
+        if (leftNormalized is null
+            || rightNormalized is null
+            || leftScheme != scheme
+            || rightScheme != scheme
+            || scheme is not (VersionScheme.Semver or VersionScheme.NumericDotted))
+        {
+            return false;
+        }
+
+        comparison = scheme == VersionScheme.Semver
+            ? CompareSemver(leftNormalized, rightNormalized)
+            : CompareNumericDotted(leftNormalized, rightNormalized);
+        return true;
+    }
+
     public static VersionComparison Compare(
         IdentityResolutionState identityState,
         IReadOnlyList<VersionObservation> observations)
@@ -891,6 +920,103 @@ public static class VersionComparator
                 ? "All supported observations have the same normalized value."
                 : "Supported observations have different normalized values.",
             observations);
+    }
+
+    private static int CompareNumericDotted(string left, string right)
+    {
+        var leftParts = left.Split('.');
+        var rightParts = right.Split('.');
+        var count = Math.Max(leftParts.Length, rightParts.Length);
+        for (var index = 0; index < count; index++)
+        {
+            var leftPart = index < leftParts.Length ? leftParts[index] : "0";
+            var rightPart = index < rightParts.Length ? rightParts[index] : "0";
+            if (!long.TryParse(leftPart, NumberStyles.None, CultureInfo.InvariantCulture, out var leftNumber)
+                || !long.TryParse(rightPart, NumberStyles.None, CultureInfo.InvariantCulture, out var rightNumber))
+            {
+                return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+            }
+
+            var comparison = leftNumber.CompareTo(rightNumber);
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+        }
+
+        return 0;
+    }
+
+    private static int CompareSemver(string left, string right)
+    {
+        var leftParts = left.Split('-', 2);
+        var rightParts = right.Split('-', 2);
+        var coreComparison = CompareNumericDotted(leftParts[0], rightParts[0]);
+        if (coreComparison != 0)
+        {
+            return coreComparison;
+        }
+
+        var leftPrerelease = leftParts.Length == 2 ? leftParts[1] : null;
+        var rightPrerelease = rightParts.Length == 2 ? rightParts[1] : null;
+        if (leftPrerelease is null && rightPrerelease is null)
+        {
+            return 0;
+        }
+
+        if (leftPrerelease is null)
+        {
+            return 1;
+        }
+
+        if (rightPrerelease is null)
+        {
+            return -1;
+        }
+
+        var leftIdentifiers = leftPrerelease.Split('.');
+        var rightIdentifiers = rightPrerelease.Split('.');
+        var count = Math.Max(leftIdentifiers.Length, rightIdentifiers.Length);
+        for (var index = 0; index < count; index++)
+        {
+            if (index >= leftIdentifiers.Length)
+            {
+                return -1;
+            }
+
+            if (index >= rightIdentifiers.Length)
+            {
+                return 1;
+            }
+
+            var leftIdentifier = leftIdentifiers[index];
+            var rightIdentifier = rightIdentifiers[index];
+            var leftIsNumeric = long.TryParse(leftIdentifier, NumberStyles.None, CultureInfo.InvariantCulture, out var leftNumber);
+            var rightIsNumeric = long.TryParse(rightIdentifier, NumberStyles.None, CultureInfo.InvariantCulture, out var rightNumber);
+            if (leftIsNumeric && rightIsNumeric)
+            {
+                var numericComparison = leftNumber.CompareTo(rightNumber);
+                if (numericComparison != 0)
+                {
+                    return numericComparison;
+                }
+
+                continue;
+            }
+
+            if (leftIsNumeric != rightIsNumeric)
+            {
+                return leftIsNumeric ? -1 : 1;
+            }
+
+            var identifierComparison = string.Compare(leftIdentifier, rightIdentifier, StringComparison.Ordinal);
+            if (identifierComparison != 0)
+            {
+                return identifierComparison;
+            }
+        }
+
+        return 0;
     }
 }
 

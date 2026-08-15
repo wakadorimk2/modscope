@@ -1132,15 +1132,20 @@ public partial class MainWindow : Window
             var extractionStatus = content is null
                 ? PageExtractionStatus.Partial
                 : PageExtractionStatus.Succeeded;
+            var observedAtUtc = DateTimeOffset.UtcNow;
 
             _controller.SetObservation(new PageObservation(
                 pageUri,
                 title,
                 content,
-                DateTimeOffset.UtcNow,
+                observedAtUtc,
                 "WebView2",
                 extractionStatus,
                 Array.Empty<DiagnosticReadModel>()));
+            _controller.SetDetectedWebVersionObservation(
+                KnownSiteVersionObserver.Observe(pageUri, content),
+                pageUri,
+                observedAtUtc);
             SendState(requestId, targetWebView);
         }
         catch (Exception exception)
