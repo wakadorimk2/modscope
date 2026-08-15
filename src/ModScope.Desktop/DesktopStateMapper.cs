@@ -287,6 +287,9 @@ internal static class DesktopStateMapper
         InspectorReadModel value,
         VersionObservationReadModel? sessionWebVersionObservation)
     {
+        var packageRelation = value.PackageRelation is null
+            ? null
+            : PackageRelation(value.PackageRelation, value.ModKey, sessionWebVersionObservation);
         return new InspectorUiState(
             value.ModKey,
             value.DirectoryName,
@@ -299,9 +302,8 @@ internal static class DesktopStateMapper
             Diagnostics(value.Diagnostics),
             Source(value.Source))
         {
-            PackageRelation = value.PackageRelation is null
-                ? null
-                : PackageRelation(value.PackageRelation, value.ModKey, sessionWebVersionObservation)
+            PackageRelation = packageRelation,
+            Conclusion = Conclusion(value, packageRelation)
         };
     }
 
@@ -446,7 +448,127 @@ internal static class DesktopStateMapper
             EnumText(value.Scheme),
             Source(value.Source),
             value.ObservedAtUtc,
-            Diagnostics(value.Diagnostics));
+            Diagnostics(value.Diagnostics))
+        {
+            SourceSite = value.SourceSite,
+            TargetUrl = value.TargetUrl,
+            Evidence = value.Evidence
+        };
+    }
+
+    private static InspectorConclusionUiState Conclusion(
+        InspectorReadModel inspector,
+        PackageRelationUiState? packageRelation)
+    {
+        var identityState = packageRelation?.IdentityState ?? "unresolved";
+        var identityConfidence = identityState switch
+        {
+            "exact" => "High",
+            "ambiguous" => "Medium",
+            "conflicting" => "Low",
+            _ => "Unknown"
+        };
+        var observations = packageRelation?.VersionObservations
+            ?? Array.Empty<VersionObservationUiState>();
+        var latest = observations
+            .Where(observation => string.Equals(observation.SourceKind, "WebObservation", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(observation => observation.ObservedAtUtc)
+            .FirstOrDefault();
+        var installedVersion = inspector.ModInfo?.Version;
+        var installedSource = string.IsNullOrWhiteSpace(installedVersion)
+            ? null
+            : Source(inspector.ModInfo!.Source);
+        var latestVersion = latest?.RawValue;
+        var versionStatus = "notAssessed";
+        var versionReason = "No GitHub Releases or Nexus Files version was observed in this session.";
+
+        if (packageRelation is null)
+        {
+            versionReason = "Package identity and version evidence are not available.";
+        }
+        else if (!string.Equals(identityState, "exact", StringComparison.OrdinalIgnoreCase))
+        {
+            versionReason = "Identity is not exact, so the latest observation is shown without an update assessment.";
+        }
+        else if (latest is not null && latest.RawValue is null)
+        {
+            var unsupported = latest.Diagnostics.Any(diagnostic =>
+                string.Equals(diagnostic.Code, "web.version.unsupported-format", StringComparison.OrdinalIgnoreCase));
+            versionStatus = unsupported ? "notComparable" : "notAssessed";
+            versionReason = unsupported
+                ? "The source exposed a version value, but its scheme is not comparable."
+                : latest.Evidence ?? "The source did not expose one confirmed latest version.";
+        }
+        else if (latest is null || string.IsNullOrWhiteSpace(latest.RawValue))
+        {
+            versionReason = "No confirmed latest version is available from the current release surface.";
+        }
+        else if (string.IsNullOrWhiteSpace(installedVersion))
+        {
+            versionReason = "Installed ModInfo.xml version is not available.";
+        }
+        else
+        {
+            var installedNormalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(
+                installedVersion,
+                out var installedScheme);
+            var latestNormalized = latest.NormalizedValue ?? latest.RawValue;
+            var latestScheme = latest.Scheme switch
+            {
+                "semver" => ModScope.LocalKnowledge.VersionScheme.Semver,
+                "numericDotted" => ModScope.LocalKnowledge.VersionScheme.NumericDotted,
+                _ => ModScope.LocalKnowledge.VersionScheme.Unknown
+            };
+            if (installedNormalized is null
+                || latestNormalized is null
+                || installedScheme != latestScheme
+                || installedScheme is not (ModScope.LocalKnowledge.VersionScheme.Semver or ModScope.LocalKnowledge.VersionScheme.NumericDotted)
+                || !ModScope.LocalKnowledge.VersionComparator.TryCompareNormalized(
+                    installedNormalized,
+                    latestNormalized,
+                    installedScheme,
+                    out var comparison))
+            {
+                versionStatus = "notComparable";
+                versionReason = "Installed and latest versions do not use one supported comparable scheme.";
+            }
+            else
+            {
+                versionStatus = comparison switch
+                {
+                    < 0 => "updateAvailable",
+                    0 => "upToDate",
+                    _ => "installedNewer"
+                };
+                versionReason = comparison switch
+                {
+                    < 0 => "The observed release is newer than the installed ModInfo.xml version.",
+                    0 => "The installed ModInfo.xml version matches the observed release.",
+                    _ => "The installed ModInfo.xml version is newer than the observed release."
+                };
+            }
+        }
+
+        var why = latest is null
+            ? versionReason
+            : latest.RawValue is null
+                ? latest.Evidence ?? versionReason
+                : $"{latest.Evidence ?? "Release version observed"} from {latest.SourceSite ?? "the current Web page"}.";
+        return new InspectorConclusionUiState(
+            installedVersion,
+            latestVersion,
+            versionStatus,
+            versionReason,
+            "unknown",
+            "No game compatibility evidence was observed. Version status does not imply game compatibility.",
+            identityState,
+            identityConfidence,
+            why,
+            installedSource,
+            latest?.Source,
+            latest?.SourceSite,
+            latest?.TargetUrl,
+            latest?.ObservedAtUtc);
     }
 
     private static VersionComparisonUiState VersionComparison(

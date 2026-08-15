@@ -480,6 +480,7 @@ public sealed record InspectorUiState(
     SourceReferenceUiState Source)
 {
     public PackageRelationUiState? PackageRelation { get; init; }
+    public InspectorConclusionUiState? Conclusion { get; init; }
 }
 
 public sealed record VersionEvidenceManifestUiState(
@@ -506,7 +507,28 @@ public sealed record VersionObservationUiState(
     string Scheme,
     SourceReferenceUiState Source,
     DateTimeOffset ObservedAtUtc,
-    IReadOnlyList<DiagnosticUiState> Diagnostics);
+    IReadOnlyList<DiagnosticUiState> Diagnostics)
+{
+    public string? SourceSite { get; init; }
+    public string? TargetUrl { get; init; }
+    public string? Evidence { get; init; }
+}
+
+public sealed record InspectorConclusionUiState(
+    string? InstalledVersion,
+    string? LatestObservedVersion,
+    string VersionStatus,
+    string VersionReason,
+    string CompatibilityStatus,
+    string CompatibilityReason,
+    string IdentityState,
+    string IdentityConfidence,
+    string Why,
+    SourceReferenceUiState? InstalledSource,
+    SourceReferenceUiState? LatestSource,
+    string? LatestSourceSite,
+    string? LatestTargetUrl,
+    DateTimeOffset? LatestObservedAtUtc);
 
 public sealed record VersionComparisonUiState(
     string Status,

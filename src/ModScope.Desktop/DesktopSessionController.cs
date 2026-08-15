@@ -16,6 +16,7 @@ public sealed class DesktopSessionController
     private KnowledgeSessionReadModel? _session;
     private PageObservation? _observation;
     private VersionObservationReadModel? _sessionWebVersionObservation;
+    private PendingWebVersionObservation? _pendingWebVersionObservation;
     private IReadOnlyList<ModCandidateSummary> _candidates = Array.Empty<ModCandidateSummary>();
     private IReadOnlyList<ProfileSummaryReadModel> _profiles = Array.Empty<ProfileSummaryReadModel>();
     private SourceDiscoveryReadModel? _sourceDiscovery;
@@ -659,11 +660,23 @@ public sealed class DesktopSessionController
         ArgumentNullException.ThrowIfNull(observation);
         _observation = observation;
         _sessionWebVersionObservation = null;
+        _pendingWebVersionObservation = null;
         _candidateIdentity = string.Empty;
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
         RefreshPageRecognition();
+    }
+
+    public void SetDetectedWebVersionObservation(
+        WebVersionObservationResult result,
+        Uri targetUrl,
+        DateTimeOffset observedAtUtc)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(targetUrl);
+        _pendingWebVersionObservation = new PendingWebVersionObservation(result, targetUrl, observedAtUtc);
+        AttachPendingWebVersionObservation();
     }
 
     public void SetSessionWebVersionObservation(string rawValue)
@@ -678,6 +691,7 @@ public sealed class DesktopSessionController
         if (trimmed.Length == 0)
         {
             _sessionWebVersionObservation = null;
+            _pendingWebVersionObservation = null;
             _statusMessage = "The session Web version observation was cleared.";
             return;
         }
@@ -688,24 +702,18 @@ public sealed class DesktopSessionController
             return;
         }
 
-        var normalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(trimmed, out var scheme);
-        _sessionWebVersionObservation = new VersionObservationReadModel(
+        _pendingWebVersionObservation = new PendingWebVersionObservation(
+            new WebVersionObservationResult(
+                "Manual",
+                trimmed,
+                "Manual Web version input",
+                Array.Empty<DiagnosticReadModel>()),
+            _observation.Url,
+            DateTimeOffset.UtcNow);
+        _sessionWebVersionObservation = CreateVersionObservation(
             _inspector.ModKey,
-            "Release",
-            "WebObservation",
-            trimmed,
-            normalized,
-            scheme switch
-            {
-                ModScope.LocalKnowledge.VersionScheme.Semver => QueryVersionScheme.Semver,
-                ModScope.LocalKnowledge.VersionScheme.NumericDotted => QueryVersionScheme.NumericDotted,
-                _ => QueryVersionScheme.Unknown
-            },
-            new SourceReferenceReadModel(
-                QuerySourceReferenceKind.WebObservation,
-                $"web-session/{_observation.Url.Host}"),
-            DateTimeOffset.UtcNow,
-            Array.Empty<DiagnosticReadModel>());
+            _pendingWebVersionObservation);
+        _pendingWebVersionObservation = null;
         _statusMessage = "The session Web version observation was added.";
     }
 
@@ -737,6 +745,7 @@ public sealed class DesktopSessionController
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modKey);
         _inspector = _query.GetInspector(modKey);
+        AttachPendingWebVersionObservation();
         _statusMessage = $"Inspector opened for {_inspector.DirectoryName}.";
     }
 
@@ -1264,6 +1273,73 @@ public sealed class DesktopSessionController
         await AnalyzeConflictsAsync();
     }
 
+    private void AttachPendingWebVersionObservation()
+    {
+        if (_inspector is null || _pendingWebVersionObservation is null)
+        {
+            return;
+        }
+
+        _sessionWebVersionObservation = CreateVersionObservation(
+            _inspector.ModKey,
+            _pendingWebVersionObservation);
+        var pending = _pendingWebVersionObservation;
+        _pendingWebVersionObservation = null;
+        _statusMessage = pending.Result.HasVersion
+            ? $"{pending.Result.Site} release version observed for this session."
+            : $"{pending.Result.Site} release observation kept with diagnostics for this session.";
+    }
+
+    private static VersionObservationReadModel CreateVersionObservation(
+        string ownerKey,
+        PendingWebVersionObservation pending)
+    {
+        var targetUrl = pending.TargetUrl.GetLeftPart(UriPartial.Query);
+        var source = new SourceReferenceReadModel(
+            QuerySourceReferenceKind.WebObservation,
+            $"web-session/{pending.Result.Site.ToLowerInvariant()}/{pending.TargetUrl.AbsolutePath.TrimStart('/')}");
+        var diagnostics = pending.Result.Diagnostics
+            .Select(diagnostic => diagnostic with { Source = source })
+            .ToList()
+            .AsReadOnly();
+        var normalizedScheme = ModScope.LocalKnowledge.VersionScheme.Unknown;
+        var normalized = pending.Result.RawValue is null
+            ? null
+            : ModScope.LocalKnowledge.VersionNormalizer.Normalize(
+                pending.Result.RawValue,
+                out normalizedScheme);
+        if (pending.Result.RawValue is null)
+        {
+            normalizedScheme = ModScope.LocalKnowledge.VersionScheme.Unknown;
+        }
+
+        return new VersionObservationReadModel(
+            ownerKey,
+            "Release",
+            "WebObservation",
+            pending.Result.RawValue,
+            normalized,
+            normalizedScheme switch
+            {
+                ModScope.LocalKnowledge.VersionScheme.Semver => QueryVersionScheme.Semver,
+                ModScope.LocalKnowledge.VersionScheme.NumericDotted => QueryVersionScheme.NumericDotted,
+                _ => QueryVersionScheme.Unknown
+            },
+            source,
+            pending.ObservedAtUtc,
+            diagnostics)
+        {
+            SourceSite = pending.Result.Site,
+            TargetUrl = targetUrl,
+            Evidence = pending.Result.Evidence
+        };
+    }
+
+    private sealed record PendingWebVersionObservation(
+        WebVersionObservationResult Result,
+        Uri TargetUrl,
+        DateTimeOffset ObservedAtUtc);
+
     private void RefreshPageRecognition()
     {
         _localModMatches = Array.Empty<LocalModMatchReadModel>();
@@ -1300,6 +1376,7 @@ public sealed class DesktopSessionController
                 _candidateIdentity,
                 match.ModKey));
             _inspector = _query.GetInspector(match.ModKey);
+            AttachPendingWebVersionObservation();
             _recognitionStatus = "auto-confirmed";
             _autoInspectToken = Guid.NewGuid().ToString("N");
             _statusMessage = $"Local MOD identity auto-confirmed as {_candidateIdentity}. Inspector opened.";

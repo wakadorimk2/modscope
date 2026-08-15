@@ -60,6 +60,23 @@ identityがresolvedでも、version observationが一致するとは限りませ
 
 `version source mismatch = 0`は、version一致の証拠ではありません。
 
+### GitHub / Nexusの限定release observation
+
+一般的なlatest crawler、汎用site parser、自動更新は採用しません。
+現在のDesktop sessionで表示中のWebView2 DOMに限り、GitHub ReleasesとNexus MODのFiles surfaceを観測します。
+
+- GitHubはrelease pageの最初のvisible release tagをrelease versionとして観測します。
+- NexusはFiles surfaceの最初のvisible File versionをrelease versionとして観測します。
+- network API、login情報、任意siteの推測抽出は使いません。
+- 欠落、複数候補、非対応page、非対応versionはversionを確定せず、diagnosticを保持します。
+- observationはsource site、対象URL、観測時刻、source referenceとともにsession evidenceへ保存します。
+- identityが`Ambiguous`、`Missing`、`Conflicting`、`Unresolved`の場合、latestは表示できますがupdate statusは`Not assessed`です。
+- exact identityかつ比較可能な場合だけ、`Update available`、`Up to date`、`Installed newer`を表示します。
+- game compatibilityは独立軸です。release observationから互換性を推測せず、今回の表示は`Unknown`です。
+
+観測はpage navigationと既存の`Observe now`で実行します。
+既存の手動Web version入力はAdvanced evidenceのfallbackとして残します。
+
 ### separatorは補助evidenceとして扱う
 
 MO2 separator textは、requirements、選択制約、運用注意の候補を発見するsourceです。

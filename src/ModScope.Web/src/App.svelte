@@ -2053,36 +2053,72 @@
           <button class="secondary-button" type="button" onclick={closeInspector}>Back to Context</button>
         </div>
 
-        <div class="drawer-section inspector-analysis-summary">
-          <div class="inspector-analysis-summary-header">
-            <div>
-              <span class="eyebrow">ANALYSIS</span>
-              <strong>{analysisSummaryStatus()}</strong>
+        {#if state.inspector}
+          <section class="drawer-section inspector-human-conclusion" aria-labelledby="inspector-conclusion-title">
+            <div class="inspector-conclusion-heading">
+              <div>
+                <span class="eyebrow">CONCLUSION</span>
+                <h3 id="inspector-conclusion-title">Human-readable update summary</h3>
+              </div>
+              <span class="status-chip {statusClass(state.inspector.conclusion?.versionStatus)}">
+                {formatLabel(state.inspector.conclusion?.versionStatus)}
+              </span>
             </div>
-            <span class="status-chip {analysisSummaryStatusClass()}">{analysisSummaryStatus()}</span>
-          </div>
 
-          {#if !state.analysis.inputs.baseDataReady}
-            <p class="subtle">{baseDataStatusLabel()}</p>
-            <button class="primary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>{staticAnalysisActionLabel()}</button>
-          {:else if analysisBusy}
-            <p class="subtle" role="status">{analysisOperationLabel()}…</p>
-          {:else}
-            <p class="subtle">{baseDataStatusLabel()}</p>
-            <button class="secondary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>{staticAnalysisActionLabel()}</button>
-          {/if}
+            <div class="inspector-conclusion-status-grid">
+              <div class="inspector-conclusion-status-item">
+                <span>Installed</span>
+                <strong>{state.inspector.conclusion?.installedVersion || state.inspector.modInfo?.version || 'Unknown'}</strong>
+              </div>
+              <div class="inspector-conclusion-status-item">
+                <span>Latest observed</span>
+                <strong>{state.inspector.conclusion?.latestObservedVersion || 'Unknown'}</strong>
+              </div>
+              <div class="inspector-conclusion-status-item">
+                <span>Version status</span>
+                <strong class="status-chip {statusClass(state.inspector.conclusion?.versionStatus)}">
+                  {formatLabel(state.inspector.conclusion?.versionStatus)}
+                </strong>
+              </div>
+              <div class="inspector-conclusion-status-item">
+                <span>Game compatibility</span>
+                <strong class="status-chip {statusClass(state.inspector.conclusion?.compatibilityStatus)}">
+                  {formatLabel(state.inspector.conclusion?.compatibilityStatus)}
+                </strong>
+              </div>
+            </div>
 
-          {#if state.analysis.conflict}
-            <p class="analysis-meta">Static analysis result is available in the closed evidence sections below.</p>
-          {:else}
-            <p class="notice">Not assessed. This is not a no-conflict conclusion.</p>
-          {/if}
-        </div>
+            <div class="inspector-conclusion-explanation">
+              <p><span>Identity</span> {formatLabel(state.inspector.conclusion?.identityState)} · confidence {state.inspector.conclusion?.identityConfidence || 'Unknown'}</p>
+              <p><span>Why</span> {state.inspector.conclusion?.why || 'Conclusion evidence is not available.'}</p>
+              <p><span>Compatibility reason</span> {state.inspector.conclusion?.compatibilityReason || 'No compatibility evidence was observed.'}</p>
+              {#if state.inspector.conclusion?.versionReason}
+                <p><span>Version reason</span> {state.inspector.conclusion.versionReason}</p>
+              {/if}
+            </div>
+
+            <div class="inspector-local-summary">
+              <span>Local profile</span><strong>{formatLabel(state.inspector.profileState)}</strong>
+              <span>Enabled</span><strong>{formatLabel(state.inspector.enabledState)}</strong>
+              <span>Priority</span><strong>{state.inspector.priority ?? 'Unknown'}</strong>
+            </div>
+
+            {#if state.inspector.conclusion?.latestSourceSite || state.inspector.conclusion?.latestTargetUrl}
+              <p class="provenance-line inspector-conclusion-source">
+                Source · {state.inspector.conclusion.latestSourceSite || 'Web'} ·
+                {state.inspector.conclusion.latestTargetUrl || state.inspector.conclusion.latestSource?.relativePath || 'Unknown'}
+              </p>
+            {/if}
+          </section>
+        {/if}
 
         {#if state.inspector}
           {#if state.inspector.packageRelation}
-            <div class="drawer-section inspector-evidence-conclusion">
-              <span class="eyebrow">IDENTITY / VERSION EVIDENCE</span>
+            <details class="drawer-section inspector-evidence-conclusion inspector-disclosure" open>
+              <summary class="inspector-disclosure-summary">
+                <span class="eyebrow">VERSION EVIDENCE</span>
+                <span class="subtle">Identity, package, and release observations</span>
+              </summary>
               <div class="inspector-conclusion-grid">
                 <div>
                   <span>Identity</span>
@@ -2107,15 +2143,22 @@
               </div>
               <p class="analysis-meta">{state.inspector.packageRelation.comparison.reason}</p>
               <p class="analysis-meta">{state.inspector.packageRelation.identityReason}</p>
-              <div class="web-version-observation">
-                <label>Web observed version<input bind:value={webObservedVersion} placeholder="Optional, e.g. 1.2.3" /></label>
-                <button class="secondary-button" type="button" disabled={operationBlocksInteraction || webObservedVersion.trim().length === 0} onclick={setWebVersionObservation}>Record for this session</button>
-              </div>
+              <details class="inspector-disclosure inspector-advanced-evidence">
+                <summary>Advanced evidence · manual fallback</summary>
+                <p class="analysis-meta">Use this fallback when the supported release surface does not expose one usable version.</p>
+                <div class="web-version-observation">
+                  <label>Manual Web version<input bind:value={webObservedVersion} placeholder="Optional, e.g. 1.2.3" /></label>
+                  <button class="secondary-button" type="button" disabled={operationBlocksInteraction || webObservedVersion.trim().length === 0} onclick={setWebVersionObservation}>Record for this session</button>
+                </div>
+              </details>
               <details class="inspector-disclosure">
                 <summary>Version observations · {state.inspector.packageRelation.versionObservations.length}</summary>
                 {#each state.inspector.packageRelation.versionObservations as observation}
                   <p class="provenance-line">
                     {formatLabel(observation.sourceKind)} · {observation.rawValue || 'Missing'} · {formatLabel(observation.scheme)} · {observation.source.relativePath}
+                    {#if observation.sourceSite} · {observation.sourceSite}{/if}
+                    {#if observation.targetUrl} · {observation.targetUrl}{/if}
+                    {#if observation.evidence}<br />{observation.evidence}{/if}
                   </p>
                 {/each}
                 {#if state.inspector.packageRelation.sourceArtifacts.length > 0}
@@ -2130,7 +2173,7 @@
                   {/each}
                 {/if}
               </details>
-            </div>
+            </details>
           {/if}
 
           {#if state.inspector.modInfo}
@@ -2187,6 +2230,29 @@
               {/each}
             </div>
           {/if}
+
+          <details class="drawer-section inspector-analysis-summary inspector-disclosure">
+            <summary class="inspector-disclosure-summary">
+              <span class="eyebrow">STATIC / RUNTIME ANALYSIS</span>
+              <span class="status-chip {analysisSummaryStatusClass()}">{analysisSummaryStatus()}</span>
+            </summary>
+
+            {#if !state.analysis.inputs.baseDataReady}
+              <p class="subtle">{baseDataStatusLabel()}</p>
+              <button class="primary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>{staticAnalysisActionLabel()}</button>
+            {:else if analysisBusy}
+              <p class="subtle" role="status">{analysisOperationLabel()}…</p>
+            {:else}
+              <p class="subtle">{baseDataStatusLabel()}</p>
+              <button class="secondary-button action-button" disabled={operationBlocksInteraction} onclick={startStaticAnalysis}>{staticAnalysisActionLabel()}</button>
+            {/if}
+
+            {#if state.analysis.conflict}
+              <p class="analysis-meta">Static analysis result is available in the evidence sections above.</p>
+            {:else}
+              <p class="notice">Not assessed. This is not a no-conflict conclusion.</p>
+            {/if}
+          </details>
 
           <details class="drawer-section inspector-disclosure" bind:open={inspectorFilesOpen}>
             <summary class="inspector-disclosure-summary">

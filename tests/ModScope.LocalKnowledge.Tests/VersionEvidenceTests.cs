@@ -148,6 +148,18 @@ public sealed class VersionEvidenceTests
     }
 
     [Fact]
+    public void ComparesInstalledAndLatestValuesInReleaseOrder()
+    {
+        Assert.True(VersionComparator.TryCompareNormalized(
+            "3.1.9.1528",
+            "3.1.25.1615",
+            VersionScheme.NumericDotted,
+            out var comparison));
+
+        Assert.True(comparison < 0);
+    }
+
+    [Fact]
     public void RetainsUnsupportedManifestRoleAsDiagnosticAndDoesNotCompareIt()
     {
         using var directory = TemporaryDirectory.Create();

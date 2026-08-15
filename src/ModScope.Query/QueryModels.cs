@@ -681,7 +681,12 @@ public sealed record VersionObservationReadModel(
     QueryVersionScheme Scheme,
     SourceReferenceReadModel Source,
     DateTimeOffset ObservedAtUtc,
-    IReadOnlyList<DiagnosticReadModel> Diagnostics);
+    IReadOnlyList<DiagnosticReadModel> Diagnostics)
+{
+    public string? SourceSite { get; init; }
+    public string? TargetUrl { get; init; }
+    public string? Evidence { get; init; }
+}
 
 public sealed record VersionComparisonReadModel(
     QueryVersionComparisonStatus Status,

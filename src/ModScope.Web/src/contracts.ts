@@ -264,6 +264,24 @@ export type InspectorUiState = {
   diagnostics: DiagnosticUiState[];
   source: SourceReferenceUiState;
   packageRelation?: PackageRelationUiState | null;
+  conclusion?: InspectorConclusionUiState | null;
+};
+
+export type InspectorConclusionUiState = {
+  installedVersion?: string | null;
+  latestObservedVersion?: string | null;
+  versionStatus: string;
+  versionReason: string;
+  compatibilityStatus: string;
+  compatibilityReason: string;
+  identityState: string;
+  identityConfidence: string;
+  why: string;
+  installedSource?: SourceReferenceUiState | null;
+  latestSource?: SourceReferenceUiState | null;
+  latestSourceSite?: string | null;
+  latestTargetUrl?: string | null;
+  latestObservedAtUtc?: string | null;
 };
 
 export type SourceArtifactUiState = {
@@ -286,6 +304,9 @@ export type VersionObservationUiState = {
   source: SourceReferenceUiState;
   observedAtUtc: string;
   diagnostics: DiagnosticUiState[];
+  sourceSite?: string | null;
+  targetUrl?: string | null;
+  evidence?: string | null;
 };
 
 export type VersionComparisonUiState = {
