@@ -145,6 +145,7 @@ public enum SourceReferenceKind
     PackageFile,
     EvidenceManifest,
     WebObservation,
+    NexusApi,
     Diagnostic
 }
 

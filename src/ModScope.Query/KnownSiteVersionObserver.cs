@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ModScope.LocalKnowledge;
 
 namespace ModScope.Query;
 
@@ -12,11 +13,14 @@ public sealed record WebReleaseScopeInput(
 
 public sealed record WebVersionObservationResult(
     string Site,
-    string? RawValue,
+    VersionNormalizationResult Normalization,
     string Evidence,
     IReadOnlyList<DiagnosticReadModel> Diagnostics)
 {
-    public bool HasVersion => !string.IsNullOrWhiteSpace(RawValue);
+    public bool HasVersion => Normalization.IsSupported;
+    public string? RawValue => Normalization.RawValue;
+    public string? NormalizedValue => Normalization.NormalizedValue;
+    public VersionScheme Scheme => Normalization.Scheme;
 
     public string? ReleaseScopeKind { get; init; }
     public string? ReleaseScopeRawVersion { get; init; }
@@ -423,14 +427,16 @@ public static class KnownSiteVersionObserver
         WebReleaseScopeInput? scope,
         bool scopeRequired)
     {
-        var normalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(rawValue, out var scheme);
-        if (normalized is null
-            || scheme is not (ModScope.LocalKnowledge.VersionScheme.Semver or ModScope.LocalKnowledge.VersionScheme.NumericDotted))
+        var normalization = VersionNormalizer.Normalize(rawValue);
+        var observationNormalization = normalization.IsSupported
+            ? normalization
+            : new VersionNormalizationResult(null, null, VersionScheme.Unknown);
+        if (!normalization.IsSupported)
         {
             return AttachScope(
                 new WebVersionObservationResult(
                     site,
-                    null,
+                    observationNormalization,
                     evidence,
                     new[]
                     {
@@ -439,24 +445,24 @@ public static class KnownSiteVersionObserver
                             QueryDiagnosticSeverity.Warning,
                             $"The observed {site} value is not a supported version.",
                             RawValue: rawValue)
-                    }),
+                }),
                 scope,
                 scopeRequired,
-                normalized);
+                normalization);
         }
 
         return AttachScope(
-            new WebVersionObservationResult(site, rawValue, evidence, Array.Empty<DiagnosticReadModel>()),
+            new WebVersionObservationResult(site, normalization, evidence, Array.Empty<DiagnosticReadModel>()),
             scope,
             scopeRequired,
-            normalized);
+            normalization);
     }
 
     private static WebVersionObservationResult AttachScope(
         WebVersionObservationResult result,
         WebReleaseScopeInput? scope,
         bool scopeRequired,
-        string? normalizedVersion = null)
+        VersionNormalizationResult? normalization = null)
     {
         if (scope is null)
         {
@@ -469,12 +475,13 @@ public static class KnownSiteVersionObserver
         }
 
         var canonicalKind = CanonicalScopeKind(scope.Kind);
-        var scopeVersion = normalizedVersion ?? NormalizeScopeVersion(scope);
+        var scopeNormalization = normalization ?? NormalizeScopeVersion(scope);
+        var scopeVersion = scopeNormalization.NormalizedValue;
         var attached = result with
         {
             ReleaseScopeKind = canonicalKind ?? scope.Kind,
             ReleaseScopeRawVersion = scope.RawVersion ?? result.RawValue,
-            ReleaseScopeVersion = scopeVersion,
+            ReleaseScopeVersion = scopeNormalization.NormalizedValue,
             ReleaseScopeUrl = scope.ScopeUrl,
             ReleaseScopeMatchedLine = scope.MatchedLine
         };
@@ -515,7 +522,7 @@ public static class KnownSiteVersionObserver
     {
         return new WebVersionObservationResult(
             "Unsupported",
-            null,
+            new VersionNormalizationResult(null, null, VersionScheme.Unknown),
             "Automatic release observation is limited to GitHub Releases, Nexus Files, and Nexus mod pages.",
             new[]
             {
@@ -533,7 +540,7 @@ public static class KnownSiteVersionObserver
     {
         return new WebVersionObservationResult(
             site,
-            null,
+            new VersionNormalizationResult(null, null, VersionScheme.Unknown),
             message,
             new[]
             {
@@ -549,7 +556,7 @@ public static class KnownSiteVersionObserver
     {
         return new WebVersionObservationResult(
             site,
-            null,
+            new VersionNormalizationResult(null, null, VersionScheme.Unknown),
             $"{site} page exposed multiple candidates on the first release line.",
             new[]
             {
@@ -601,23 +608,20 @@ public static class KnownSiteVersionObserver
             || string.Equals(kind, NexusModPageScope, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? NormalizeScopeVersion(WebReleaseScopeInput scope)
+    private static VersionNormalizationResult NormalizeScopeVersion(WebReleaseScopeInput scope)
     {
         if (!string.IsNullOrWhiteSpace(scope.RawVersion))
         {
-            var normalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(
-                scope.RawVersion,
-                out var scheme);
-            if (scheme is ModScope.LocalKnowledge.VersionScheme.Semver
-                or ModScope.LocalKnowledge.VersionScheme.NumericDotted)
+            var normalization = VersionNormalizer.Normalize(scope.RawVersion);
+            if (normalization.IsSupported)
             {
-                return normalized;
+                return normalization;
             }
 
-            return null;
+            return normalization with { NormalizedValue = null };
         }
 
-        return scope.NormalizedVersion;
+        return new VersionNormalizationResult(null, scope.NormalizedVersion, VersionScheme.Unknown);
     }
 
     private static bool IsGitHubReleasePage(Uri url)

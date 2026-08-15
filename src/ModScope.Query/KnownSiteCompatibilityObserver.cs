@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ModScope.LocalKnowledge;
 
 namespace ModScope.Query;
 
@@ -399,11 +400,12 @@ public static class KnownSiteCompatibilityObserver
         }
 
         var canonicalKind = CanonicalScopeKind(scope.Kind);
+        var scopeNormalization = NormalizeScopeVersion(scope);
         var attached = observation with
         {
             ReleaseScopeKind = canonicalKind ?? scope.Kind,
             ReleaseScopeRawVersion = scope.RawVersion,
-            ReleaseScopeVersion = NormalizeScopeVersion(scope),
+            ReleaseScopeVersion = scopeNormalization.NormalizedValue,
             ReleaseScopeUrl = scope.ScopeUrl,
             ReleaseScopeMatchedLine = scope.MatchedLine
         };
@@ -587,20 +589,18 @@ public static class KnownSiteCompatibilityObserver
             || string.IsNullOrWhiteSpace(scope.ScopeUrl);
     }
 
-    private static string? NormalizeScopeVersion(WebReleaseScopeInput scope)
+    private static VersionNormalizationResult NormalizeScopeVersion(WebReleaseScopeInput scope)
     {
         if (!string.IsNullOrWhiteSpace(scope.RawVersion))
         {
-            var normalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(
-                scope.RawVersion,
-                out _);
-            if (!string.IsNullOrWhiteSpace(normalized))
+            var normalization = VersionNormalizer.Normalize(scope.RawVersion);
+            if (!string.IsNullOrWhiteSpace(normalization.NormalizedValue))
             {
-                return normalized;
+                return normalization;
             }
         }
 
-        return scope.NormalizedVersion;
+        return new VersionNormalizationResult(null, scope.NormalizedVersion, VersionScheme.Unknown);
     }
 
     private static bool IsGitHubReleasePage(Uri url)
