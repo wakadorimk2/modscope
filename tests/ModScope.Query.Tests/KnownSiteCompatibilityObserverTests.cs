@@ -121,4 +121,109 @@ public sealed class KnownSiteCompatibilityObserverTests
         Assert.False(observation.IsPositive);
         Assert.Equal("3.1.0", observation.NormalizedVersion);
     }
+
+    [Fact]
+    public void AssociatesEachGitHubCompatibilityClaimWithItsReleaseScope()
+    {
+        var scopes = new[]
+        {
+            new WebReleaseScopeInput(
+                "GitHubRelease",
+                "3.1.25.1615",
+                "3.1.25.1615",
+                "https://github.com/Sperell/Sperell.Mods/releases/tag/3.1.25.1615",
+                "3.1.25.1615",
+                "3.1.25.1615\nGame Version: v3.1.0 (b14)"),
+            new WebReleaseScopeInput(
+                "GitHubRelease",
+                "3.1.22.801",
+                "3.1.22.801",
+                "https://github.com/Sperell/Sperell.Mods/releases/tag/3.1.22.801",
+                "3.1.22.801",
+                "3.1.22.801\nGame Version: v3.1.0 (b13)"),
+            new WebReleaseScopeInput(
+                "GitHubRelease",
+                "3.1.9.1528",
+                "3.1.9.1528",
+                "https://github.com/Sperell/Sperell.Mods/releases/tag/3.1.9.1528",
+                "3.1.9.1528",
+                "3.1.9.1528\nGame Version: v3.1.0 (b11)")
+        };
+
+        var result = KnownSiteCompatibilityObserver.Observe(
+            new Uri("https://github.com/Sperell/Sperell.Mods/releases"),
+            "release list",
+            scopes);
+
+        Assert.Equal(3, result.Observations.Count);
+        Assert.Equal(
+            new[] { "3.1.25.1615", "3.1.22.801", "3.1.9.1528" },
+            result.Observations.Select(observation => observation.ReleaseScopeVersion));
+        Assert.Equal("b14", result.Observations[0].Build);
+        Assert.Equal("b13", result.Observations[1].Build);
+        Assert.Equal("b11", result.Observations[2].Build);
+    }
+
+    [Fact]
+    public void KeepsAClaimWithAnUnresolvedScopeDiagnostic()
+    {
+        var result = KnownSiteCompatibilityObserver.Observe(
+            new Uri("https://github.com/Sperell/Sperell.Mods/releases"),
+            "Game Version: v3.1.0 (b14)",
+            Array.Empty<WebReleaseScopeInput>());
+
+        var observation = Assert.Single(result.Observations);
+        Assert.Equal("Game Version: v3.1.0 (b14)", observation.MatchedLine);
+        Assert.Contains(observation.Diagnostics, diagnostic =>
+            diagnostic.Code == "web.compatibility.release-scope-unresolved");
+    }
+
+    [Fact]
+    public void UsesPageScopeForNexusDescriptionClaims()
+    {
+        var pageUrl = new Uri("https://www.nexusmods.com/7daystodie/mods/123?tab=description");
+        var result = KnownSiteCompatibilityObserver.Observe(
+            pageUrl,
+            "Description\nCompatible with: 7 Days to Die v3.1.0",
+            new[]
+            {
+                new WebReleaseScopeInput(
+                    "Page",
+                    null,
+                    null,
+                    pageUrl.ToString(),
+                    null,
+                    "Description\nCompatible with: 7 Days to Die v3.1.0")
+            });
+
+        var observation = Assert.Single(result.Observations);
+        Assert.Equal("Page", observation.ReleaseScopeKind);
+        Assert.Equal(pageUrl.ToString(), observation.ReleaseScopeUrl);
+        Assert.Empty(observation.Diagnostics);
+    }
+
+    [Fact]
+    public void AssociatesNexusFileCompatibilityWithTheFileRowScope()
+    {
+        var fileUrl = "https://www.nexusmods.com/7daystodie/mods/123?tab=files&file_id=1";
+        var result = KnownSiteCompatibilityObserver.Observe(
+            new Uri("https://www.nexusmods.com/7daystodie/mods/123?tab=files"),
+            "Files",
+            new[]
+            {
+                new WebReleaseScopeInput(
+                    "NexusFile",
+                    "3.1.25.1615",
+                    "3.1.25.1615",
+                    fileUrl,
+                    "Version: 3.1.25.1615",
+                    "File 1\nVersion: 3.1.25.1615\nSupported for: 7DTD v3.1.0 (b14)")
+            });
+
+        var observation = Assert.Single(result.Observations);
+        Assert.Equal("NexusFile", observation.ReleaseScopeKind);
+        Assert.Equal("3.1.25.1615", observation.ReleaseScopeVersion);
+        Assert.Equal(fileUrl, observation.ReleaseScopeUrl);
+        Assert.Equal("b14", observation.Build);
+    }
 }

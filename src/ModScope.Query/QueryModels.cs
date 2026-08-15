@@ -686,6 +686,11 @@ public sealed record VersionObservationReadModel(
     public string? SourceSite { get; init; }
     public string? TargetUrl { get; init; }
     public string? Evidence { get; init; }
+    public string? ReleaseScopeKind { get; init; }
+    public string? ReleaseScopeRawVersion { get; init; }
+    public string? ReleaseScopeVersion { get; init; }
+    public string? ReleaseScopeUrl { get; init; }
+    public string? ReleaseScopeMatchedLine { get; init; }
 }
 
 public sealed record VersionComparisonReadModel(

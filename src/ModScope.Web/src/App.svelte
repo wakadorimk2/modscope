@@ -697,6 +697,30 @@
       .replace(/^./, (character) => character.toUpperCase());
   }
 
+  function statusLabel(value: string | null | undefined): string {
+    const normalized = (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+    switch (normalized) {
+      case 'updateavailable':
+        return 'Update available';
+      case 'uptodate':
+        return 'Up to date';
+      case 'installednewer':
+        return 'Installed newer';
+      case 'notassessed':
+        return 'Not assessed';
+      case 'notcomparable':
+        return 'Not comparable';
+      case 'observed':
+        return 'Observed';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'unknown':
+        return 'Unknown';
+      default:
+        return formatLabel(value);
+    }
+  }
+
   function statusClass(status: string | undefined): string {
     return 'status-' + (status ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
   }
@@ -2061,7 +2085,7 @@
                 <h3 id="inspector-conclusion-title">{state.inspector.conclusion?.summary || 'Release comparison not assessed'}</h3>
               </div>
               <span class="status-chip {statusClass(state.inspector.conclusion?.versionStatus)}">
-                {formatLabel(state.inspector.conclusion?.versionStatus)}
+                {statusLabel(state.inspector.conclusion?.versionStatus)}
               </span>
             </div>
 
@@ -2077,19 +2101,19 @@
               <div class="inspector-conclusion-status-item">
                 <span>Version status</span>
                 <strong class="status-chip {statusClass(state.inspector.conclusion?.versionStatus)}">
-                  {formatLabel(state.inspector.conclusion?.versionStatus)}
+                  {statusLabel(state.inspector.conclusion?.versionStatus)}
                 </strong>
               </div>
               <div class="inspector-conclusion-status-item">
                 <span>Game compatibility</span>
                 <strong class="status-chip {statusClass(state.inspector.conclusion?.compatibilityStatus)}">
-                  {formatLabel(state.inspector.conclusion?.compatibilityStatus)}
+                  {statusLabel(state.inspector.conclusion?.compatibilityStatus)}
                 </strong>
               </div>
             </div>
 
             <div class="inspector-conclusion-explanation">
-              <p><span>Identity</span> {formatLabel(state.inspector.conclusion?.identityState)} · confidence {state.inspector.conclusion?.identityConfidence || 'Unknown'}</p>
+              <p><span>Package identity</span> {formatLabel(state.inspector.conclusion?.identityState)} · confidence {state.inspector.conclusion?.identityConfidence || 'Unknown'}</p>
               <p><span>Why</span> {state.inspector.conclusion?.why || 'Conclusion evidence is not available.'}</p>
               <p><span>Compatibility reason</span> {state.inspector.conclusion?.compatibilityReason || 'No compatibility evidence was observed.'}</p>
               {#if state.inspector.conclusion?.compatibilityTarget}
@@ -2097,6 +2121,13 @@
               {/if}
               {#if state.inspector.conclusion?.compatibilityEvidence}
                 <p><span>Evidence</span> {state.inspector.conclusion.compatibilityEvidence}</p>
+              {/if}
+              <p><span>Release match</span> {state.inspector.conclusion?.releaseAssociationReason || 'Release association was not assessed.'}</p>
+              {#if state.inspector.conclusion?.releaseAssociationEvidence}
+                <p><span>Release evidence</span> {state.inspector.conclusion.releaseAssociationEvidence}</p>
+              {/if}
+              {#if state.inspector.conclusion?.selectedLatestReleaseScopeLine}
+                <p><span>Latest release scope</span> {state.inspector.conclusion.selectedLatestReleaseScopeLine}</p>
               {/if}
               {#if state.inspector.conclusion?.compatibilityCondition}
                 <p><span>Condition observed</span> {state.inspector.conclusion.compatibilityCondition}</p>
@@ -2112,10 +2143,10 @@
               <span>Priority</span><strong>{state.inspector.priority ?? 'Unknown'}</strong>
             </div>
 
-            {#if state.inspector.conclusion?.compatibilitySourceSite || state.inspector.conclusion?.compatibilityTargetUrl || state.inspector.conclusion?.latestSourceSite || state.inspector.conclusion?.latestTargetUrl}
+            {#if state.inspector.conclusion?.compatibilitySourceSite || state.inspector.conclusion?.compatibilityTargetUrl || state.inspector.conclusion?.latestSourceSite || state.inspector.conclusion?.latestTargetUrl || state.inspector.conclusion?.selectedLatestReleaseUrl}
               <p class="provenance-line inspector-conclusion-source">
                 Source · {state.inspector.conclusion.compatibilitySourceSite || state.inspector.conclusion.latestSourceSite || 'Web'} ·
-                {state.inspector.conclusion.compatibilityTargetUrl || state.inspector.conclusion.latestTargetUrl || state.inspector.conclusion.compatibilitySource?.relativePath || state.inspector.conclusion.latestSource?.relativePath || 'Unknown'}
+                {state.inspector.conclusion.compatibilityTargetUrl || state.inspector.conclusion.selectedLatestReleaseUrl || state.inspector.conclusion.latestTargetUrl || state.inspector.conclusion.compatibilitySource?.relativePath || state.inspector.conclusion.latestSource?.relativePath || 'Unknown'}
                 {#if state.inspector.conclusion.compatibilityObservedAtUtc}
                   · observed {state.inspector.conclusion.compatibilityObservedAtUtc}
                 {:else if state.inspector.conclusion.latestObservedAtUtc}
@@ -2141,6 +2172,14 @@
                     · Build · {observation.build || 'None'}
                   </p>
                   <p class="provenance-line">Matched line · {observation.matchedLine}</p>
+                  <p class="provenance-line">
+                    Release scope · {observation.releaseScopeKind || 'Unresolved'} ·
+                    {observation.releaseScopeVersion || observation.releaseScopeRawVersion || 'Unknown'} ·
+                    {observation.releaseScopeUrl || 'URL unresolved'}
+                  </p>
+                  {#if observation.releaseScopeMatchedLine}
+                    <p class="provenance-line">Release scope line · {observation.releaseScopeMatchedLine}</p>
+                  {/if}
                   <p class="provenance-line">
                     Source · {observation.sourceSite || 'Web'} · {observation.targetUrl || observation.source.relativePath} · observed {observation.observedAtUtc}
                   </p>
@@ -2203,7 +2242,10 @@
                     {formatLabel(observation.sourceKind)} · {observation.rawValue || 'Missing'} · {formatLabel(observation.scheme)} · {observation.source.relativePath}
                     {#if observation.sourceSite} · {observation.sourceSite}{/if}
                     {#if observation.targetUrl} · {observation.targetUrl}{/if}
+                    {#if observation.releaseScopeKind} · scope {observation.releaseScopeKind}{/if}
+                    {#if observation.releaseScopeVersion} · {observation.releaseScopeVersion}{/if}
                     {#if observation.evidence}<br />{observation.evidence}{/if}
+                    {#if observation.releaseScopeMatchedLine}<br />scope line · {observation.releaseScopeMatchedLine}{/if}
                   </p>
                 {/each}
                 {#if state.inspector.packageRelation.sourceArtifacts.length > 0}

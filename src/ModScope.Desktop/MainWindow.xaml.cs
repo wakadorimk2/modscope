@@ -37,6 +37,138 @@ public partial class MainWindow : Window
         </html>
         """;
 
+    private const string WebReleaseScopeObservationScript = """
+        (() => {
+          const pageUrl = new URL(window.location.href);
+          const bodyText = document.body ? (document.body.innerText || '') : '';
+          const visible = (element) => {
+            if (!element) return false;
+            const style = window.getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+            return style.display !== 'none'
+              && style.visibility !== 'hidden'
+              && style.opacity !== '0'
+              && !element.closest('[aria-hidden="true"]')
+              && (element === document.body || rect.width > 0 || rect.height > 0);
+          };
+          const textOf = (element) => (element?.innerText || '').trim();
+          const linesOf = (text) => text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+          const versionPattern = /\bv?\d+\.\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?\b/i;
+          const versionFromLine = (text) => {
+            const line = linesOf(text).find(candidate => versionPattern.test(candidate));
+            if (!line) return null;
+            const match = line.match(versionPattern);
+            return match ? { rawVersion: match[0], matchedLine: line } : null;
+          };
+          const decode = (value) => {
+            try { return decodeURIComponent(value); } catch { return value; }
+          };
+          const githubTag = (href) => {
+            const match = new URL(href, pageUrl).pathname.match(/\/releases\/tag\/([^/]+)/i);
+            return match ? decode(match[1]) : null;
+          };
+          const normalizedVersion = (rawVersion) => rawVersion
+            ? rawVersion.replace(/^v/i, '')
+            : null;
+          const scopes = [];
+          const githubHost = pageUrl.hostname === 'github.com' || pageUrl.hostname === 'www.github.com';
+          const githubReleasePage = githubHost
+            && pageUrl.pathname.split('/').filter(Boolean)[2]?.toLowerCase() === 'releases';
+
+          if (githubReleasePage) {
+            const tag = githubTag(pageUrl.href);
+            if (tag) {
+              const heading = Array.from(document.querySelectorAll('h1,h2,h3'))
+                .filter(visible)
+                .map(textOf)
+                .find(line => line.includes(tag));
+              scopes.push({
+                kind: 'GitHubRelease',
+                rawVersion: tag,
+                normalizedVersion: normalizedVersion(tag),
+                scopeUrl: pageUrl.href,
+                matchedLine: heading || tag,
+                visibleText: bodyText
+              });
+            } else {
+              const anchors = Array.from(document.querySelectorAll('a[href*="/releases/tag/"]'))
+                .filter(visible);
+              const seen = new Set();
+              anchors.forEach(anchor => {
+                const scopeUrl = new URL(anchor.href, pageUrl).href;
+                if (seen.has(scopeUrl)) return;
+                seen.add(scopeUrl);
+                let node = anchor;
+                let block = anchor;
+                while (node && node !== document.body) {
+                  const nested = Array.from(node.querySelectorAll('a[href*="/releases/tag/"]')).filter(visible);
+                  if (nested.length <= 2 && textOf(node)) block = node;
+                  node = node.parentElement;
+                }
+                const rawVersion = githubTag(scopeUrl);
+                const blockText = textOf(block) || textOf(anchor);
+                const matched = rawVersion
+                  ? linesOf(blockText).find(line => line.includes(rawVersion))
+                  : null;
+                scopes.push({
+                  kind: 'GitHubRelease',
+                  rawVersion,
+                  normalizedVersion: normalizedVersion(rawVersion),
+                  scopeUrl,
+                  matchedLine: matched || textOf(anchor) || rawVersion,
+                  visibleText: blockText
+                });
+              });
+            }
+          }
+
+          const nexusHost = pageUrl.hostname === 'nexusmods.com'
+            || pageUrl.hostname.endsWith('.nexusmods.com');
+          const nexusModPage = nexusHost && pageUrl.pathname.toLowerCase().includes('/mods/');
+          const nexusFilesPage = nexusModPage
+            && (pageUrl.pathname.toLowerCase().includes('/files')
+              || pageUrl.searchParams.get('tab')?.toLowerCase() === 'files');
+          if (nexusFilesPage) {
+            const selectors = 'tr,[role="row"],article,li,[data-testid*="file" i],[class*="file" i]';
+            const rows = Array.from(document.querySelectorAll(selectors)).filter(visible);
+            const matchingRows = rows
+              .filter(row => versionFromLine(textOf(row)))
+              .filter(row => !rows.some(other => other !== row && row.contains(other) && versionFromLine(textOf(other))));
+            const seen = new Set();
+            matchingRows.forEach(row => {
+              const version = versionFromLine(textOf(row));
+              if (!version) return;
+              const fileLink = Array.from(row.querySelectorAll('a[href]'))
+                .filter(visible)
+                .find(anchor => /file_id=|\/files?\//i.test(anchor.href));
+              const scopeUrl = fileLink ? new URL(fileLink.href, pageUrl).href : null;
+              const key = `${scopeUrl || ''}|${version.rawVersion}`;
+              if (seen.has(key)) return;
+              seen.add(key);
+              scopes.push({
+                kind: 'NexusFile',
+                rawVersion: version.rawVersion,
+                normalizedVersion: normalizedVersion(version.rawVersion),
+                scopeUrl,
+                matchedLine: version.matchedLine,
+                visibleText: textOf(row)
+              });
+            });
+          } else if (nexusModPage) {
+            scopes.push({
+              kind: 'Page',
+              rawVersion: null,
+              normalizedVersion: null,
+              scopeUrl: pageUrl.href,
+              matchedLine: null,
+              visibleText: bodyText
+            });
+          }
+
+          return JSON.stringify(scopes);
+        })()
+        """;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -1125,6 +1257,14 @@ public partial class MainWindow : Window
             var serializedContent = await browser.ExecuteScriptAsync(
                 "document.body ? document.body.innerText : null");
             var content = JsonSerializer.Deserialize<string>(serializedContent);
+            var serializedScopes = await browser.ExecuteScriptAsync(WebReleaseScopeObservationScript);
+            var scopesJson = JsonSerializer.Deserialize<string>(serializedScopes);
+            IReadOnlyList<WebReleaseScopeInput> scopes = string.IsNullOrWhiteSpace(scopesJson)
+                ? Array.Empty<WebReleaseScopeInput>()
+                : (IReadOnlyList<WebReleaseScopeInput>?)JsonSerializer.Deserialize<List<WebReleaseScopeInput>>(
+                        scopesJson,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                    ?? Array.Empty<WebReleaseScopeInput>();
             var pageUri = tab.InternalPage == "history"
                 ? new Uri("about:history")
                 : browser.Source ?? new Uri("about:blank");
@@ -1143,11 +1283,11 @@ public partial class MainWindow : Window
                 extractionStatus,
                 Array.Empty<DiagnosticReadModel>()));
             _controller.SetDetectedWebVersionObservation(
-                KnownSiteVersionObserver.Observe(pageUri, content),
+                KnownSiteVersionObserver.Observe(pageUri, content, scopes),
                 pageUri,
                 observedAtUtc);
             _controller.SetDetectedWebCompatibilityObservations(
-                KnownSiteCompatibilityObserver.Observe(pageUri, content),
+                KnownSiteCompatibilityObserver.Observe(pageUri, content, scopes),
                 pageUri,
                 observedAtUtc);
             SendState(requestId, targetWebView);

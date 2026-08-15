@@ -1381,8 +1381,13 @@ public sealed class DesktopSessionController
             diagnostics)
         {
             SourceSite = pending.Result.Site,
-            TargetUrl = targetUrl,
-            Evidence = pending.Result.Evidence
+            TargetUrl = pending.Result.ReleaseScopeUrl ?? targetUrl,
+            Evidence = pending.Result.Evidence,
+            ReleaseScopeKind = pending.Result.ReleaseScopeKind,
+            ReleaseScopeRawVersion = pending.Result.ReleaseScopeRawVersion,
+            ReleaseScopeVersion = pending.Result.ReleaseScopeVersion,
+            ReleaseScopeUrl = pending.Result.ReleaseScopeUrl,
+            ReleaseScopeMatchedLine = pending.Result.ReleaseScopeMatchedLine
         };
     }
 
@@ -1411,7 +1416,12 @@ public sealed class DesktopSessionController
                     .AsReadOnly())
             {
                 SourceSite = pending.Result.Site,
-                TargetUrl = targetUrl
+                TargetUrl = observation.ReleaseScopeUrl ?? targetUrl,
+                ReleaseScopeKind = observation.ReleaseScopeKind,
+                ReleaseScopeRawVersion = observation.ReleaseScopeRawVersion,
+                ReleaseScopeVersion = observation.ReleaseScopeVersion,
+                ReleaseScopeUrl = observation.ReleaseScopeUrl,
+                ReleaseScopeMatchedLine = observation.ReleaseScopeMatchedLine
             })
             .ToList()
             .AsReadOnly();
