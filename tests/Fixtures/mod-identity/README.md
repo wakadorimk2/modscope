@@ -36,3 +36,10 @@
 | `missing-modinfo` | packageに`ModInfo.xml`がない |
 | `same-nexus-mod-multiple-files` | 1 Nexus Mod → 複数Nexus File候補 |
 | `separator-with-selection-constraint` | separator textと選択制約 |
+| `historical-artifact/case-01-current-vs-historical` | current MO2 packageとhistorical Wabbajack record |
+| `historical-artifact/case-02-multiple-file-candidates` | 同じMOD IDに複数File IDとcandidate selection |
+| `historical-artifact/case-03-stale-modinfo` | staleなModInfoと新しいpackage/download metadata |
+| `historical-artifact/case-04-bundle-missing-evidence` | 複数Modlet packageとmissing evidence |
+
+`historical-artifact`の4件は、Wabbajack record、MO2 metadata、download metadataをsynthetic valueで表します。
+実際のarchive、公開URL、owner path、credentialは含みません。

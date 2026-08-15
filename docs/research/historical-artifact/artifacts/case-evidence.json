@@ -1,0 +1,518 @@
+{
+  "schema_version": "modscope.historical_artifact.case_evidence.v1",
+  "run_id": "run-2026-08-15T16-47-42Z-historical-artifact-pilot",
+  "evidence_status": "candidate_only",
+  "accepted_case_count": 0,
+  "rejected_case_count": 0,
+  "uncertain_case_count": 8,
+  "diagnostic_case_count": 6,
+  "cases": [
+    {
+      "case_id": "hart-001",
+      "case_family": "current_installation_vs_historical_wabbajack_record",
+      "review_state": "uncertain",
+      "evidence": [
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "mo2_package_and_metadata",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/mods/opaque-oakraven-package/meta.ini",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "mod_id": "5105",
+            "file_id": "41522",
+            "modinfo_version": "3.0.0.0",
+            "mo2_version": "3.1.0.0",
+            "download_version": "3.0.0.0"
+          },
+          "normalized": {
+            "identity": "mod_id=5105;file_id=41522",
+            "version_role": "local_mod_release"
+          }
+        },
+        {
+          "source_id": "source-wj-secondary-001",
+          "source_kind": "wabbajack_archive_record",
+          "evidence_role": "secondary",
+          "locator": "docs/research/version/snapshot-2026-08-14/artifacts/dataset.json#row_id=5806a601fcc1ad2b",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "historical_observation",
+          "raw": {
+            "mod_id": "5105",
+            "file_id": "41522",
+            "record_version": "1.2.0.1",
+            "list_version": "3.1.1.39",
+            "archive_hash": "i2kvTj6E9vM=",
+            "archive_size": 4391503
+          },
+          "normalized": {
+            "identity": "mod_id=5105;file_id=41522",
+            "record_version_role": "wj_archive_declared",
+            "list_version_role": "wj_list_version"
+          }
+        }
+      ],
+      "relations": [
+        {
+          "type": "mod_id_and_file_id",
+          "result": "Exact"
+        },
+        {
+          "type": "version_observation",
+          "result": "Mismatch",
+          "note": "record version and local release version are separate observations"
+        }
+      ],
+      "decision": {
+        "mo2_time_axis": "current_installation",
+        "wj_time_axis": "historical_observation",
+        "temporal_relation": "unresolved",
+        "identity_state": "Exact",
+        "version_comparison_state": "Mismatch",
+        "deprecated_candidate": "not_assessed"
+      },
+      "diagnostic": [],
+      "additional_evidence_required": [
+        "owner-local Wabbajack file or list",
+        "record provenance and observed time"
+      ],
+      "false_positive_risk": "Wabbajack record version may use a different version scheme."
+    },
+    {
+      "case_id": "hart-002",
+      "case_family": "same_mod_id_multiple_file_ids",
+      "review_state": "uncertain",
+      "evidence": [
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "mo2_download_metadata",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/downloads/opaque-0-score.zip.meta",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "mod_id": "6176",
+            "file_id": "44553",
+            "version": "3.1.9.1528"
+          },
+          "normalized": {
+            "identity": "mod_id=6176;file_id=44553",
+            "selected_file": true
+          }
+        },
+        {
+          "source_id": "source-wj-secondary-001",
+          "source_kind": "wabbajack_candidate_record",
+          "evidence_role": "secondary",
+          "locator": "docs/research/version/snapshot-2026-08-14/artifacts/dataset.json#row_id=a7a8882d6cb2b86e",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "historical_observation",
+          "raw": {
+            "mod_id": "6176",
+            "file_id": "45359",
+            "version": "1.2.4.1601",
+            "candidate_count": 1
+          },
+          "normalized": {
+            "identity": "mod_id=6176;file_id=45359",
+            "selection": "candidate_only"
+          }
+        }
+      ],
+      "relations": [
+        {
+          "type": "mod_id_only",
+          "result": "Ambiguous"
+        }
+      ],
+      "decision": {
+        "mo2_time_axis": "current_installation",
+        "wj_time_axis": "historical_observation",
+        "temporal_relation": "unresolved",
+        "identity_state": "Ambiguous",
+        "version_comparison_state": "NotComparable",
+        "deprecated_candidate": "not_assessed"
+      },
+      "diagnostic": [],
+      "additional_evidence_required": [
+        "owner-local Wabbajack record",
+        "explicit selected File ID binding"
+      ],
+      "false_positive_risk": "MOD ID alone does not identify the selected file."
+    },
+    {
+      "case_id": "hart-003",
+      "case_family": "modinfo_stale_vs_newer_metadata",
+      "review_state": "uncertain",
+      "evidence": [
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "modinfo",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/mods/opaque-tmo-package/opaque-modlet/ModInfo.xml#Version",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "version": "2.2"
+          },
+          "normalized": {
+            "version_role": "modlet_declared"
+          }
+        },
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "mo2_package_meta_and_download_meta",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/mods/opaque-tmo-package/meta.ini#version",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "mod_id": "7170",
+            "file_id": "36796",
+            "package_version": "2.4.0.0",
+            "newest_version": "2.4.0.0",
+            "download_version": "2.4.0.0"
+          },
+          "normalized": {
+            "identity": "mod_id=7170;file_id=36796",
+            "version_role": "package_and_download"
+          }
+        }
+      ],
+      "relations": [
+        {
+          "type": "version_observation",
+          "result": "Mismatch"
+        },
+        {
+          "type": "mod_id_and_file_id",
+          "result": "Exact"
+        }
+      ],
+      "decision": {
+        "mo2_time_axis": "current_installation",
+        "wj_time_axis": "not_observable",
+        "temporal_relation": "unresolved",
+        "identity_state": "Exact",
+        "version_comparison_state": "Mismatch",
+        "deprecated_candidate": "not_assessed"
+      },
+      "diagnostic": [
+        "no_safe_version_order"
+      ],
+      "additional_evidence_required": [
+        "owner-local Wabbajack record",
+        "version role documentation or source page evidence"
+      ],
+      "false_positive_risk": "ModInfo version may be an author or Modlet version."
+    },
+    {
+      "case_id": "hart-004",
+      "case_family": "mo2_cache_drift",
+      "review_state": "uncertain",
+      "evidence": [
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "mo2_package_meta",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/mods/opaque-oakraven-package/meta.ini#version,newestVersion",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "mod_id": "5105",
+            "file_id": "41522",
+            "version": "3.1.0.0",
+            "newestVersion": "3.0.0.0"
+          },
+          "normalized": {
+            "identity": "mod_id=5105;file_id=41522",
+            "cache_relation": "drift"
+          }
+        },
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "mo2_download_metadata",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/downloads/opaque-oakraven.zip.meta#version",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "version": "3.0.0.0"
+          },
+          "normalized": {
+            "version_role": "download_metadata"
+          }
+        }
+      ],
+      "relations": [
+        {
+          "type": "version_observation",
+          "result": "Mismatch"
+        }
+      ],
+      "decision": {
+        "mo2_time_axis": "current_installation",
+        "wj_time_axis": "not_observable",
+        "temporal_relation": "unresolved",
+        "identity_state": "Exact",
+        "version_comparison_state": "Mismatch",
+        "deprecated_candidate": "not_assessed"
+      },
+      "diagnostic": [
+        "mo2_cache_drift"
+      ],
+      "additional_evidence_required": [
+        "owner-local Wabbajack record",
+        "fresh source observation or explicit cache provenance"
+      ],
+      "false_positive_risk": "newestVersion is cached metadata and is not live latest proof."
+    },
+    {
+      "case_id": "hart-005",
+      "case_family": "wabbajack_file_id_or_hash_mismatch",
+      "review_state": "uncertain",
+      "evidence": [
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "mo2_archive_and_download_metadata",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/downloads/opaque-0-score.zip.meta",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "file_id": "44553",
+            "archive_hash": "9CB21691155A89C239740C38318137F957907FF91C32F4B2838E18109D85F6F3"
+          },
+          "normalized": {
+            "selected_file": "44553"
+          }
+        },
+        {
+          "source_id": "source-wj-secondary-001",
+          "source_kind": "wabbajack_candidate_record",
+          "evidence_role": "secondary",
+          "locator": "docs/research/version/snapshot-2026-08-14/artifacts/dataset.json#row_id=a7a8882d6cb2b86e",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "historical_observation",
+          "raw": {
+            "file_id": "45359",
+            "archive_hash": null
+          },
+          "normalized": {
+            "hash_comparison": "not_observable",
+            "file_selection": "different_candidate"
+          }
+        }
+      ],
+      "relations": [
+        {
+          "type": "file_id",
+          "result": "Conflicting"
+        },
+        {
+          "type": "archive_hash",
+          "result": "not_observable"
+        }
+      ],
+      "decision": {
+        "mo2_time_axis": "current_installation",
+        "wj_time_axis": "historical_observation",
+        "temporal_relation": "unresolved",
+        "identity_state": "Conflicting",
+        "version_comparison_state": "NotComparable",
+        "deprecated_candidate": "not_assessed"
+      },
+      "diagnostic": [
+        "local_archive_hash_not_comparable"
+      ],
+      "additional_evidence_required": [
+        "owner-local Wabbajack record",
+        "Wabbajack archive hash for the selected File ID"
+      ],
+      "false_positive_risk": "An alternate file candidate is not proof of a hash mismatch."
+    },
+    {
+      "case_id": "hart-006",
+      "case_family": "package_with_multiple_modlets",
+      "review_state": "uncertain",
+      "evidence": [
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "mo2_package_directory",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/mods/opaque-bundle-package",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "package_count": 1,
+            "modlet_count": 17,
+            "package_binding": "one_to_many"
+          },
+          "normalized": {
+            "package_relation": "contains",
+            "modlet_specific_source": "not_assessed"
+          }
+        }
+      ],
+      "relations": [
+        {
+          "type": "package_contains_modlets",
+          "result": "observed"
+        }
+      ],
+      "decision": {
+        "mo2_time_axis": "current_installation",
+        "wj_time_axis": "not_observable",
+        "temporal_relation": "unresolved",
+        "identity_state": "Unresolved",
+        "version_comparison_state": "NotAssessed",
+        "deprecated_candidate": "not_assessed"
+      },
+      "diagnostic": [
+        "package_level_binding_only"
+      ],
+      "additional_evidence_required": [
+        "owner-local Wabbajack archive record",
+        "explicit package-to-Modlet source binding"
+      ],
+      "false_positive_risk": "Package co-presence does not establish a Modlet-specific source."
+    },
+    {
+      "case_id": "hart-007",
+      "case_family": "missing_modinfo_or_metadata",
+      "review_state": "uncertain",
+      "evidence": [
+        {
+          "source_id": "source-mo2-primary-001",
+          "source_kind": "mo2_package_inventory",
+          "evidence_role": "primary",
+          "locator": "opaque/mo2-instance-001/mods/opaque-contents-separator",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_installation",
+          "raw": {
+            "modinfo": null,
+            "package_meta": null,
+            "download_meta": null
+          },
+          "normalized": {
+            "modinfo": "not_observable",
+            "package_metadata": "not_observable",
+            "download_metadata": "not_observable"
+          }
+        }
+      ],
+      "relations": [],
+      "decision": {
+        "mo2_time_axis": "current_installation",
+        "wj_time_axis": "not_observable",
+        "temporal_relation": "unresolved",
+        "identity_state": "Missing",
+        "version_comparison_state": "NotAssessed",
+        "deprecated_candidate": "not_assessed"
+      },
+      "diagnostic": [
+        "missing_modinfo",
+        "missing_package_metadata",
+        "missing_download_metadata"
+      ],
+      "additional_evidence_required": [
+        "owner-local Wabbajack record",
+        "explicit source metadata or package binding"
+      ],
+      "false_positive_risk": "Missing evidence is not evidence of absence."
+    },
+    {
+      "case_id": "hart-008",
+      "case_family": "current_or_historical_axis_unresolved",
+      "review_state": "uncertain",
+      "evidence": [
+        {
+          "source_id": "source-wj-secondary-001",
+          "source_kind": "wabbajack_archive_record",
+          "evidence_role": "secondary",
+          "locator": "docs/research/version/snapshot-2026-08-14/artifacts/smorgasbord.wj-records.json#opaque-record",
+          "observed_at_utc": "2026-08-14T10:01:09Z",
+          "time_axis": "current_source_record",
+          "raw": {
+            "source_record_present": true,
+            "local_match": null,
+            "record_version": null
+          },
+          "normalized": {
+            "local_match": "not_observable",
+            "temporal_relation": "unresolved"
+          }
+        }
+      ],
+      "relations": [],
+      "decision": {
+        "mo2_time_axis": "not_observable",
+        "wj_time_axis": "current_source_record",
+        "temporal_relation": "unresolved",
+        "identity_state": "Unresolved",
+        "version_comparison_state": "NotComparable",
+        "deprecated_candidate": "not_assessed"
+      },
+      "diagnostic": [
+        "current_historical_axis_not_observable"
+      ],
+      "additional_evidence_required": [
+        "owner-local Wabbajack input",
+        "matching MO2 profile snapshot",
+        "record observed time"
+      ],
+      "false_positive_risk": "Source record age alone does not prove deprecated status."
+    }
+  ],
+  "case_family_counts": {
+    "current_installation_vs_historical_wabbajack_record": {
+      "accepted": 0,
+      "rejected": 0,
+      "uncertain": 1,
+      "diagnostic": 0
+    },
+    "same_mod_id_multiple_file_ids": {
+      "accepted": 0,
+      "rejected": 0,
+      "uncertain": 1,
+      "diagnostic": 0
+    },
+    "modinfo_stale_vs_newer_metadata": {
+      "accepted": 0,
+      "rejected": 0,
+      "uncertain": 1,
+      "diagnostic": 1
+    },
+    "mo2_cache_drift": {
+      "accepted": 0,
+      "rejected": 0,
+      "uncertain": 1,
+      "diagnostic": 1
+    },
+    "wabbajack_file_id_or_hash_mismatch": {
+      "accepted": 0,
+      "rejected": 0,
+      "uncertain": 1,
+      "diagnostic": 1
+    },
+    "package_with_multiple_modlets": {
+      "accepted": 0,
+      "rejected": 0,
+      "uncertain": 1,
+      "diagnostic": 1
+    },
+    "missing_modinfo_or_metadata": {
+      "accepted": 0,
+      "rejected": 0,
+      "uncertain": 1,
+      "diagnostic": 1
+    },
+    "current_or_historical_axis_unresolved": {
+      "accepted": 0,
+      "rejected": 0,
+      "uncertain": 1,
+      "diagnostic": 1
+    }
+  }
+}

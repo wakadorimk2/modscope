@@ -1,0 +1,2 @@
+# Synthetic multiple file candidate fixture
++synthetic-multiple-file-package

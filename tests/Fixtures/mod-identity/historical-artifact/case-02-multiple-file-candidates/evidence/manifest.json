@@ -1,0 +1,82 @@
+{
+  "scenario": "historical-artifact-multiple-file-candidates",
+  "fixture_status": "anonymous_synthetic",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "package-multiple-file-01",
+      "name": "synthetic-multiple-file-package",
+      "relativePath": "mods/synthetic-multiple-file-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-multiple-file-01",
+      "name": "Synthetic Multiple File Modlet",
+      "version": "3.0.0",
+      "relativePath": "mods/synthetic-multiple-file-package/SelectedModlet/ModInfo.xml"
+    },
+    {
+      "kind": "nexus-mod",
+      "id": "nexus-mod-7201",
+      "modId": "synthetic-mod-7201"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-8203",
+      "fileId": "synthetic-file-8203",
+      "version": "3.0.0"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-8204",
+      "fileId": "synthetic-file-8204",
+      "version": "3.1.0"
+    }
+  ],
+  "relations": [
+    {
+      "from": "package-multiple-file-01",
+      "type": "contains",
+      "to": "modlet-multiple-file-01"
+    },
+    {
+      "from": "modlet-multiple-file-01",
+      "type": "selected-source",
+      "to": "nexus-file-8203"
+    },
+    {
+      "from": "modlet-multiple-file-01",
+      "type": "candidate-source",
+      "to": "nexus-file-8204"
+    },
+    {
+      "from": "nexus-file-8203",
+      "type": "belongs-to",
+      "to": "nexus-mod-7201"
+    },
+    {
+      "from": "nexus-file-8204",
+      "type": "belongs-to",
+      "to": "nexus-mod-7201"
+    }
+  ],
+  "observations": [
+    {
+      "type": "same-mod-id-multiple-file-ids",
+      "target": "nexus-mod-7201",
+      "fileIds": [
+        "synthetic-file-8203",
+        "synthetic-file-8204"
+      ]
+    }
+  ],
+  "expected": {
+    "temporalState": "unresolved",
+    "identityState": "Ambiguous",
+    "versionComparisonState": "NotComparable",
+    "deprecatedCandidate": "not_assessed",
+    "diagnostics": [
+      "mod_id_does_not_select_file"
+    ]
+  }
+}
