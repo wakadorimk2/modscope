@@ -41,6 +41,178 @@ public sealed class VersionEvidenceTests
     }
 
     [Fact]
+    public void ReadsIndexedInstalledFilesWithoutUsingSizeAsAnIdentity()
+    {
+        using var directory = TemporaryDirectory.Create();
+        File.WriteAllText(
+            Path.Combine(directory.Path, "meta.ini"),
+            "[General]\nname=Indexed package\n[installedFiles]\nsize=1\n1\\modid=11594\n1\\fileid=44590\n");
+
+        var parsed = Mo2MetaIniReader.Read(directory.Path, "indexed-package");
+
+        var installedFile = Assert.Single(parsed.InstalledFileRecords);
+        Assert.Equal(1, installedFile.Index);
+        Assert.Equal("11594", installedFile.ModId);
+        Assert.Equal("44590", installedFile.FileId);
+        Assert.Same(parsed.InstalledFileRecords, parsed.InstalledFiles);
+        Assert.Contains("installedfiles.size", parsed.UnknownValues.Keys);
+    }
+
+    [Fact]
+    public void ReadsSimpleSleepTopLevelModIdWithIndexedFileId()
+    {
+        using var directory = TemporaryDirectory.Create();
+        File.WriteAllText(
+            Path.Combine(directory.Path, "meta.ini"),
+            "[General]\nmodid=11594\n[installedFiles]\nsize=1\n1\\fileid=44590\n");
+
+        var parsed = Mo2MetaIniReader.Read(directory.Path, "simple-sleep");
+
+        Assert.Equal("11594", parsed.ModId);
+        Assert.Null(parsed.FileId);
+        var installedFile = Assert.Single(parsed.InstalledFileRecords);
+        Assert.Equal("44590", installedFile.FileId);
+        Assert.Null(installedFile.ModId);
+    }
+
+    [Fact]
+    public void DerivesOnePackageLevelNexusArtifactFromOneIndexedPair()
+    {
+        var metadata = Metadata(
+            null,
+            null,
+            new[] { new Mo2InstalledFileRecord(1, "11594", "44590") });
+        var source = new SourceReference(SourceReferenceKind.ModDirectory, "mods/synthetic-package");
+        var records = new[]
+        {
+            Record("synthetic-package/modlet-01", "modlet-01", metadata, source),
+            Record("synthetic-package/modlet-02", "modlet-02", metadata, source)
+        };
+
+        var attached = VersionEvidenceAssembler.Attach(records, null);
+
+        Assert.All(attached, record =>
+        {
+            var evidence = Assert.IsType<PackageVersionEvidence>(record.PackageEvidence);
+            var artifact = Assert.Single(evidence.SourceArtifacts);
+            Assert.Equal("nexus-file:11594:44590", artifact.ArtifactId);
+            Assert.Equal(IdentityResolutionState.Exact, evidence.IdentityState);
+            Assert.Equal(2, evidence.Package.ModletCount);
+        });
+    }
+
+    [Fact]
+    public void CombinesEqualTopLevelAndIndexedPairsIntoOneCandidate()
+    {
+        var evidence = AttachPackage(
+            Metadata(
+                "11594",
+                "44590",
+                new[] { new Mo2InstalledFileRecord(1, "11594", "44590") }),
+            Array.Empty<SourceArtifact>(),
+            Array.Empty<string>());
+
+        Assert.Equal(IdentityResolutionState.Exact, evidence.IdentityState);
+        var artifact = Assert.Single(evidence.SourceArtifacts);
+        Assert.Equal("nexus-file:11594:44590", artifact.ArtifactId);
+    }
+
+    [Fact]
+    public void MarksDifferentIndexedPairsAsAmbiguous()
+    {
+        var evidence = AttachPackage(
+            Metadata(
+                null,
+                null,
+                new[]
+                {
+                    new Mo2InstalledFileRecord(1, "11594", "44590"),
+                    new Mo2InstalledFileRecord(2, "11594", "44591")
+                }),
+            Array.Empty<SourceArtifact>(),
+            Array.Empty<string>());
+
+        Assert.Equal(IdentityResolutionState.Ambiguous, evidence.IdentityState);
+        Assert.Equal(2, evidence.SourceArtifacts.Count);
+    }
+
+    [Fact]
+    public void MarksDifferentTopLevelAndIndexedPairsAsConflicting()
+    {
+        var evidence = AttachPackage(
+            Metadata(
+                "11594",
+                "44590",
+                new[] { new Mo2InstalledFileRecord(1, "11594", "44591") }),
+            Array.Empty<SourceArtifact>(),
+            Array.Empty<string>());
+
+        Assert.Equal(IdentityResolutionState.Conflicting, evidence.IdentityState);
+        Assert.Equal(2, evidence.SourceArtifacts.Count);
+    }
+
+    [Fact]
+    public void KeepsIncompleteZeroAndNonNumericInstalledIdsOutOfArtifacts()
+    {
+        var incomplete = AttachPackage(
+            Metadata(
+                null,
+                null,
+                new[] { new Mo2InstalledFileRecord(1, "11594", null) }),
+            Array.Empty<SourceArtifact>(),
+            Array.Empty<string>());
+        Assert.Empty(incomplete.SourceArtifacts);
+        Assert.Contains(
+            incomplete.Diagnostics,
+            diagnostic => diagnostic.Code == "package.identity.installed-file.pair.incomplete");
+
+        var zero = AttachPackage(
+            Metadata(
+                null,
+                null,
+                new[] { new Mo2InstalledFileRecord(1, "0", "44590") }),
+            Array.Empty<SourceArtifact>(),
+            Array.Empty<string>());
+        Assert.Equal(IdentityResolutionState.Unresolved, zero.IdentityState);
+        Assert.Empty(zero.SourceArtifacts);
+        Assert.Contains(
+            zero.Diagnostics,
+            diagnostic => diagnostic.Code == "package.identity.meta.numeric.invalid");
+
+        var nonNumeric = AttachPackage(
+            Metadata(
+                null,
+                null,
+                new[] { new Mo2InstalledFileRecord(1, "not-a-number", "44590") }),
+            Array.Empty<SourceArtifact>(),
+            Array.Empty<string>());
+        Assert.Equal(IdentityResolutionState.Unresolved, nonNumeric.IdentityState);
+        Assert.Empty(nonNumeric.SourceArtifacts);
+        Assert.Contains(
+            nonNumeric.Diagnostics,
+            diagnostic => diagnostic.Code == "package.identity.meta.numeric.invalid");
+    }
+
+    [Fact]
+    public void DoesNotResolveAnInstalledFilesSizeWithoutIndexedPairs()
+    {
+        using var directory = TemporaryDirectory.Create();
+        File.WriteAllText(
+            Path.Combine(directory.Path, "meta.ini"),
+            "[installedFiles]\nsize=0\n");
+        var metadata = Mo2MetaIniReader.Read(directory.Path, "separator-package");
+        var source = new SourceReference(SourceReferenceKind.ModDirectory, "mods/separator-package");
+        var evidence = VersionEvidenceAssembler.Attach(
+                new[] { Record("separator-package/modlet-01", "modlet-01", metadata, source) },
+                null)
+            .Single()
+            .PackageEvidence!;
+
+        Assert.Equal(IdentityResolutionState.Missing, evidence.IdentityState);
+        Assert.Empty(evidence.SourceArtifacts);
+    }
+
+    [Fact]
     public void ReadsVersionEvidenceManifestAsASeparateProductionInput()
     {
         using var directory = TemporaryDirectory.Create();
@@ -224,7 +396,8 @@ public sealed class VersionEvidenceTests
             new Dictionary<string, string>(),
             new Dictionary<string, string>(),
             Array.Empty<Diagnostic>(),
-            new SourceReference(SourceReferenceKind.PackageFile, "mods/synthetic-package/meta.ini"));
+            new SourceReference(SourceReferenceKind.PackageFile, "mods/synthetic-package/meta.ini"),
+            Array.Empty<Mo2InstalledFileRecord>());
         var records = new[]
         {
             Record("synthetic-package/modlet-01", "modlet-01", metadata, source),
@@ -442,7 +615,10 @@ public sealed class VersionEvidenceTests
         return VersionEvidenceAssembler.Attach(new[] { record }, manifest).Single().PackageEvidence!;
     }
 
-    private static Mo2PackageMetadata Metadata(string? modId, string? fileId)
+    private static Mo2PackageMetadata Metadata(
+        string? modId,
+        string? fileId,
+        IReadOnlyList<Mo2InstalledFileRecord>? installedFileRecords = null)
     {
         return new Mo2PackageMetadata(
             "mods/synthetic-package/meta.ini",
@@ -455,7 +631,8 @@ public sealed class VersionEvidenceTests
             new Dictionary<string, string>(),
             new Dictionary<string, string>(),
             Array.Empty<Diagnostic>(),
-            new SourceReference(SourceReferenceKind.PackageFile, "mods/synthetic-package/meta.ini"));
+            new SourceReference(SourceReferenceKind.PackageFile, "mods/synthetic-package/meta.ini"),
+            installedFileRecords ?? Array.Empty<Mo2InstalledFileRecord>());
     }
 
     private static SourceArtifact Artifact(string artifactId, string modId, string fileId)
