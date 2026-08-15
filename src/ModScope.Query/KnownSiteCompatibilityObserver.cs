@@ -27,6 +27,12 @@ public sealed record WebCompatibilityObservation(
         or WebCompatibilityRelation.CompatibleWith;
 
     public bool IsCondition => Relation == WebCompatibilityRelation.RequiresGameVersion;
+
+    public string? ReleaseScopeKind { get; init; }
+    public string? ReleaseScopeRawVersion { get; init; }
+    public string? ReleaseScopeVersion { get; init; }
+    public string? ReleaseScopeUrl { get; init; }
+    public string? ReleaseScopeMatchedLine { get; init; }
 }
 
 public sealed record WebCompatibilityObservationResult(
@@ -52,10 +58,19 @@ public sealed record CompatibilityObservationReadModel(
 {
     public string? SourceSite { get; init; }
     public string? TargetUrl { get; init; }
+    public string? ReleaseScopeKind { get; init; }
+    public string? ReleaseScopeRawVersion { get; init; }
+    public string? ReleaseScopeVersion { get; init; }
+    public string? ReleaseScopeUrl { get; init; }
+    public string? ReleaseScopeMatchedLine { get; init; }
 }
 
 public static class KnownSiteCompatibilityObserver
 {
+    private const string GitHubReleaseScope = "GitHubRelease";
+    private const string NexusFileScope = "NexusFile";
+    private const string PageScope = "Page";
+
     private static readonly Regex LabelPattern = new(
         @"^\s*(?:[-*•]\s*)?(?<label>Requires\s+Game\s+Version|Supported\s+Game\s+Version|Game\s+Version|Supported\s+for|Compatible\s+with)\s*[:#-]?\s*(?<value>.*?)\s*$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
@@ -77,21 +92,59 @@ public static class KnownSiteCompatibilityObserver
 
     public static WebCompatibilityObservationResult Observe(Uri url, string? visibleText)
     {
+        return ObserveCore(url, visibleText, null, scopeInputWasProvided: false);
+    }
+
+    public static WebCompatibilityObservationResult Observe(
+        Uri url,
+        string? visibleText,
+        IReadOnlyList<WebReleaseScopeInput>? scopes)
+    {
+        return ObserveCore(url, visibleText, scopes, scopeInputWasProvided: true);
+    }
+
+    private static WebCompatibilityObservationResult ObserveCore(
+        Uri url,
+        string? visibleText,
+        IReadOnlyList<WebReleaseScopeInput>? scopes,
+        bool scopeInputWasProvided)
+    {
         ArgumentNullException.ThrowIfNull(url);
 
         if (IsGitHubReleasePage(url))
         {
-            return ObserveSurface("GitHub", "GitHub Releases", url, visibleText);
+            return ObserveSurface(
+                "GitHub",
+                "GitHub Releases",
+                url,
+                visibleText,
+                scopes,
+                scopeInputWasProvided,
+                isReleaseSurface: true);
         }
 
         if (IsNexusFilesPage(url))
         {
-            return ObserveSurface("Nexus", "Nexus Files", url, visibleText);
+            return ObserveSurface(
+                "Nexus",
+                "Nexus Files",
+                url,
+                visibleText,
+                scopes,
+                scopeInputWasProvided,
+                isReleaseSurface: true);
         }
 
         if (IsNexusDescriptionPage(url))
         {
-            return ObserveSurface("Nexus", "Nexus Description", url, visibleText);
+            return ObserveSurface(
+                "Nexus",
+                "Nexus Description",
+                url,
+                visibleText,
+                scopes,
+                scopeInputWasProvided,
+                isReleaseSurface: false);
         }
 
         return new WebCompatibilityObservationResult(
@@ -111,17 +164,45 @@ public static class KnownSiteCompatibilityObserver
         string site,
         string surface,
         Uri url,
-        string? visibleText)
+        string? visibleText,
+        IReadOnlyList<WebReleaseScopeInput>? scopes,
+        bool scopeInputWasProvided,
+        bool isReleaseSurface)
     {
-        if (string.IsNullOrWhiteSpace(visibleText))
+        if (string.IsNullOrWhiteSpace(visibleText)
+            && (scopes is null || scopes.Count == 0))
         {
             return Missing(site, surface, $"{surface} content is empty.");
         }
 
-        var observations = Lines(visibleText)
-            .Select(ParseLine)
+        var scopeTexts = BuildScopeTexts(
+            url,
+            visibleText,
+            scopes,
+            scopeInputWasProvided,
+            isReleaseSurface,
+            surface);
+        var parsedObservations = scopeTexts
+            .SelectMany(scopeText => Lines(scopeText.Text)
+                .Select(line => ParseLine(line, scopeText.Scope, scopeText.ScopeRequired)))
             .Where(observation => observation is not null)
             .Select(observation => observation!)
+            .ToList();
+
+        if (scopeInputWasProvided && isReleaseSurface && scopeTexts.Any(scopeText => scopeText.Scope is not null))
+        {
+            var scopedLines = scopeTexts
+                .SelectMany(scopeText => Lines(scopeText.Text))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            parsedObservations.AddRange(
+                Lines(visibleText ?? string.Empty)
+                    .Where(line => !scopedLines.Contains(line))
+                    .Select(line => ParseLine(line, null, scopeRequired: true))
+                    .Where(observation => observation is not null)
+                    .Select(observation => observation!));
+        }
+
+        var observations = parsedObservations
             .GroupBy(IdentityKey, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToList()
@@ -139,7 +220,61 @@ public static class KnownSiteCompatibilityObserver
             Array.Empty<DiagnosticReadModel>());
     }
 
-    private static WebCompatibilityObservation? ParseLine(string line)
+    private static IReadOnlyList<ScopeText> BuildScopeTexts(
+        Uri url,
+        string? visibleText,
+        IReadOnlyList<WebReleaseScopeInput>? scopes,
+        bool scopeInputWasProvided,
+        bool isReleaseSurface,
+        string surface)
+    {
+        if (!scopeInputWasProvided)
+        {
+            return new[] { new ScopeText(null, false, visibleText ?? string.Empty) };
+        }
+
+        if (scopes is { Count: > 0 })
+        {
+            return scopes
+                .Select(scope => new ScopeText(
+                    scope,
+                    ScopeRequiresResolution(scope),
+                    scope.VisibleText ?? string.Empty))
+                .ToList()
+                .AsReadOnly();
+        }
+
+        if (!isReleaseSurface
+            && string.Equals(surface, "Nexus Description", StringComparison.OrdinalIgnoreCase))
+        {
+            return new[]
+            {
+                new ScopeText(
+                    new WebReleaseScopeInput(
+                        PageScope,
+                        null,
+                        null,
+                        url.ToString(),
+                        null,
+                        visibleText),
+                    false,
+                    visibleText ?? string.Empty)
+            };
+        }
+
+        var tagScope = CreateGitHubTagScope(url, visibleText);
+        if (tagScope is not null)
+        {
+            return new[] { new ScopeText(tagScope, false, visibleText ?? string.Empty) };
+        }
+
+        return new[] { new ScopeText(null, true, visibleText ?? string.Empty) };
+    }
+
+    private static WebCompatibilityObservation? ParseLine(
+        string line,
+        WebReleaseScopeInput? scope,
+        bool scopeRequired)
     {
         var labelMatch = LabelPattern.Match(line);
         if (!labelMatch.Success)
@@ -158,21 +293,24 @@ public static class KnownSiteCompatibilityObserver
 
         if (candidates.Count > 1)
         {
-            return new WebCompatibilityObservation(
-                relation,
-                "Unresolved",
-                NullIfWhiteSpace(rawValue),
-                null,
-                null,
-                matchedLine,
-                new[]
-                {
-                    new DiagnosticReadModel(
-                        "web.compatibility.multiple-candidates",
-                        QueryDiagnosticSeverity.Warning,
-                        "The compatibility label contains multiple version candidates.",
-                        RawValue: rawValue)
-                });
+            return AttachScope(
+                new WebCompatibilityObservation(
+                    relation,
+                    "Unresolved",
+                    NullIfWhiteSpace(rawValue),
+                    null,
+                    null,
+                    matchedLine,
+                    new[]
+                    {
+                        new DiagnosticReadModel(
+                            "web.compatibility.multiple-candidates",
+                            QueryDiagnosticSeverity.Warning,
+                            "The compatibility label contains multiple version candidates.",
+                            RawValue: rawValue)
+                    }),
+                scope,
+                scopeRequired);
         }
 
         if (candidates.Count == 0)
@@ -197,14 +335,17 @@ public static class KnownSiteCompatibilityObserver
                 diagnostics.Add(OtherGameDiagnostic(rawValue));
             }
 
-            return new WebCompatibilityObservation(
-                relation,
-                gameContext,
-                NullIfWhiteSpace(rawValue),
-                null,
-                null,
-                matchedLine,
-                diagnostics.AsReadOnly());
+            return AttachScope(
+                new WebCompatibilityObservation(
+                    relation,
+                    gameContext,
+                    NullIfWhiteSpace(rawValue),
+                    null,
+                    null,
+                    matchedLine,
+                    diagnostics.AsReadOnly()),
+                scope,
+                scopeRequired);
         }
 
         var candidate = candidates[0];
@@ -219,14 +360,75 @@ public static class KnownSiteCompatibilityObserver
             parsedDiagnostics.Add(OtherGameDiagnostic(rawValue));
         }
 
-        return new WebCompatibilityObservation(
-            relation,
-            gameResolution.GameContext,
-            rawValue,
-            normalizedVersion,
-            build,
-            matchedLine,
-            parsedDiagnostics.AsReadOnly());
+        return AttachScope(
+            new WebCompatibilityObservation(
+                relation,
+                gameResolution.GameContext,
+                rawValue,
+                normalizedVersion,
+                build,
+                matchedLine,
+                parsedDiagnostics.AsReadOnly()),
+            scope,
+            scopeRequired);
+    }
+
+    private static WebCompatibilityObservation AttachScope(
+        WebCompatibilityObservation observation,
+        WebReleaseScopeInput? scope,
+        bool scopeRequired)
+    {
+        if (scope is null)
+        {
+            return scopeRequired
+                ? AddDiagnostic(
+                    observation,
+                    "web.compatibility.release-scope-unresolved",
+                    "The compatibility claim was visible, but its release or File scope could not be resolved.")
+                : observation;
+        }
+
+        var canonicalKind = CanonicalScopeKind(scope.Kind);
+        var attached = observation with
+        {
+            ReleaseScopeKind = canonicalKind ?? scope.Kind,
+            ReleaseScopeRawVersion = scope.RawVersion,
+            ReleaseScopeVersion = NormalizeScopeVersion(scope),
+            ReleaseScopeUrl = scope.ScopeUrl,
+            ReleaseScopeMatchedLine = scope.MatchedLine
+        };
+
+        if (canonicalKind is null
+            || string.IsNullOrWhiteSpace(scope.ScopeUrl)
+            || (canonicalKind is GitHubReleaseScope or NexusFileScope
+                && string.IsNullOrWhiteSpace(attached.ReleaseScopeVersion)))
+        {
+            return AddDiagnostic(
+                attached,
+                "web.compatibility.release-scope-unresolved",
+                "The visible release or File scope is incomplete. The compatibility claim remains raw evidence.");
+        }
+
+        return attached;
+    }
+
+    private static WebCompatibilityObservation AddDiagnostic(
+        WebCompatibilityObservation observation,
+        string code,
+        string message)
+    {
+        var diagnostics = observation.Diagnostics
+            .Concat(new[]
+            {
+                new DiagnosticReadModel(
+                    code,
+                    QueryDiagnosticSeverity.Warning,
+                    message,
+                    RawValue: observation.RawValue)
+            })
+            .ToList()
+            .AsReadOnly();
+        return observation with { Diagnostics = diagnostics };
     }
 
     private static WebCompatibilityRelation ParseRelation(string label)
@@ -251,7 +453,10 @@ public static class KnownSiteCompatibilityObserver
             observation.GameContext,
             observation.NormalizedVersion ?? string.Empty,
             observation.Build ?? string.Empty,
-            observation.RawValue ?? string.Empty);
+            observation.RawValue ?? string.Empty,
+            observation.ReleaseScopeKind ?? string.Empty,
+            observation.ReleaseScopeVersion ?? string.Empty,
+            observation.ReleaseScopeUrl ?? string.Empty);
     }
 
     private static (string GameContext, bool IsOtherGame) ResolveGameContext(
@@ -313,6 +518,74 @@ public static class KnownSiteCompatibilityObserver
                     QueryDiagnosticSeverity.Warning,
                     message)
             });
+    }
+
+    private static WebReleaseScopeInput? CreateGitHubTagScope(Uri url, string? visibleText)
+    {
+        if (!IsGitHubReleasePage(url))
+        {
+            return null;
+        }
+
+        var segments = url.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var tagIndex = Array.FindIndex(
+            segments,
+            segment => string.Equals(segment, "tag", StringComparison.OrdinalIgnoreCase));
+        if (tagIndex < 0 || tagIndex + 1 >= segments.Length)
+        {
+            return null;
+        }
+
+        var rawTag = Uri.UnescapeDataString(segments[tagIndex + 1]);
+        return new WebReleaseScopeInput(
+            GitHubReleaseScope,
+            rawTag,
+            null,
+            url.ToString(),
+            rawTag,
+            visibleText);
+    }
+
+    private static string? CanonicalScopeKind(string? kind)
+    {
+        if (string.Equals(kind, GitHubReleaseScope, StringComparison.OrdinalIgnoreCase))
+        {
+            return GitHubReleaseScope;
+        }
+
+        if (string.Equals(kind, NexusFileScope, StringComparison.OrdinalIgnoreCase))
+        {
+            return NexusFileScope;
+        }
+
+        if (string.Equals(kind, PageScope, StringComparison.OrdinalIgnoreCase))
+        {
+            return PageScope;
+        }
+
+        return null;
+    }
+
+    private static bool ScopeRequiresResolution(WebReleaseScopeInput scope)
+    {
+        return CanonicalScopeKind(scope.Kind) is null
+            || string.IsNullOrWhiteSpace(scope.ScopeUrl);
+    }
+
+    private static string? NormalizeScopeVersion(WebReleaseScopeInput scope)
+    {
+        if (!string.IsNullOrWhiteSpace(scope.RawVersion))
+        {
+            var normalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(
+                scope.RawVersion,
+                out _);
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                return normalized;
+            }
+        }
+
+        return scope.NormalizedVersion;
     }
 
     private static bool IsGitHubReleasePage(Uri url)
@@ -381,4 +654,9 @@ public static class KnownSiteCompatibilityObserver
     {
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
+
+    private sealed record ScopeText(
+        WebReleaseScopeInput? Scope,
+        bool ScopeRequired,
+        string Text);
 }

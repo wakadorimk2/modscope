@@ -54,6 +54,17 @@ Compatibility Graphやruntime判定機能は、この変更では実装しませ
 positive targetが複数あり内容が異なる場合はwinnerを選択せず、conflictとしてUnknownを返します。
 Web source claimの`Observed`はruntime compatibilityの保証ではありません。
 
+compatibility claimは、現在表示中のvisible DOMから取得したreleaseまたはFile scopeへ関連付けます。
+GitHub release listはrelease tag linkと同じrelease blockを`GitHubRelease` scopeとして扱います。
+GitHub tag pageは単一の`GitHubRelease` scopeとして扱います。
+Nexus FilesはFile rowまたはcardを`NexusFile` scopeとして扱います。
+Nexus Descriptionはpage全体を`Page` scopeとして扱います。
+latest release scopeのclaimだけを結論へ使います。
+過去scopeのclaimはhistoryとして保持します。
+latest scopeにevidenceがない場合、過去scopeへfallbackしません。
+scopeを確定できないclaimは破棄せず、`web.compatibility.release-scope-unresolved` diagnosticを付けます。
+conflict時にwinnerを自動選択しません。
+
 confirmed_compatibleとconfirmed_incompatibleは、保存したsource claimの確認を示します。
 ModScopeがruntimeを確認していない場合、runtime guaranteeとして表示しません。
 

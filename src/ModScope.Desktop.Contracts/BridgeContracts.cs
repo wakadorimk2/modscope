@@ -516,6 +516,11 @@ public sealed record VersionObservationUiState(
     public string? SourceSite { get; init; }
     public string? TargetUrl { get; init; }
     public string? Evidence { get; init; }
+    public string? ReleaseScopeKind { get; init; }
+    public string? ReleaseScopeRawVersion { get; init; }
+    public string? ReleaseScopeVersion { get; init; }
+    public string? ReleaseScopeUrl { get; init; }
+    public string? ReleaseScopeMatchedLine { get; init; }
 }
 
 public sealed record CompatibilityObservationUiState(
@@ -532,6 +537,11 @@ public sealed record CompatibilityObservationUiState(
 {
     public string? SourceSite { get; init; }
     public string? TargetUrl { get; init; }
+    public string? ReleaseScopeKind { get; init; }
+    public string? ReleaseScopeRawVersion { get; init; }
+    public string? ReleaseScopeVersion { get; init; }
+    public string? ReleaseScopeUrl { get; init; }
+    public string? ReleaseScopeMatchedLine { get; init; }
 }
 
 public sealed record InspectorConclusionUiState(
@@ -561,6 +571,14 @@ public sealed record InspectorConclusionUiState(
     public DateTimeOffset? CompatibilityObservedAtUtc { get; init; }
     public IReadOnlyList<DiagnosticUiState> CompatibilityDiagnostics { get; init; } =
         Array.Empty<DiagnosticUiState>();
+    public string ReleaseAssociationStatus { get; init; } = "not-assessed";
+    public string ReleaseAssociationReason { get; init; } = "Release association was not assessed.";
+    public string? ReleaseAssociationEvidence { get; init; }
+    public string? SelectedLatestReleaseScopeKind { get; init; }
+    public string? SelectedLatestReleaseScopeRawVersion { get; init; }
+    public string? SelectedLatestReleaseScopeVersion { get; init; }
+    public string? SelectedLatestReleaseUrl { get; init; }
+    public string? SelectedLatestReleaseScopeLine { get; init; }
 }
 
 public sealed record VersionComparisonUiState(

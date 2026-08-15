@@ -70,9 +70,27 @@ identityがresolvedでも、version observationが一致するとは限りませ
 - network API、login情報、任意siteの推測抽出は使いません。
 - 欠落、複数候補、非対応page、非対応versionはversionを確定せず、diagnosticを保持します。
 - observationはsource site、対象URL、観測時刻、source referenceとともにsession evidenceへ保存します。
-- identityが`Ambiguous`、`Missing`、`Conflicting`、`Unresolved`の場合、latestは表示できますがupdate statusは`Not assessed`です。
-- exact identityかつ比較可能な場合だけ、`Update available`、`Up to date`、`Installed newer`を表示します。
+- package identity stateとWeb release association stateは別に保持します。
+- package identityが`Ambiguous`でも、page identity、selected local Modlet、installed local context、automatic Web release scopeが確認できればupdate statusを計算します。
+- confirmed release associationはMO2 package identityを`Exact`へ変更しません。
+- release associationが未確定の場合、update statusは`Not assessed`です。
+- release associationがconfirmedで比較可能な場合だけ、`Update available`、`Up to date`、`Installed newer`を表示します。
 - game compatibilityは独立軸です。release version observationから互換性を推測しません。
+
+#### release scope
+
+GitHub ReleasesとNexus Filesでは、releaseまたはFile単位のvisible DOM blockをscopeとして保持します。
+
+- GitHub Releasesは、visibleなrelease tag linkと同じrelease blockを1つの`GitHubRelease` scopeとして扱います。
+- GitHubの`/releases/tag/...` pageは、URLとvisible page textを1つの`GitHubRelease` scopeとして扱います。
+- Nexus Filesは、visibleなFile versionと同じrowまたはcardを1つの`NexusFile` scopeとして扱います。
+- Nexus Descriptionは、page全体を`Page` scopeとして扱います。
+- scopeは、kind、raw releaseまたはFile version、normalized version、releaseまたはFile URL、matched line、scope内visible textを保持します。
+- scopeを確定できないclaimは破棄しません。raw claimへ`web.compatibility.release-scope-unresolved` diagnosticを付けます。
+- latest release scopeは、release version observerが返した最初のvisible releaseまたはFile versionと一致するscopeです。
+- latest scopeだけをcompatibility conclusionへ使います。過去scopeはhistoryへ残します。
+- latest scopeにevidenceがない場合、過去scopeへfallbackしません。
+- conflict時にwinnerを自動選択しません。
 
 ### GitHub / Nexusの限定Web compatibility observation
 
@@ -85,6 +103,7 @@ release version observationとは別に、現在のDesktop sessionで表示中�
 - game名がないlabelは、現在の7DTD adapter contextへ関連付けます。
 - 他game名が明示された値はraw evidenceとして保持しますが、7DTD compatibilityへ変換しません。
 - `Requires Game Version`はcondition evidenceです。単独ではpositive compatibility statusを生成しません。
+- compatibility claimはrelease scopeまたはFile scopeへ関連付けます。scopeの異なるclaimを同じ階層で比較しません。
 - positive targetが1つだけの場合はsource claimとして`Observed`を表示します。
 - positive targetが複数あり内容が異なる場合はwinnerを選ばず、`Unknown`とconflict diagnosticを保持します。
 - `Observed`はsource claimの観測結果です。runtime compatibilityを保証しません。

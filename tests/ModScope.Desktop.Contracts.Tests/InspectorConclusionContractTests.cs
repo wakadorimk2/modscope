@@ -50,11 +50,38 @@ public sealed class InspectorConclusionContractTests
                         "web.compatibility.conflict",
                         "Warning",
                         "Conflicting Web compatibility observations were preserved.")
-                }
+                },
+                ReleaseAssociationStatus = "confirmed",
+                ReleaseAssociationReason = "Confirmed for 0-SCore",
+                ReleaseAssociationEvidence = "GitHubRelease 3.1.25.1615",
+                SelectedLatestReleaseScopeKind = "GitHubRelease",
+                SelectedLatestReleaseScopeRawVersion = "3.1.25.1615",
+                SelectedLatestReleaseScopeVersion = "3.1.25.1615",
+                SelectedLatestReleaseUrl = "https://github.com/Sperell/Sperell.Mods/releases/tag/3.1.25.1615",
+                SelectedLatestReleaseScopeLine = "3.1.25.1615"
             }
         };
 
-        var serialized = JsonSerializer.Serialize(state);
+        var observation = new CompatibilityObservationUiState(
+            "mod-key",
+            "GameVersion",
+            "7DTD",
+            "v3.1.0 (b14)",
+            "3.1.0",
+            "b14",
+            "Game Version: v3.1.0 (b14)",
+            new SourceReferenceUiState("webObservation", "web-session/github/Sperell.SMods/releases"),
+            DateTimeOffset.UnixEpoch,
+            Array.Empty<DiagnosticUiState>())
+        {
+            ReleaseScopeKind = "GitHubRelease",
+            ReleaseScopeRawVersion = "3.1.25.1615",
+            ReleaseScopeVersion = "3.1.25.1615",
+            ReleaseScopeUrl = "https://github.com/Sperell/Sperell.Mods/releases/tag/3.1.25.1615",
+            ReleaseScopeMatchedLine = "3.1.25.1615"
+        };
+
+        var serialized = JsonSerializer.Serialize(new { state, observation });
 
         Assert.Contains("LatestObservedVersion", serialized, StringComparison.Ordinal);
         Assert.Contains("updateAvailable", serialized, StringComparison.Ordinal);
@@ -62,5 +89,8 @@ public sealed class InspectorConclusionContractTests
         Assert.Contains("CompatibilityTarget", serialized, StringComparison.Ordinal);
         Assert.Contains("3.1.0 (b14)", serialized, StringComparison.Ordinal);
         Assert.Contains("web.compatibility.conflict", serialized, StringComparison.Ordinal);
+        Assert.Contains("ReleaseScopeKind", serialized, StringComparison.Ordinal);
+        Assert.Contains("SelectedLatestReleaseUrl", serialized, StringComparison.Ordinal);
+        Assert.Contains("Confirmed for 0-SCore", serialized, StringComparison.Ordinal);
     }
 }

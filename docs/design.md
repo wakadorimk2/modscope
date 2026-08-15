@@ -501,7 +501,10 @@ version observationは、`ModInfo.xml`、MO2 `meta.ini`、explicit manifest、�
 `semver`と`numeric_dotted`だけを同一scheme内で比較します。
 
 比較結果は`equal`、`mismatch`、`Not comparable`、`Not assessed`を分離します。
-identityがexactでない場合は`Not assessed`です。
+package identity stateとWeb release association stateは別に保持します。
+package identityが`Ambiguous`でも、page identity、selected local Modlet、installed local context、automatic Web release scopeが確認できればversion statusを計算します。
+confirmed release associationはMO2 package identityを`Exact`へ変更しません。
+release associationが未確定の場合は`Not assessed`です。
 versionが欠落、schemeが異なる、または比較対象が不足する場合は`Not comparable`です。
 version observationのroleが一致しない場合も`Not comparable`です。
 一般的なlatest crawler、update通知、dependency、compatibility boolean、runtime保証はこのsliceへ追加しません。
@@ -510,16 +513,29 @@ release version observationとWeb compatibility observationは別のevidence mod
 対象surfaceはGitHub Releases、Nexus MODのFiles surface、Nexus MODのDescription surfaceです。
 GitHubではrelease pageの最初のvisible release tagを読みます。
 NexusではFiles surfaceの最初のvisible File versionを読みます。
+GitHub Releasesでは、visibleなrelease tag linkと同じrelease blockのvisible textを1つのrelease scopeとして保持します。
+GitHubのtag pageは1つのrelease scopeとして保持します。
+Nexus Filesでは、visibleなFile versionと同じrowまたはcardのvisible textを1つのFile scopeとして保持します。
+Nexus Descriptionでは、page全体をPage scopeとして保持します。
+scopeには、kind、raw releaseまたはFile version、normalized version、releaseまたはFile URL、matched line、scope内のvisible textを保持します。
+hidden DOM、network API、login情報はscope観測へ使いません。
 互換性観測では、`Game Version`、`Supported Game Version`、`Supported for`、`Compatible with`、`Requires Game Version`のvisible labelだけを読みます。
 `Game Version: v3.1.0 (b14)`はraw value、normalized version `3.1.0`、build `b14`、matched lineを分離して保持します。
 `Requires Game Version`はcondition evidenceです。positive compatibility observationへ自動変換しません。
 positive targetが1つだけの場合は、source claimとして`Observed`を表示します。
 positive targetが複数あり内容が異なる場合は、winnerを選ばず`Unknown`とdiagnosticを表示します。
+compatibility claimはrelease scopeまたはFile scopeへ関連付けます。
+latest scopeのpositive targetだけを結論へ使います。
+過去scopeのclaimはhistoryとして保持します。
+latest scopeにevidenceがない場合は、過去scopeへfallbackしません。
+scopeを確定できないclaimはraw evidenceとして保持し、`web.compatibility.release-scope-unresolved` diagnosticを付けます。
 Web compatibility observationの`Observed`は、7DTD runtimeでの互換性保証を意味しません。
 network API、login情報、任意site parser、推測による候補選択は使いません。
 欠落、複数候補、非対応page、非対応versionはversionを確定せず、diagnostic付きのsession evidenceとして保持します。
-identityが`Ambiguous`、`Missing`、`Conflicting`、`Unresolved`の場合はlatestを表示できますが、version statusは`Not assessed`です。
-exact identityで比較可能な場合だけ、`Update available`、`Up to date`、`Installed newer`を表示します。
+package identityが`Ambiguous`、`Missing`、`Conflicting`、`Unresolved`でも、release associationがconfirmedならlatestとversion statusを表示できます。
+release associationは、page identity confirmation、selected local Modlet、installed local context、automatic Web release observation、latest release scopeの確認で成立します。
+manual Web version入力だけではrelease associationをconfirmedにしません。
+release associationがconfirmedで比較可能な場合だけ、`Update available`、`Up to date`、`Installed newer`を表示します。
 game compatibilityはversion comparisonと別軸です。
 現在のgame versionとのmatchまたはmismatch比較は行いません。
 Web observationはpage navigationと既存の`Observe now`で実行し、現在のDesktop sessionにだけ保持します。
