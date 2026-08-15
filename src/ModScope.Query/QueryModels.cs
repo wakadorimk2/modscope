@@ -74,6 +74,7 @@ public enum QuerySourceReferenceKind
     PackageFile,
     EvidenceManifest,
     WebObservation,
+    NexusApi,
     Diagnostic
 }
 

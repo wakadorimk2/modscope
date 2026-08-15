@@ -1295,6 +1295,15 @@ public partial class MainWindow : Window
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
+            case "knowledge.observeNexusFileVersion":
+            {
+                _ = BridgeProtocol.ReadPayload<ObserveNexusFileVersionPayload>(command.Payload);
+                var observeTask = _controller.ObserveNexusFileVersionAsync();
+                SendState(targetWebView: sourceWebView);
+                await observeTask;
+                SendState(command.RequestId, sourceWebView);
+                break;
+            }
             case "analysis.selectBaseData":
             {
                 var path = ChooseFolder("Select the 7 Days to Die base Data/Config folder");

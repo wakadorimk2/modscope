@@ -30,7 +30,8 @@ internal static class DesktopStateMapper
         IReadOnlyList<DeploymentDiagnostic>? deploymentDiagnostics = null,
         VersionObservationReadModel? sessionWebVersionObservation = null,
         IReadOnlyList<CompatibilityObservationReadModel>? sessionWebCompatibilityObservations = null,
-        IReadOnlyList<DiagnosticReadModel>? sessionWebCompatibilityDiagnostics = null)
+        IReadOnlyList<DiagnosticReadModel>? sessionWebCompatibilityDiagnostics = null,
+        IReadOnlyDictionary<string, VersionObservationReadModel>? sessionNexusFileVersionObservations = null)
     {
         return new UiState(
             browser,
@@ -56,7 +57,8 @@ internal static class DesktopStateMapper
                     localContext,
                     sessionWebVersionObservation,
                     sessionWebCompatibilityObservations ?? Array.Empty<CompatibilityObservationReadModel>(),
-                    sessionWebCompatibilityDiagnostics ?? Array.Empty<DiagnosticReadModel>()),
+                    sessionWebCompatibilityDiagnostics ?? Array.Empty<DiagnosticReadModel>(),
+                    sessionNexusFileVersionObservations ?? new Dictionary<string, VersionObservationReadModel>(StringComparer.OrdinalIgnoreCase)),
             analysis,
             Deployment(
                 session?.ProfileName ?? string.Empty,
@@ -299,11 +301,16 @@ internal static class DesktopStateMapper
         LocalContextReadModel? localContext,
         VersionObservationReadModel? sessionWebVersionObservation,
         IReadOnlyList<CompatibilityObservationReadModel> sessionWebCompatibilityObservations,
-        IReadOnlyList<DiagnosticReadModel> sessionWebCompatibilityDiagnostics)
+        IReadOnlyList<DiagnosticReadModel> sessionWebCompatibilityDiagnostics,
+        IReadOnlyDictionary<string, VersionObservationReadModel> sessionNexusFileVersionObservations)
     {
         var packageRelation = value.PackageRelation is null
             ? null
-            : PackageRelation(value.PackageRelation, value.ModKey, sessionWebVersionObservation);
+            : PackageRelation(
+                value.PackageRelation,
+                value.ModKey,
+                sessionWebVersionObservation,
+                sessionNexusFileVersionObservations);
         var applicableCompatibilityObservations = sessionWebCompatibilityObservations
             .Where(observation => string.Equals(observation.OwnerKey, value.ModKey, StringComparison.OrdinalIgnoreCase))
             .ToList()
@@ -433,16 +440,45 @@ internal static class DesktopStateMapper
     private static PackageRelationUiState PackageRelation(
         PackageRelationReadModel value,
         string? modKey = null,
-        VersionObservationReadModel? sessionWebVersionObservation = null)
+        VersionObservationReadModel? sessionWebVersionObservation = null,
+        IReadOnlyDictionary<string, VersionObservationReadModel>? sessionNexusFileVersionObservations = null)
     {
-        var applicableSessionObservation = sessionWebVersionObservation is not null
-            && string.Equals(sessionWebVersionObservation.OwnerKey, modKey, StringComparison.OrdinalIgnoreCase)
-            ? new[] { sessionWebVersionObservation }
-            : Array.Empty<VersionObservationReadModel>();
-        var observations = value.VersionObservations
-            .Concat(applicableSessionObservation)
-            .ToList()
-            .AsReadOnly();
+        var allObservations = value.VersionObservations.ToList();
+        var comparisonObservations = value.Comparison.Observations
+            .Where(observation =>
+                string.Equals(observation.SourceKind, "Mo2MetaIni", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(observation.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var nexusObservations = value.SourceArtifacts
+            .Select(artifact => sessionNexusFileVersionObservations is not null
+                && sessionNexusFileVersionObservations.TryGetValue(artifact.ArtifactId, out var observation)
+                ? observation
+                : null)
+            .Where(observation => observation is not null)
+            .Cast<VersionObservationReadModel>()
+            .ToList();
+
+        foreach (var observation in nexusObservations)
+        {
+            allObservations.RemoveAll(existing =>
+                string.Equals(existing.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.OwnerKey, observation.OwnerKey, StringComparison.OrdinalIgnoreCase));
+            allObservations.Add(observation);
+            comparisonObservations.RemoveAll(existing =>
+                string.Equals(existing.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.OwnerKey, observation.OwnerKey, StringComparison.OrdinalIgnoreCase));
+            comparisonObservations.Add(observation);
+        }
+
+        if (sessionWebVersionObservation is not null
+            && string.Equals(sessionWebVersionObservation.OwnerKey, modKey, StringComparison.OrdinalIgnoreCase))
+        {
+            allObservations.RemoveAll(existing =>
+                string.Equals(existing.SourceKind, "WebObservation", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.OwnerKey, sessionWebVersionObservation.OwnerKey, StringComparison.OrdinalIgnoreCase));
+            allObservations.Add(sessionWebVersionObservation);
+        }
+
         return new PackageRelationUiState(
             value.PackageDirectoryName,
             value.ModletCount,
@@ -464,8 +500,8 @@ internal static class DesktopStateMapper
                     Source(artifact.Source)))
                 .ToList()
                 .AsReadOnly(),
-            observations.Select(VersionObservation).ToList().AsReadOnly(),
-            VersionComparison(value, observations),
+            allObservations.Select(VersionObservation).ToList().AsReadOnly(),
+            VersionComparison(value, comparisonObservations),
             Diagnostics(value.Diagnostics));
     }
 
@@ -540,21 +576,53 @@ internal static class DesktopStateMapper
             .Where(observation => string.Equals(observation.SourceKind, "WebObservation", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(observation => observation.ObservedAtUtc)
             .FirstOrDefault();
-        var installedVersion = inspector.ModInfo?.Version;
+        var nexusFile = observations
+            .Where(observation => string.Equals(observation.SourceKind, "NexusApi", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(observation => observation.ObservedAtUtc)
+            .FirstOrDefault();
+        var observedVersion = nexusFile ?? latest;
+        var installedVersion = nexusFile is null
+            ? inspector.ModInfo?.Version
+            : observations
+                .Where(observation => string.Equals(observation.SourceKind, "Mo2MetaIni", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(observation => observation.ObservedAtUtc)
+                .Select(observation => observation.RawValue)
+                .FirstOrDefault();
         var installedSource = string.IsNullOrWhiteSpace(installedVersion)
             ? null
-            : Source(inspector.ModInfo!.Source);
-        var latestVersion = latest?.RawValue;
-        var releaseAssociation = DetermineReleaseAssociation(
-            inspector,
-            identity,
-            localContext,
-            latest,
-            packageRelation);
+            : nexusFile is null
+                ? Source(inspector.ModInfo!.Source)
+                : observations
+                    .Where(observation => string.Equals(observation.SourceKind, "Mo2MetaIni", StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(observation => observation.ObservedAtUtc)
+                    .Select(observation => observation.Source)
+                    .FirstOrDefault();
+        var latestVersion = observedVersion?.RawValue;
+        var releaseAssociation = nexusFile is not null
+            ? ReleaseAssociationResult.NotAssessed("Nexus File observation does not establish latest or release association.")
+            : DetermineReleaseAssociation(
+                inspector,
+                identity,
+                localContext,
+                latest,
+                packageRelation);
         var versionStatus = "notAssessed";
         var versionReason = "No GitHub Releases, Nexus Files, or Nexus mod page version was observed in this session.";
 
-        if (packageRelation is null)
+        if (nexusFile is not null)
+        {
+            var comparisonStatus = packageRelation?.Comparison.Status ?? "notAssessed";
+            versionStatus = string.Equals(comparisonStatus, "equal", StringComparison.OrdinalIgnoreCase)
+                ? "equal"
+                : string.Equals(comparisonStatus, "mismatch", StringComparison.OrdinalIgnoreCase)
+                    ? "mismatch"
+                    : string.Equals(comparisonStatus, "notComparable", StringComparison.OrdinalIgnoreCase)
+                        ? "notComparable"
+                        : "notAssessed";
+            versionReason = packageRelation?.Comparison.Reason
+                ?? "Nexus File comparison evidence is not available.";
+        }
+        else if (packageRelation is null)
         {
             versionReason = "Package identity and version evidence are not available.";
         }
@@ -630,13 +698,18 @@ internal static class DesktopStateMapper
             "updateAvailable" => "Update available",
             "upToDate" => "Up to date",
             "installedNewer" => "Installed newer",
+            "equal" => "Installed vs Nexus File: Equal",
+            "mismatch" => "Installed vs Nexus File: Mismatch",
+            "notComparable" => "Installed vs Nexus File: Not comparable",
             _ => "Release comparison not assessed"
         };
-        var why = latest is null
-            ? versionReason
-            : latest.RawValue is null
-                ? latest.Evidence ?? versionReason
-                : $"{latest.Evidence ?? "Release version observed"} from {latest.SourceSite ?? "the current Web page"}.";
+        var why = nexusFile is not null
+            ? $"Nexus File version observed from {nexusFile.Source.RelativePath}. {versionReason}"
+            : latest is null
+                ? versionReason
+                : latest.RawValue is null
+                    ? latest.Evidence ?? versionReason
+                    : $"{latest.Evidence ?? "Release version observed"} from {latest.SourceSite ?? "the current Web page"}.";
         return new InspectorConclusionUiState(
             installedVersion,
             latestVersion,
@@ -648,10 +721,10 @@ internal static class DesktopStateMapper
             identityConfidence,
             why,
             installedSource,
-            latest?.Source,
-            latest?.SourceSite,
-            latest?.TargetUrl,
-            latest?.ObservedAtUtc)
+            observedVersion?.Source,
+            nexusFile is not null ? "Nexus API" : observedVersion?.SourceSite,
+            nexusFile is not null ? observedVersion?.Source.RelativePath : observedVersion?.TargetUrl,
+            observedVersion?.ObservedAtUtc)
         {
             Summary = summary,
             CompatibilityTarget = compatibility.Target,
@@ -972,31 +1045,30 @@ internal static class DesktopStateMapper
         PackageRelationReadModel package,
         IReadOnlyList<VersionObservationReadModel> observations)
     {
-        var status = package.Comparison.Status;
-        var reason = package.Comparison.Reason;
-        if (observations.Count != package.VersionObservations.Count)
+        var status = package.IdentityState != QueryIdentityResolutionState.Exact
+            ? QueryVersionComparisonStatus.NotAssessed
+            : QueryVersionComparisonStatus.NotComparable;
+        var reason = package.IdentityState != QueryIdentityResolutionState.Exact
+            ? "Identity is not exact, so the MO2 meta.ini and Nexus File comparison was not assessed."
+            : "Both an MO2 meta.ini version and a Nexus File version are required.";
+        var comparable = observations
+            .Where(observation => !string.IsNullOrWhiteSpace(observation.NormalizedValue))
+            .ToList();
+        if (package.IdentityState == QueryIdentityResolutionState.Exact
+            && observations.Count >= 2
+            && comparable.Count == observations.Count)
         {
-            if (package.IdentityState != QueryIdentityResolutionState.Exact)
+            if (observations.Any(observation => !string.Equals(observation.Role, "Release", StringComparison.OrdinalIgnoreCase)))
             {
-                status = QueryVersionComparisonStatus.NotAssessed;
-                reason = "Identity is not exact, so the session Web observation was not assessed.";
+                reason = "The MO2 meta.ini and Nexus File observations do not use the release role.";
             }
             else
             {
-                var comparable = observations
-                    .Where(observation => !string.IsNullOrWhiteSpace(observation.NormalizedValue))
-                    .ToList();
                 var schemes = comparable.Select(observation => observation.Scheme).Distinct().ToList();
-                if (comparable.Count < 2)
-                {
-                    status = QueryVersionComparisonStatus.NotComparable;
-                    reason = "At least two version observations are required.";
-                }
-                else if (schemes.Count != 1
+                if (schemes.Count != 1
                     || schemes[0] is not (QueryVersionScheme.Semver or QueryVersionScheme.NumericDotted))
                 {
-                    status = QueryVersionComparisonStatus.NotComparable;
-                    reason = "The observations do not use one supported version scheme.";
+                    reason = "The MO2 meta.ini and Nexus File observations do not use one supported version scheme.";
                 }
                 else
                 {
@@ -1007,8 +1079,8 @@ internal static class DesktopStateMapper
                         ? QueryVersionComparisonStatus.Equal
                         : QueryVersionComparisonStatus.Mismatch;
                     reason = equal
-                        ? "All supported observations have the same normalized value."
-                        : "Supported observations have different normalized values.";
+                        ? "The MO2 meta.ini and Nexus File versions have the same normalized value."
+                        : "The MO2 meta.ini and Nexus File versions have different normalized values.";
                 }
             }
         }

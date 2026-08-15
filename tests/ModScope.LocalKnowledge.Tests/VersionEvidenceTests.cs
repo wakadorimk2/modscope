@@ -261,7 +261,8 @@ public sealed class VersionEvidenceTests
             Assert.True(record.PackageEvidence.Package.ModletCount > 1);
             Assert.Equal(IdentityResolutionState.Exact, record.PackageEvidence.IdentityState);
             Assert.Single(record.PackageEvidence.SourceArtifacts);
-            Assert.Equal(VersionComparisonStatus.Equal, record.PackageEvidence.Comparison.Status);
+            Assert.Equal(VersionComparisonStatus.NotComparable, record.PackageEvidence.Comparison.Status);
+            Assert.Single(record.PackageEvidence.Comparison.Observations);
         });
     }
 
@@ -295,6 +296,125 @@ public sealed class VersionEvidenceTests
             new[] { Artifact("artifact-1", "999", "456") },
             new[] { "artifact-1" });
         Assert.Equal(IdentityResolutionState.Conflicting, conflicting.IdentityState);
+    }
+
+    [Fact]
+    public void DerivesOnePackageLevelNexusArtifactFromPositiveMetaIds()
+    {
+        var metadata = Metadata("000123", "000456");
+        var source = new SourceReference(SourceReferenceKind.ModDirectory, "mods/synthetic-package");
+        var records = new[]
+        {
+            Record("synthetic-package/modlet-01", "modlet-01", metadata, source),
+            Record("synthetic-package/modlet-02", "modlet-02", metadata, source)
+        };
+
+        var attached = VersionEvidenceAssembler.Attach(records, null);
+
+        Assert.All(attached, record =>
+        {
+            var evidence = Assert.IsType<PackageVersionEvidence>(record.PackageEvidence);
+            var artifact = Assert.Single(evidence.SourceArtifacts);
+            Assert.Equal("nexus-file:123:456", artifact.ArtifactId);
+            Assert.Equal("123", artifact.ModId);
+            Assert.Equal("456", artifact.FileId);
+            Assert.Equal(
+                "https://www.nexusmods.com/7daystodie/mods/123?tab=files&file_id=456",
+                artifact.SourceUrl);
+            Assert.Equal(SourceReferenceKind.PackageFile, artifact.Source.Kind);
+            Assert.Equal(IdentityResolutionState.Exact, evidence.IdentityState);
+            Assert.Equal(2, evidence.Package.ModletCount);
+            Assert.Single(evidence.VersionObservations);
+            Assert.Equal(VersionObservationSourceKind.Mo2MetaIni, evidence.VersionObservations[0].SourceKind);
+            Assert.Single(evidence.Comparison.Observations);
+            Assert.Equal(VersionObservationSourceKind.Mo2MetaIni, evidence.Comparison.Observations[0].SourceKind);
+            Assert.Equal(VersionComparisonStatus.NotComparable, evidence.Comparison.Status);
+        });
+    }
+
+    [Fact]
+    public void DoesNotResolveIdentityFromNamesUrlsOrInvalidMetaIds()
+    {
+        var missing = VersionEvidenceAssembler.Attach(
+                new[] { Record("synthetic-package/modlet-01", "modlet-01", Metadata(null, null), new SourceReference(SourceReferenceKind.ModDirectory, "mods/synthetic-package")) },
+                null)
+            .Single()
+            .PackageEvidence!;
+        Assert.Equal(IdentityResolutionState.Missing, missing.IdentityState);
+        Assert.Empty(missing.SourceArtifacts);
+
+        var invalid = VersionEvidenceAssembler.Attach(
+                new[] { Record("synthetic-package/modlet-01", "modlet-01", Metadata("abc", "-456"), new SourceReference(SourceReferenceKind.ModDirectory, "mods/synthetic-package")) },
+                null)
+            .Single()
+            .PackageEvidence!;
+        Assert.Equal(IdentityResolutionState.Unresolved, invalid.IdentityState);
+        Assert.Empty(invalid.SourceArtifacts);
+        Assert.Contains(invalid.Diagnostics, diagnostic => diagnostic.Code == "package.identity.meta.numeric.invalid");
+    }
+
+    [Fact]
+    public void KeepsModInfoAndMetaVersionsSeparateAndUsesOnlyMetaForPackageComparison()
+    {
+        var source = new SourceReference(SourceReferenceKind.ModDirectory, "mods/synthetic-package");
+        var modInfo = new ModInfoMetadata(
+            "mods/synthetic-package/ModInfo.xml",
+            XmlParseStatus.Parsed,
+            "Synthetic",
+            "Synthetic",
+            "1.2.4",
+            null,
+            null,
+            null,
+            Array.Empty<RawXmlObservation>(),
+            Array.Empty<Diagnostic>(),
+            new SourceReference(SourceReferenceKind.ModFile, "mods/synthetic-package/ModInfo.xml"));
+        var record = Record(
+            "synthetic-package/modlet-01",
+            "modlet-01",
+            Metadata("123", "456"),
+            source,
+            modInfo);
+
+        var evidence = VersionEvidenceAssembler.Attach(new[] { record }, null).Single().PackageEvidence!;
+
+        Assert.Contains(evidence.VersionObservations, observation =>
+            observation.SourceKind == VersionObservationSourceKind.ModInfoXml
+            && observation.RawValue == "1.2.4");
+        Assert.Contains(evidence.VersionObservations, observation =>
+            observation.SourceKind == VersionObservationSourceKind.Mo2MetaIni
+            && observation.RawValue == "1.2.3");
+        Assert.Contains(evidence.Diagnostics, diagnostic => diagnostic.Code == "package.version.local-conflict");
+        Assert.Single(evidence.Comparison.Observations);
+        Assert.Equal(VersionObservationSourceKind.Mo2MetaIni, evidence.Comparison.Observations[0].SourceKind);
+        Assert.Equal(VersionComparisonStatus.NotComparable, evidence.Comparison.Status);
+    }
+
+    [Fact]
+    public void ComparesOnlyMo2MetaAndNexusApiObservations()
+    {
+        var meta = Observation("package", "v1.02.003", VersionObservationSourceKind.Mo2MetaIni);
+        var nexus = Observation("nexus-file:123:456", "1.2.3", VersionObservationSourceKind.NexusApi);
+
+        var equal = VersionComparator.ComparePackage(IdentityResolutionState.Exact, meta, nexus);
+        Assert.Equal(VersionComparisonStatus.Equal, equal.Status);
+        Assert.Equal(new[] { VersionObservationSourceKind.Mo2MetaIni, VersionObservationSourceKind.NexusApi }, equal.Observations.Select(observation => observation.SourceKind));
+
+        var mismatch = VersionComparator.ComparePackage(
+            IdentityResolutionState.Exact,
+            meta,
+            Observation("nexus-file:123:456", "1.2.4", VersionObservationSourceKind.NexusApi));
+        Assert.Equal(VersionComparisonStatus.Mismatch, mismatch.Status);
+
+        var unsupported = VersionComparator.ComparePackage(
+            IdentityResolutionState.Exact,
+            meta,
+            Observation("nexus-file:123:456", "1.2.3.4", VersionObservationSourceKind.NexusApi));
+        Assert.Equal(VersionComparisonStatus.NotComparable, unsupported.Status);
+
+        var notAssessed = VersionComparator.ComparePackage(IdentityResolutionState.Ambiguous, meta, nexus);
+        Assert.Equal(VersionComparisonStatus.NotAssessed, notAssessed.Status);
+        Assert.Equal(2, notAssessed.Observations.Count);
     }
 
     private static PackageVersionEvidence AttachPackage(
@@ -356,7 +476,8 @@ public sealed class VersionEvidenceTests
         string modKey,
         string directoryName,
         Mo2PackageMetadata metadata,
-        SourceReference source)
+        SourceReference source,
+        ModInfoMetadata? modInfo = null)
     {
         return new LocalModRecord(
             directoryName,
@@ -365,7 +486,7 @@ public sealed class VersionEvidenceTests
             ModEnabledState.Enabled,
             0,
             modKey,
-            null,
+            modInfo,
             Array.Empty<ModFileRecord>(),
             Array.Empty<XmlFileReference>(),
             Array.Empty<Diagnostic>(),
@@ -384,9 +505,13 @@ public sealed class VersionEvidenceTests
         VersionObservationRole role = VersionObservationRole.Release)
     {
         var source = new SourceReference(
-            sourceKind == VersionObservationSourceKind.EvidenceManifest
-                ? SourceReferenceKind.EvidenceManifest
-                : SourceReferenceKind.ModFile,
+            sourceKind switch
+            {
+                VersionObservationSourceKind.EvidenceManifest => SourceReferenceKind.EvidenceManifest,
+                VersionObservationSourceKind.Mo2MetaIni => SourceReferenceKind.PackageFile,
+                VersionObservationSourceKind.NexusApi => SourceReferenceKind.NexusApi,
+                _ => SourceReferenceKind.ModFile
+            },
             $"evidence/{ownerKey}");
         var normalized = VersionNormalizer.Normalize(rawValue, out var scheme);
         return new VersionObservation(

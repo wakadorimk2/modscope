@@ -545,6 +545,36 @@ game compatibilityはversion comparisonと別軸です。
 Web observationはpage navigationと既存の`Observe now`で実行し、現在のDesktop sessionにだけ保持します。
 既存の手動Web version入力は、Advanced evidence内のfallbackとして残します。
 
+#### 7.5.2 Installed vs Nexus File observed version
+
+MO2 `meta.ini`にある正の数値の`modId`と`fileId`だけを、Nexus File identityの自動解決へ使います。
+artifact IDは`nexus-file:{modId}:{fileId}`へ正規化します。
+manifestのpackage bindingがある場合は、manifest bindingを優先します。
+bindingが複数の場合は`Ambiguous`を維持します。
+name、title、URL、fuzzy matchingだけではartifactを導出しません。
+1 packageに複数のModletがある場合も、packageへ1つのartifactだけを結び付けます。
+ModletごとのNexus File identityは作りません。
+
+今回のNexus source versionは、Nexus File APIの`version`です。
+`ModInfo.xml`のversion、MO2 `meta.ini`のversion、Nexus Fileのversionは別のobservationとして保持します。
+primary comparisonはMO2 `meta.ini`対Nexus Fileだけです。
+`latest`、`outdated`、update notificationは判定しません。
+`ModInfo.xml`と`meta.ini`が異なる場合はlocal conflict diagnosticを保持します。
+このdiagnosticはprimary comparisonへ`ModInfo.xml`を追加しません。
+
+Nexus File observationは、明示操作で1 packageずつ取得します。
+endpointは7DTDのFile info APIへ限定します。
+自動refresh、bulk crawler、retry、page scrapingは行いません。
+API failure diagnosticとidentity failure diagnosticは分離します。
+responseの`file_id`が要求IDと異なる場合はversionを採用しません。
+JSON全体、API key、cookieは保持しません。
+
+API keyはDesktop起動前に`MODSCOPE_NEXUS_API_KEY`環境変数から読みます。
+API keyはbridge payload、frontend state、ログへ渡しません。
+Nexus observationはDesktop session内だけに保持します。
+sourceまたはprofileを再読み込みすると、session observationを破棄します。
+MO2の`meta.ini`、`modlist.txt`、ModInfo.xml、MOD本体は変更しません。
+
 Desktopだけがnative file pickerで明示されたmanifest pathを扱います。
 Web frontendへabsolute path、manifest path、raw local file contentを渡しません。
 Web version observationは現在のDesktop sessionにだけ保持します。

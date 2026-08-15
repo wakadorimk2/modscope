@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using ModScope.Deployment;
 using ModScope.Desktop.Contracts;
 using ModScope.LocalKnowledge;
@@ -9,6 +10,7 @@ namespace ModScope.Desktop;
 public sealed class DesktopSessionController
 {
     private readonly ILocalKnowledgeQuery _query;
+    private readonly INexusFileVersionClient _nexusFileVersionClient;
     private readonly IModDeploymentService _deployment;
     private readonly IGameLauncher _gameLauncher;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
@@ -16,6 +18,8 @@ public sealed class DesktopSessionController
     private KnowledgeSessionReadModel? _session;
     private PageObservation? _observation;
     private VersionObservationReadModel? _sessionWebVersionObservation;
+    private readonly Dictionary<string, VersionObservationReadModel> _sessionNexusFileVersionObservations =
+        new(StringComparer.OrdinalIgnoreCase);
     private PendingWebVersionObservation? _pendingWebVersionObservation;
     private IReadOnlyList<CompatibilityObservationReadModel> _sessionWebCompatibilityObservations =
         Array.Empty<CompatibilityObservationReadModel>();
@@ -69,12 +73,13 @@ public sealed class DesktopSessionController
         : this(
             LocalKnowledgeQueryService.CreateDefault(),
             new ModDeploymentService(),
-            new SteamGameLauncher())
+            new SteamGameLauncher(),
+            CreateNexusFileVersionClient())
     {
     }
 
     internal DesktopSessionController(ILocalKnowledgeQuery query)
-        : this(query, new ModDeploymentService(), new SteamGameLauncher())
+        : this(query, new ModDeploymentService(), new SteamGameLauncher(), CreateNexusFileVersionClient())
     {
     }
 
@@ -82,10 +87,20 @@ public sealed class DesktopSessionController
         ILocalKnowledgeQuery query,
         IModDeploymentService deployment,
         IGameLauncher gameLauncher)
+        : this(query, deployment, gameLauncher, CreateNexusFileVersionClient())
+    {
+    }
+
+    internal DesktopSessionController(
+        ILocalKnowledgeQuery query,
+        IModDeploymentService deployment,
+        IGameLauncher gameLauncher,
+        INexusFileVersionClient nexusFileVersionClient)
     {
         _query = query ?? throw new ArgumentNullException(nameof(query));
         _deployment = deployment ?? throw new ArgumentNullException(nameof(deployment));
         _gameLauncher = gameLauncher ?? throw new ArgumentNullException(nameof(gameLauncher));
+        _nexusFileVersionClient = nexusFileVersionClient ?? throw new ArgumentNullException(nameof(nexusFileVersionClient));
     }
 
     public void UseFixture()
@@ -751,6 +766,69 @@ public sealed class DesktopSessionController
         _statusMessage = "The session Web version observation was added.";
     }
 
+    public async Task<bool> ObserveNexusFileVersionAsync()
+    {
+        ThrowIfAnalysisBusy();
+        if (_inspector is null)
+        {
+            _statusMessage = "Open a local MOD Inspector before observing a Nexus File version.";
+            return false;
+        }
+
+        var relation = _inspector.PackageRelation;
+        if (relation is null)
+        {
+            _statusMessage = "The selected MOD has no package relation for Nexus File observation.";
+            return false;
+        }
+
+        if (relation.IdentityState != QueryIdentityResolutionState.Exact)
+        {
+            _statusMessage = "Nexus File observation requires an AutoResolved package identity.";
+            return false;
+        }
+
+        var artifacts = relation.SourceArtifacts
+            .Where(artifact => string.Equals(artifact.Kind, "nexus-file", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (artifacts.Count != 1)
+        {
+            _statusMessage = "Nexus File observation requires exactly one package-level Nexus File artifact.";
+            return false;
+        }
+
+        var artifact = artifacts[0];
+        await _operationGate.WaitAsync();
+        var operationToken = BeginOperation("nexus-file-version", artifact.ArtifactId);
+        try
+        {
+            try
+            {
+                var observation = await _nexusFileVersionClient.ObserveAsync(ToSourceArtifact(artifact));
+                _sessionNexusFileVersionObservations[artifact.ArtifactId] = LocalKnowledgeQueryService.ProjectVersionObservation(observation);
+                _statusMessage = observation.Diagnostics.Count == 0
+                    ? "Nexus File version observation was added to this session."
+                    : "Nexus File version observation completed with diagnostics.";
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                _statusMessage = "Nexus File version observation was canceled.";
+                return false;
+            }
+            catch (Exception)
+            {
+                _statusMessage = "Nexus File version observation failed. No local source data was changed.";
+                return false;
+            }
+        }
+        finally
+        {
+            EndOperation(operationToken);
+            _operationGate.Release();
+        }
+    }
+
     public void ConfirmIdentity(string candidateIdentity, string? localModKey)
     {
         if (_observation is null)
@@ -828,7 +906,8 @@ public sealed class DesktopSessionController
             _deploymentDiagnostics,
             _sessionWebVersionObservation,
             _sessionWebCompatibilityObservations,
-            _sessionWebCompatibilityDiagnostics);
+            _sessionWebCompatibilityDiagnostics,
+            _sessionNexusFileVersionObservations);
     }
 
     private async Task<bool> LoadSourceCandidateCoreAsync(
@@ -1175,6 +1254,48 @@ public sealed class DesktopSessionController
         }
     }
 
+    private static SourceArtifact ToSourceArtifact(SourceArtifactReadModel value)
+    {
+        return new SourceArtifact(
+            value.ArtifactId,
+            value.Kind,
+            value.Name,
+            value.ModId,
+            value.FileId,
+            value.SourceUrl,
+            new SourceReference(
+                ToSourceReferenceKind(value.Source.Kind),
+                value.Source.RelativePath,
+                value.Source.LineNumber,
+                value.Source.ColumnNumber));
+    }
+
+    private static SourceReferenceKind ToSourceReferenceKind(QuerySourceReferenceKind kind)
+    {
+        return kind switch
+        {
+            QuerySourceReferenceKind.ProfileFile => SourceReferenceKind.ProfileFile,
+            QuerySourceReferenceKind.InstanceFile => SourceReferenceKind.InstanceFile,
+            QuerySourceReferenceKind.ModDirectory => SourceReferenceKind.ModDirectory,
+            QuerySourceReferenceKind.ModFile => SourceReferenceKind.ModFile,
+            QuerySourceReferenceKind.GameDataFile => SourceReferenceKind.GameDataFile,
+            QuerySourceReferenceKind.RuntimeLog => SourceReferenceKind.RuntimeLog,
+            QuerySourceReferenceKind.PackageFile => SourceReferenceKind.PackageFile,
+            QuerySourceReferenceKind.EvidenceManifest => SourceReferenceKind.EvidenceManifest,
+            QuerySourceReferenceKind.WebObservation => SourceReferenceKind.WebObservation,
+            QuerySourceReferenceKind.NexusApi => SourceReferenceKind.NexusApi,
+            QuerySourceReferenceKind.Diagnostic => SourceReferenceKind.Diagnostic,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
+        };
+    }
+
+    private static INexusFileVersionClient CreateNexusFileVersionClient()
+    {
+        return new NexusFileVersionClient(
+            new HttpClient { Timeout = TimeSpan.FromSeconds(30) },
+            Environment.GetEnvironmentVariable(NexusFileVersionClient.ApiKeyEnvironmentVariable));
+    }
+
     private static Mo2SourceDefinition ToDefinition(Mo2SourceInput source)
     {
         return new Mo2SourceDefinition(
@@ -1201,6 +1322,7 @@ public sealed class DesktopSessionController
     private void ApplyProfileSession(KnowledgeSessionReadModel session)
     {
         _session = session;
+        _sessionNexusFileVersionObservations.Clear();
         _candidates = _query.GetModCandidates();
         _profiles = _query.GetProfiles();
         InitializeProfileLoadStates(session.ProfileName);
@@ -1254,6 +1376,7 @@ public sealed class DesktopSessionController
     {
         _session = session;
         _sessionWebVersionObservation = null;
+        _sessionNexusFileVersionObservations.Clear();
         _pendingWebVersionObservation = null;
         _sessionWebCompatibilityObservations = Array.Empty<CompatibilityObservationReadModel>();
         _sessionWebCompatibilityDiagnostics = Array.Empty<DiagnosticReadModel>();

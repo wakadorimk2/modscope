@@ -24,7 +24,8 @@ public enum VersionObservationSourceKind
     ModInfoXml,
     Mo2MetaIni,
     EvidenceManifest,
-    WebObservation
+    WebObservation,
+    NexusApi
 }
 
 public enum VersionObservationRole
@@ -693,23 +694,34 @@ public static class VersionEvidenceAssembler
                 var packageDirectory = record.Mo2OuterDirectoryName ?? record.DirectoryName;
                 var count = packageCounts.TryGetValue(packageDirectory, out var packageCount) ? packageCount : 1;
                 var metadata = record.PackageMetadata ?? MissingMetadata(packageDirectory);
-                var artifactIds = manifest?.PackageArtifactBindings.TryGetValue(packageDirectory, out var boundIds) == true
-                    ? boundIds
-                    : Array.Empty<string>();
-                var artifacts = artifactIds
-                    .Where(artifactsById.ContainsKey)
-                    .Select(id => artifactsById[id])
-                    .ToList()
-                    .AsReadOnly();
-                var identity = ResolveIdentity(metadata, artifacts, artifactIds.Count);
+                IReadOnlyList<string> artifactIds = Array.Empty<string>();
+                var hasManifestBinding = false;
+                if (manifest?.PackageArtifactBindings.TryGetValue(packageDirectory, out var boundIds) == true)
+                {
+                    artifactIds = boundIds;
+                    hasManifestBinding = boundIds.Count > 0;
+                }
+                var artifacts = hasManifestBinding
+                    ? artifactIds
+                        .Where(artifactsById.ContainsKey)
+                        .Select(id => artifactsById[id])
+                        .ToList()
+                        .AsReadOnly()
+                    : DeriveArtifacts(metadata);
+                var identity = ResolveIdentity(metadata, artifacts, artifactIds.Count, hasManifestBinding);
                 var package = new MO2Package(
                     packageDirectory,
                     record.Mo2OuterSource ?? record.Source,
                     metadata,
                     count);
-                var observations = BuildObservations(record, package, artifacts, manifest);
-                var comparison = VersionComparator.Compare(identity.State, observations);
+                var observations = BuildObservations(record, package, manifest);
+                var comparison = VersionComparator.ComparePackage(
+                    identity.State,
+                    FirstObservation(observations, VersionObservationSourceKind.Mo2MetaIni),
+                    FirstObservation(observations, VersionObservationSourceKind.NexusApi));
                 var diagnostics = metadata.Diagnostics
+                    .Concat(BuildIdentityDiagnostics(metadata))
+                    .Concat(BuildLocalVersionDiagnostics(observations, metadata.Source))
                     .Concat(comparison.Observations.SelectMany(observation => observation.Diagnostics))
                     .ToList()
                     .AsReadOnly();
@@ -730,25 +742,40 @@ public static class VersionEvidenceAssembler
     private static (IdentityResolutionState State, string Reason) ResolveIdentity(
         Mo2PackageMetadata metadata,
         IReadOnlyList<SourceArtifact> artifacts,
-        int boundArtifactCount)
+        int boundArtifactCount,
+        bool hasManifestBinding)
     {
         var hasModId = !string.IsNullOrWhiteSpace(metadata.ModId);
         var hasFileId = !string.IsNullOrWhiteSpace(metadata.FileId);
+        var hasInvalidId = (hasModId && !TryNormalizePositiveId(metadata.ModId, out _))
+            || (hasFileId && !TryNormalizePositiveId(metadata.FileId, out _));
         if (artifacts.Count > 1 || boundArtifactCount > 1)
         {
             return (IdentityResolutionState.Ambiguous, "The package is bound to multiple source artifacts.");
         }
 
+        if (hasManifestBinding && artifacts.Count == 0)
+        {
+            return (IdentityResolutionState.Unresolved, "The manifest binding does not resolve to a known source artifact.");
+        }
+
         if (artifacts.Count == 1)
         {
             var artifact = artifacts[0];
-            if ((hasModId && !string.Equals(metadata.ModId, artifact.ModId, StringComparison.OrdinalIgnoreCase))
-                || (hasFileId && !string.Equals(metadata.FileId, artifact.FileId, StringComparison.OrdinalIgnoreCase)))
+            if ((!hasInvalidId && hasModId && !string.IsNullOrWhiteSpace(artifact.ModId)
+                    && !IdsEqual(metadata.ModId, artifact.ModId))
+                || (!hasInvalidId && hasFileId && !string.IsNullOrWhiteSpace(artifact.FileId)
+                    && !IdsEqual(metadata.FileId, artifact.FileId)))
             {
                 return (IdentityResolutionState.Conflicting, "MO2 meta.ini identifiers conflict with the bound source artifact.");
             }
 
-            return (IdentityResolutionState.Exact, "The package has one explicit source artifact binding.");
+            return (IdentityResolutionState.Exact, "The package has one explicit source artifact binding, which takes precedence over derived identity.");
+        }
+
+        if (hasInvalidId)
+        {
+            return (IdentityResolutionState.Unresolved, "MO2 meta.ini contains a non-positive or non-numeric source identifier.");
         }
 
         if (hasModId && hasFileId)
@@ -762,6 +789,118 @@ public static class VersionEvidenceAssembler
         }
 
         return (IdentityResolutionState.Missing, "No explicit source artifact identity was observed.");
+    }
+
+    private static IReadOnlyList<SourceArtifact> DeriveArtifacts(Mo2PackageMetadata metadata)
+    {
+        if (!TryNormalizePositiveId(metadata.ModId, out var modId)
+            || !TryNormalizePositiveId(metadata.FileId, out var fileId))
+        {
+            return Array.Empty<SourceArtifact>();
+        }
+
+        var sourceUrl = $"https://www.nexusmods.com/7daystodie/mods/{modId}?tab=files&file_id={fileId}";
+        return new[]
+        {
+            new SourceArtifact(
+                $"nexus-file:{modId}:{fileId}",
+                "nexus-file",
+                null,
+                modId,
+                fileId,
+                sourceUrl,
+                metadata.Source)
+        };
+    }
+
+    private static IReadOnlyList<Diagnostic> BuildIdentityDiagnostics(Mo2PackageMetadata metadata)
+    {
+        var diagnostics = new List<Diagnostic>();
+        AddInvalidIdDiagnostic(diagnostics, metadata.ModId, "modId", metadata.Source);
+        AddInvalidIdDiagnostic(diagnostics, metadata.FileId, "fileId", metadata.Source);
+        return diagnostics.AsReadOnly();
+    }
+
+    private static void AddInvalidIdDiagnostic(
+        List<Diagnostic> diagnostics,
+        string? value,
+        string key,
+        SourceReference source)
+    {
+        if (string.IsNullOrWhiteSpace(value) || TryNormalizePositiveId(value, out _))
+        {
+            return;
+        }
+
+        diagnostics.Add(new Diagnostic(
+            "package.identity.meta.numeric.invalid",
+            DiagnosticSeverity.Warning,
+            $"The MO2 meta.ini {key} is not a positive integer, so automatic Nexus File identity was not derived.",
+            source,
+            value));
+    }
+
+    private static IReadOnlyList<Diagnostic> BuildLocalVersionDiagnostics(
+        IReadOnlyList<VersionObservation> observations,
+        SourceReference source)
+    {
+        var modInfo = FirstObservation(observations, VersionObservationSourceKind.ModInfoXml);
+        var meta = FirstObservation(observations, VersionObservationSourceKind.Mo2MetaIni);
+        if (modInfo is null || meta is null
+            || string.IsNullOrWhiteSpace(modInfo.RawValue)
+            || string.IsNullOrWhiteSpace(meta.RawValue))
+        {
+            return Array.Empty<Diagnostic>();
+        }
+
+        var normalizedModInfo = VersionNormalizer.Normalize(modInfo.RawValue, out var modInfoScheme);
+        var normalizedMeta = VersionNormalizer.Normalize(meta.RawValue, out var metaScheme);
+        var equivalent = normalizedModInfo is not null
+            && normalizedMeta is not null
+            && modInfoScheme == metaScheme
+            && string.Equals(normalizedModInfo, normalizedMeta, StringComparison.OrdinalIgnoreCase);
+        if (equivalent || string.Equals(modInfo.RawValue.Trim(), meta.RawValue.Trim(), StringComparison.Ordinal))
+        {
+            return Array.Empty<Diagnostic>();
+        }
+
+        return new[]
+        {
+            new Diagnostic(
+                "package.version.local-conflict",
+                DiagnosticSeverity.Warning,
+                "ModInfo.xml and MO2 meta.ini contain different version observations. The package comparison uses MO2 meta.ini only.",
+                source,
+                $"ModInfo.xml={modInfo.RawValue}; meta.ini={meta.RawValue}")
+        };
+    }
+
+    private static VersionObservation? FirstObservation(
+        IReadOnlyList<VersionObservation> observations,
+        VersionObservationSourceKind sourceKind)
+    {
+        return observations.FirstOrDefault(observation => observation.SourceKind == sourceKind);
+    }
+
+    private static bool IdsEqual(string? left, string? right)
+    {
+        return TryNormalizePositiveId(left, out var leftNormalized)
+            && TryNormalizePositiveId(right, out var rightNormalized)
+            && string.Equals(leftNormalized, rightNormalized, StringComparison.Ordinal);
+    }
+
+    private static bool TryNormalizePositiveId(string? value, out string normalized)
+    {
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(value)
+            || !ulong.TryParse(value.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
+            || parsed == 0)
+        {
+            return false;
+        }
+
+        normalized = parsed.ToString(CultureInfo.InvariantCulture);
+        return true;
     }
 
     private static Mo2PackageMetadata MissingMetadata(string packageDirectory)
@@ -793,7 +932,6 @@ public static class VersionEvidenceAssembler
     private static IReadOnlyList<VersionObservation> BuildObservations(
         LocalModRecord record,
         MO2Package package,
-        IReadOnlyList<SourceArtifact> artifacts,
         VersionEvidenceManifestDocument? manifest)
     {
         var result = new List<VersionObservation>();
@@ -919,6 +1057,65 @@ public static class VersionComparator
             equal
                 ? "All supported observations have the same normalized value."
                 : "Supported observations have different normalized values.",
+            observations);
+    }
+
+    public static VersionComparison ComparePackage(
+        IdentityResolutionState identityState,
+        VersionObservation? mo2MetaIniObservation,
+        VersionObservation? nexusApiObservation)
+    {
+        var observations = new[] { mo2MetaIniObservation, nexusApiObservation }
+            .Where(observation => observation is not null)
+            .Cast<VersionObservation>()
+            .ToList()
+            .AsReadOnly();
+
+        if (identityState != IdentityResolutionState.Exact)
+        {
+            return new VersionComparison(
+                VersionComparisonStatus.NotAssessed,
+                "Identity is not exact, so the MO2 meta.ini and Nexus File comparison was not assessed.",
+                observations);
+        }
+
+        if (mo2MetaIniObservation is null || nexusApiObservation is null
+            || string.IsNullOrWhiteSpace(mo2MetaIniObservation.NormalizedValue)
+            || string.IsNullOrWhiteSpace(nexusApiObservation.NormalizedValue))
+        {
+            return new VersionComparison(
+                VersionComparisonStatus.NotComparable,
+                "Both an MO2 meta.ini version and a Nexus File version are required.",
+                observations);
+        }
+
+        if (mo2MetaIniObservation.Role != VersionObservationRole.Release
+            || nexusApiObservation.Role != VersionObservationRole.Release)
+        {
+            return new VersionComparison(
+                VersionComparisonStatus.NotComparable,
+                "The MO2 meta.ini and Nexus File observations do not use the release role.",
+                observations);
+        }
+
+        if (mo2MetaIniObservation.Scheme != nexusApiObservation.Scheme
+            || mo2MetaIniObservation.Scheme is not (VersionScheme.Semver or VersionScheme.NumericDotted))
+        {
+            return new VersionComparison(
+                VersionComparisonStatus.NotComparable,
+                "The MO2 meta.ini and Nexus File observations do not use one supported version scheme.",
+                observations);
+        }
+
+        var equal = string.Equals(
+            mo2MetaIniObservation.NormalizedValue,
+            nexusApiObservation.NormalizedValue,
+            StringComparison.OrdinalIgnoreCase);
+        return new VersionComparison(
+            equal ? VersionComparisonStatus.Equal : VersionComparisonStatus.Mismatch,
+            equal
+                ? "The MO2 meta.ini and Nexus File versions have the same normalized value."
+                : "The MO2 meta.ini and Nexus File versions have different normalized values.",
             observations);
     }
 

@@ -103,6 +103,11 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
             new JsonMo2SourcePreferenceStore());
     }
 
+    public static VersionObservationReadModel ProjectVersionObservation(VersionObservation observation)
+    {
+        return QueryProjection.VersionObservation(observation);
+    }
+
     public SourceDiscoveryReadModel DiscoverSources(
         IReadOnlyList<string>? selectedRoots = null,
         CancellationToken cancellationToken = default)
@@ -1379,7 +1384,7 @@ internal static class QueryProjection
             Source(value.Source));
     }
 
-    private static VersionObservationReadModel VersionObservation(VersionObservation value)
+    public static VersionObservationReadModel VersionObservation(VersionObservation value)
     {
         return new VersionObservationReadModel(
             value.OwnerKey,
@@ -1716,6 +1721,7 @@ internal static class QueryProjection
                 SourceReferenceKind.PackageFile => QuerySourceReferenceKind.PackageFile,
                 SourceReferenceKind.EvidenceManifest => QuerySourceReferenceKind.EvidenceManifest,
                 SourceReferenceKind.WebObservation => QuerySourceReferenceKind.WebObservation,
+                SourceReferenceKind.NexusApi => QuerySourceReferenceKind.NexusApi,
                 SourceReferenceKind.Diagnostic => QuerySourceReferenceKind.Diagnostic,
                 _ => throw new ArgumentOutOfRangeException(nameof(source), source.Kind, null)
             },

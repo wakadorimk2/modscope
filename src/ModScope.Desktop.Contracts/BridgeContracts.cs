@@ -37,6 +37,7 @@ public static class BridgeProtocol
         "knowledge.useFixture",
         "knowledge.selectEvidenceManifest",
         "knowledge.setWebVersionObservation",
+        "knowledge.observeNexusFileVersion",
         "knowledge.loadSource",
         "knowledge.discoverSources",
         "knowledge.selectSource",
@@ -247,6 +248,8 @@ public sealed record DiscoverSourcesPayload(IReadOnlyList<string>? SelectedRoots
 public sealed record SelectSourcePayload(string CandidateId);
 
 public sealed record SetWebVersionObservationPayload(string RawValue);
+
+public sealed record ObserveNexusFileVersionPayload();
 
 public sealed record ConfirmIdentityPayload(
     string CandidateIdentity,
