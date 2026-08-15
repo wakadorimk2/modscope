@@ -2,6 +2,15 @@
 
 このディレクトリは、現在仕様、将来方針、設計判断、調査記録、ユーザー知見を分けて管理します。
 
+## North Starとprimary surface
+
+North Starは、ModScopeを使っていて気持ちよく、異様に賢いMODマネージャにすることです。
+
+Web pageとLocal Mod Knowledgeを、製品の二つのprimary surfaceとして扱います。
+MO2はsource of truthとして残します。
+現在のBrowse-first vertical sliceとcontrolled writeは、現在のdelivery shapeと安全境界です。
+manager機能の追加可否は、North Starへの寄与、Prior Art、安全境界、検証可能性で判断します。
+
 ## 推奨読順
 
 1. [ModScope設計](design.md)
@@ -17,7 +26,7 @@
 | [`design.md`](design.md) | 現在の製品定義、アーキテクチャ、責務境界、実装範囲、受入条件 | 将来の候補だけの詳細 |
 | [`future-vision.md`](future-vision.md) | 将来像、設計原則、拡張方針、保留事項 | 現在の実装仕様の詳細 |
 | [`adr/`](adr/) | Acceptedとした設計判断、代替案、帰結 | 未確定の調査結果 |
-| [`research/`](research/README.md) | 観測、source、provenance、snapshot、diagnostic | production schemaやruntime保証 |
+| [`research/`](research/README.md) | 観測、source、provenance、snapshot、diagnostic、日付付き提案 | production schemaやruntime保証、accepted design |
 | [`user-knowledge.md`](user-knowledge.md) | ユーザー報告と、そこから分けて記録した仮説 | 一般化した製品仕様 |
 
 ## 証拠の扱い
@@ -29,3 +38,5 @@
 - MO2、7DTD、外部sourceの正本は、ModScopeの派生データではありません。
 
 新しい現在仕様は`design.md`へ、将来の選択肢は`future-vision.md`または対応するresearchへ記録します。
+
+日付付きresearchの製品提案は、`design.md`または`future-vision.md`へ採用されるまで、accepted designではありません。

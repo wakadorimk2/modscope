@@ -19,11 +19,18 @@
 
 ## 1. 目的
 
-ModScopeの将来像は、MODの発見、評価、導入判断、問題調査を、Web pageとlocal environmentの同じWorkspaceで行える状態です。
+ModScopeの将来像は、MODの発見、整理、理解、導入判断、問題調査を、Web pageとLocal Mod Knowledgeの同じWorkspaceで行える状態です。
 
-ModScopeはMod Managerではありません。MO2をsource of truthとして残します。ModScopeは、MO2から再生成可能なLocal Mod Knowledgeと、Web pageに対するLocal contextを提供します。
+ModScopeはMO2をsource of truthとして残します。
+MO2を置き換えずに、MO2から再生成可能なLocal Mod Knowledgeと、Web pageに対するLocal contextを提供します。
+North Starへの寄与が明確なmanager機能は、候補へ入ります。
+その機能は、Prior Art、安全境界、検証計画を満たす必要があります。
 
-Web pageはprimary surfaceです。Local contextはprogressive disclosureします。Inspectorは、必要なときだけ根拠と技術詳細を開きます。
+Web pageとLocal Mod Knowledgeは、製品の二つのprimary surfaceです。
+Web pageは発見と外部evidenceを扱います。
+Local Mod Knowledgeは、現在のMOD環境の整理、理解、比較、診断、必要な操作を扱います。
+現在のv0.1 delivery shapeはBrowse-first vertical sliceです。
+Local Mod Knowledgeを補助面へ限定する意味ではありません。
 
 ## 2. 中心となる利用体験
 
@@ -83,9 +90,13 @@ AgentはCodexに限定しません。CLI、structured files、local API、MCP、
 
 ## 3. Product principles
 
-### Web page first
+### 二つのprimary surface
 
-MOD一覧を主画面にしません。ユーザーが現在見ているpageを主画面にします。
+Web pageは、MODの発見、作者の説明、compatibility guide、issue、Wiki、GitHubなどの外部evidenceを扱うprimary surfaceです。
+
+Local Mod Knowledgeは、MO2 profile、package、Modlet、archive、version、source、dependency、conflict、runtimeなどの関係を扱うprimary surfaceです。
+
+初期画面は、二つのsurfaceを必要な深さで表示します。高密度なmanager UIを既定の主画面にせず、情報量と認知負荷を制御します。
 
 ### Local context is progressive disclosure
 
@@ -131,22 +142,27 @@ Nexus専用にしません。最初は7DTD + MO2に集中します。将来のSi
 ## 4. 将来アーキテクチャ
 
 ```text
-Human browser surface
+Web page primary surface
   -> page observation
   -> MOD identity confirmation
   -> Local context
   -> Inspector / Compare / Diagnosis
 
-Agent browser boundary
-  -> Web observation and evidence
-  -> agent read model
-
-MO2 source
+Local Mod Knowledge primary surface
+  -> MO2 source
   -> MO2 Adapter
   -> source snapshot
   -> Game Adapter
   -> Local Mod Knowledge
+  -> Mod Library / Inspector / Compare / Diagnosis
+
+Agent browser boundary
+  -> Web observation and evidence
+  -> agent read model
+
+Shared read model
   -> query / reverse index
+  -> evidence / provenance / uncertainty
 
 Runtime tool
   -> Runtime Adapter
@@ -393,7 +409,10 @@ Apply前にMO2または7DTDが実行中の場合、processを停止せずblock�
 
 既存junctionは、選択中MO2 `modsPath`の既知MOD rootへ解決できる場合だけModScope管理manifestへ採用します。foreign junction、実folder、重複MOD名、path衝突はApplyを止めます。
 
-Write planeが追加されても、ModScopeはMod Managerにはなりません。
+Write planeは、MO2のsource of truthを保護する限定された操作面です。
+Write planeの存在はMO2の置き換えを意味しません。
+将来のmanager機能も候補にできます。
+その機能は、North Starへの寄与、Prior Art、安全境界、検証計画を満たす必要があります。
 
 ## 12. Roadmap
 
@@ -432,7 +451,8 @@ neutral runtime evidenceとLocal-only RuntimeOCD comparisonを実装しました
 ### Phase 6：Workspace UIの拡張
 
 Browser page、Local context、Inspector、Compare、DiagnosisをBrowse-first UIへ統合しました。
-高密度Mod Manager UIと、MO2を直接管理するUIは作りません。
+高密度なmanager UIを既定の主画面にしません。
+MO2のsource of truthを直接置き換えない境界を維持します。
 
 ### Phase 6.5：Browse-first UI情報設計の整理（完了）
 
@@ -443,7 +463,8 @@ MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません�
 
 ### Phase 6.6：情報減算UI（完了）
 
-通常画面はWeb pageを主役にし、Contextには`RECOGNIZE`と最小Local summaryを表示します。
+通常画面はWeb pageとLocal Mod Knowledgeを主役にします。
+Contextには`RECOGNIZE`と最小Local summaryを表示します。
 詳細なevidence、diagnostic、XML、priorityはInspectorへ段階表示します。
 MO2 read-only境界、Query層、Bridge contract、Desktop host、Browser engineは変更しません。
 
@@ -534,4 +555,7 @@ ModScopeは、次の状態を目指します。
 現在のWeb UI、Browser surface、Bridge contract、Conclusion-first表示、Deployment previewの仕様は、[ModScope設計](design.md)を正本とします。
 
 将来像では、現在のUI細部を再記載しません。
-将来の判断は、Web page first、Local contextのprogressive disclosure、AIなしでのinspect、evidence before inference、controlled writeの原則に従います。
+将来の判断は、Web pageとLocal Mod Knowledgeの二つのprimary surfaceに基づきます。
+Local contextはprogressive disclosureします。
+AIなしでのinspectを維持します。
+evidence before inferenceとcontrolled writeの原則を維持します。
