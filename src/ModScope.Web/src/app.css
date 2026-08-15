@@ -2539,6 +2539,35 @@ dd {
   background: var(--chrome-panel);
 }
 
+.recognition-candidate-action {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.recognition-candidate-action:hover:not(:disabled) {
+  filter: none;
+  color: #f8fafc;
+}
+
+.recognition-candidate-action:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.recognition-candidate-action-label {
+  display: block;
+  margin-top: 8px;
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .recognition-candidate-heading {
   display: flex;
   align-items: center;
