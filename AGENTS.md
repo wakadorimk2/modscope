@@ -193,6 +193,42 @@ Requirements / Dependenciesでは、次の境界を維持します。
 - list co-presenceや名前の類似だけをdependency evidenceにしません。
 - target identityを名前だけで自動確定しません。raw targetとsource referenceを保持します。
 
+## 個人名の匿名化
+
+tracked filesとその内容へ、実名、個人名の別名、account handleを追加しませんわ。
+この規則は、docs、fixtures、artifact名、archive名、path、source URL、filenameにも適用しますの。
+`AGENTS.md`自身へ、実名または実名のdenylistを記録しませんわ。
+匿名化のplaceholderには、`ANONYMIZED_AUTHOR`、`PROJECT_OWNER`、`EXAMPLE_USER`を使いますの。
+source evidenceに実名が必要な場合は、Git外へ置きますわ。
+repository内には、匿名化した要約だけを保存しますの。
+
+Git author metadataとcommitter metadataは、この規則の対象外ですわ。
+履歴書換えとremote refの変更は、別途明示依頼がある場合だけ実行しますの。
+
+commitまたはpushの前に、taskで指定された名前と別名をcase-insensitiveで検索しますわ。
+検索語はshell変数だけに置き、`AGENTS.md`へ保存しませんの。
+検索対象はworking tree、filename、staged diff、commit message、tag messageですわ。
+
+検索は、次の手順で実行しますの。
+
+1. taskで指定された検索語をshell変数`$terms`へ設定しますわ。
+2. `[regex]::Escape()`で各検索語をescapeし、case-insensitiveなregexをshell変数`$pattern`へ作成しますの。
+3. `rg --hidden -n -i -e $pattern --glob '!.git/**' .`でworking treeのtextを検索しますわ。
+4. `git grep -I -n -i -E $pattern -- .`でtracked textを検索しますの。
+5. `rg --hidden --no-ignore --files -g '!.git/**' | rg -n -i -e $pattern`と`git ls-files | rg -n -i -e $pattern`でfilenameを検索しますわ。
+6. `git diff --cached --text | rg -n -i -e $pattern`と`git diff --cached --name-only | rg -n -i -e $pattern`でstaged diffを検索しますの。
+7. `git log --all --format='%H%n%s%n%b' | rg -n -i -e $pattern`でcommit messageを検索しますわ。
+8. `git log --all --reflog --format='%H%n%s%n%b' | rg -n -i -e $pattern`でreflogから到達できるcommit messageも検索しますの。
+9. `git for-each-ref refs/tags --format='%(refname:short)%n%(contents)' | rg -n -i -e $pattern`でtag messageを検索しますわ。
+10. `git diff --check`と`git diff --cached --check`でdiffの形式を確認しますの。
+
+textで検出した名前は、`ANONYMIZED_AUTHOR`、`PROJECT_OWNER`、または`EXAMPLE_USER`へ置換しますわ。
+新規または変更するfilenameにも、同じplaceholderを使いますの。
+source URLに実名が含まれる場合は、source evidenceをGit外へ移し、repository内には匿名化した要約だけを残しますわ。
+binaryで偶発一致した場合は、binaryを破損させず、pathと検出理由をdiagnosticとして報告しますの。
+既存のcommit messageまたはtag messageに一致がある場合は、履歴を書き換えずにdiagnosticとして報告しますわ。
+自動check scriptとCI変更は追加しませんの。
+
 ## GUIとInspectorの原則
 
 画面の主役はWeb pageとLocal Mod Knowledgeです。
