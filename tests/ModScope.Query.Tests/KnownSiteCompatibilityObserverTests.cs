@@ -203,6 +203,38 @@ public sealed class KnownSiteCompatibilityObserverTests
     }
 
     [Fact]
+    public void ExcludesNexusModPageScopeFromNexusDescriptionCompatibilityClaims()
+    {
+        var pageUrl = new Uri("https://www.nexusmods.com/7daystodie/mods/2409?tab=description");
+        var visibleText = "Version v8.0.1\nCompatible with: 7 Days to Die v3.1.0";
+        var result = KnownSiteCompatibilityObserver.Observe(
+            pageUrl,
+            visibleText,
+            new[]
+            {
+                new WebReleaseScopeInput(
+                    "NexusModPage",
+                    "v8.0.1",
+                    "8.0.1",
+                    pageUrl.ToString(),
+                    "Version v8.0.1",
+                    visibleText),
+                new WebReleaseScopeInput(
+                    "Page",
+                    null,
+                    null,
+                    pageUrl.ToString(),
+                    null,
+                    visibleText)
+            });
+
+        var observation = Assert.Single(result.Observations);
+        Assert.Equal("Page", observation.ReleaseScopeKind);
+        Assert.DoesNotContain(result.Observations, item => item.ReleaseScopeKind == "NexusModPage");
+        Assert.Equal("3.1.0", observation.NormalizedVersion);
+    }
+
+    [Fact]
     public void AssociatesNexusFileCompatibilityWithTheFileRowScope()
     {
         var fileUrl = "https://www.nexusmods.com/7daystodie/mods/123?tab=files&file_id=1";

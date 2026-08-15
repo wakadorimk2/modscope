@@ -552,7 +552,7 @@ internal static class DesktopStateMapper
             latest,
             packageRelation);
         var versionStatus = "notAssessed";
-        var versionReason = "No GitHub Releases or Nexus Files version was observed in this session.";
+        var versionReason = "No GitHub Releases, Nexus Files, or Nexus mod page version was observed in this session.";
 
         if (packageRelation is null)
         {
@@ -857,6 +857,10 @@ internal static class DesktopStateMapper
         VersionObservationUiState? latest)
     {
         var latestScope = IsReleaseScope(latest)
+            && !string.Equals(
+                latest!.ReleaseScopeKind,
+                "NexusModPage",
+                StringComparison.OrdinalIgnoreCase)
             ? new CompatibilityScopeKey(
                 latest!.ReleaseScopeKind!,
                 latest.ReleaseScopeVersion!,
@@ -891,7 +895,8 @@ internal static class DesktopStateMapper
     {
         return observation is not null
             && (string.Equals(observation.ReleaseScopeKind, "GitHubRelease", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(observation.ReleaseScopeKind, "NexusFile", StringComparison.OrdinalIgnoreCase))
+                || string.Equals(observation.ReleaseScopeKind, "NexusFile", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(observation.ReleaseScopeKind, "NexusModPage", StringComparison.OrdinalIgnoreCase))
             && !string.IsNullOrWhiteSpace(observation.ReleaseScopeVersion)
             && !string.IsNullOrWhiteSpace(observation.ReleaseScopeUrl);
     }

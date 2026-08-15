@@ -29,12 +29,16 @@ public static class KnownSiteVersionObserver
 {
     private const string GitHubReleaseScope = "GitHubRelease";
     private const string NexusFileScope = "NexusFile";
+    private const string NexusModPageScope = "NexusModPage";
 
     private static readonly Regex VersionTokenPattern = new(
         @"(?<![A-Za-z0-9])v?\d+\.\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?(?![A-Za-z0-9])",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex VersionLabelPattern = new(
         @"(?i)^\s*(?:file\s+)?version\s*[:#]?\s*(?<value>[^\s,;\)\]]+)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex NexusModVersionLabelPattern = new(
+        @"(?i)^\s*version\b(?:\s*[:#-]?\s*(?<value>.*?))?\s*$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex ReleaseLabelPattern = new(
         @"(?i)\b(?:latest\s+)?release\s*[:#]\s*(?<value>[^\s,;\)\]]+)",
@@ -68,6 +72,11 @@ public static class KnownSiteVersionObserver
         if (IsNexusFilesPage(url))
         {
             return ObserveNexus(url, visibleText, scopes, scopeInputWasProvided);
+        }
+
+        if (IsNexusModPage(url))
+        {
+            return ObserveNexusModPage(url, visibleText, scopes, scopeInputWasProvided);
         }
 
         return Unsupported(url);
@@ -207,6 +216,101 @@ public static class KnownSiteVersionObserver
             scopeInputWasProvided);
     }
 
+    private static WebVersionObservationResult ObserveNexusModPage(
+        Uri url,
+        string? visibleText,
+        IReadOnlyList<WebReleaseScopeInput>? scopes,
+        bool scopeInputWasProvided)
+    {
+        if (scopeInputWasProvided)
+        {
+            var pageScopes = scopes?
+                .Where(scope => string.Equals(scope.Kind, NexusModPageScope, StringComparison.OrdinalIgnoreCase))
+                .ToList()
+                ?? new List<WebReleaseScopeInput>();
+            if (pageScopes.Count == 0)
+            {
+                return Missing(
+                    "Nexus",
+                    "Nexus mod page has no visible Version scope.");
+            }
+
+            if (pageScopes.Count > 1)
+            {
+                return Multiple(
+                    "Nexus",
+                    pageScopes
+                        .Select(scope => string.IsNullOrWhiteSpace(scope.RawVersion)
+                            ? "<missing>"
+                            : scope.RawVersion!)
+                        .ToList(),
+                    string.Join(
+                        " | ",
+                        pageScopes.Select(scope => scope.MatchedLine
+                            ?? scope.VisibleText
+                            ?? "<missing>")));
+            }
+
+            return BuildNexusModPageScopeCandidate(pageScopes[0]);
+        }
+
+        if (string.IsNullOrWhiteSpace(visibleText))
+        {
+            return Missing("Nexus", "Nexus mod page content is empty.");
+        }
+
+        var labeledLines = Lines(visibleText)
+            .Where(line => NexusModVersionLabelPattern.IsMatch(line))
+            .ToList();
+        if (labeledLines.Count == 0)
+        {
+            return Missing(
+                "Nexus",
+                "Nexus mod page has no visible Version label.");
+        }
+
+        if (labeledLines.Count > 1)
+        {
+            return Multiple(
+                "Nexus",
+                labeledLines
+                    .Select(line => VersionTokenPattern.Match(line) is { Success: true } match
+                        ? match.Value
+                        : line)
+                    .ToList(),
+                string.Join(" | ", labeledLines));
+        }
+
+        var labeledLine = labeledLines[0];
+        var candidates = VersionTokenPattern.Matches(labeledLine)
+            .Select(match => match.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (candidates.Count > 1)
+        {
+            return Multiple("Nexus", candidates, labeledLine);
+        }
+
+        var rawValue = candidates.Count == 1
+            ? candidates[0]
+            : NexusModVersionLabelPattern.Match(labeledLine).Groups["value"].Value.Trim();
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return Missing(
+                "Nexus",
+                "Nexus mod page Version label has no visible value.",
+                labeledLine);
+        }
+
+        return BuildSingleCandidate(
+            "Nexus",
+            rawValue,
+            "Nexus mod page visible Version label",
+            "web.version.nexus.mod-page-version",
+            null,
+            scopeRequired: false);
+    }
+
     private static WebVersionObservationResult BuildScopeCandidate(
         string site,
         WebReleaseScopeInput scope,
@@ -236,6 +340,29 @@ public static class KnownSiteVersionObserver
             rawValue,
             evidence,
             diagnosticCode,
+            scope,
+            scopeRequired: true);
+    }
+
+    private static WebVersionObservationResult BuildNexusModPageScopeCandidate(
+        WebReleaseScopeInput scope)
+    {
+        if (string.IsNullOrWhiteSpace(scope.RawVersion))
+        {
+            return AttachScope(
+                Missing(
+                    "Nexus",
+                    "Nexus mod page Version label has no visible value.",
+                    scope.MatchedLine ?? scope.VisibleText),
+                scope,
+                scopeRequired: true);
+        }
+
+        return BuildSingleCandidate(
+            "Nexus",
+            scope.RawVersion!,
+            "Nexus mod page visible Version label",
+            "web.version.nexus.mod-page-version",
             scope,
             scopeRequired: true);
     }
@@ -389,7 +516,7 @@ public static class KnownSiteVersionObserver
         return new WebVersionObservationResult(
             "Unsupported",
             null,
-            "Automatic release observation is limited to GitHub Releases and Nexus Files.",
+            "Automatic release observation is limited to GitHub Releases, Nexus Files, and Nexus mod pages.",
             new[]
             {
                 new DiagnosticReadModel(
@@ -399,7 +526,10 @@ public static class KnownSiteVersionObserver
             });
     }
 
-    private static WebVersionObservationResult Missing(string site, string message)
+    private static WebVersionObservationResult Missing(
+        string site,
+        string message,
+        string? rawValue = null)
     {
         return new WebVersionObservationResult(
             site,
@@ -410,7 +540,8 @@ public static class KnownSiteVersionObserver
                 new DiagnosticReadModel(
                     "web.version.missing",
                     QueryDiagnosticSeverity.Warning,
-                    message)
+                    message,
+                    RawValue: rawValue)
             });
     }
 
@@ -450,6 +581,11 @@ public static class KnownSiteVersionObserver
             return NexusFileScope;
         }
 
+        if (string.Equals(kind, NexusModPageScope, StringComparison.OrdinalIgnoreCase))
+        {
+            return NexusModPageScope;
+        }
+
         if (string.Equals(kind, "Page", StringComparison.OrdinalIgnoreCase))
         {
             return "Page";
@@ -461,7 +597,8 @@ public static class KnownSiteVersionObserver
     private static bool IsReleaseScopeKind(string? kind)
     {
         return string.Equals(kind, GitHubReleaseScope, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(kind, NexusFileScope, StringComparison.OrdinalIgnoreCase);
+            || string.Equals(kind, NexusFileScope, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(kind, NexusModPageScope, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? NormalizeScopeVersion(WebReleaseScopeInput scope)
@@ -470,11 +607,14 @@ public static class KnownSiteVersionObserver
         {
             var normalized = ModScope.LocalKnowledge.VersionNormalizer.Normalize(
                 scope.RawVersion,
-                out _);
-            if (!string.IsNullOrWhiteSpace(normalized))
+                out var scheme);
+            if (scheme is ModScope.LocalKnowledge.VersionScheme.Semver
+                or ModScope.LocalKnowledge.VersionScheme.NumericDotted)
             {
                 return normalized;
             }
+
+            return null;
         }
 
         return scope.NormalizedVersion;
@@ -504,6 +644,17 @@ public static class KnownSiteVersionObserver
         var hasFilesQuery = url.Query.Contains("tab=files", StringComparison.OrdinalIgnoreCase);
         var hasFilesPath = path.Contains("/files", StringComparison.OrdinalIgnoreCase);
         return hasModPath && (hasFilesQuery || hasFilesPath);
+    }
+
+    private static bool IsNexusModPage(Uri url)
+    {
+        if (!IsHostSuffix(url, "nexusmods.com"))
+        {
+            return false;
+        }
+
+        return url.AbsolutePath.Contains("/mods/", StringComparison.OrdinalIgnoreCase)
+            && !IsNexusFilesPage(url);
     }
 
     private static bool IsHost(Uri url, string host)
