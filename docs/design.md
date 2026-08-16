@@ -278,7 +278,7 @@ Local Mod Knowledgeは、ModScopeのcore assetです。GUIだけの内部デー�
 
 解決した、7DTD + MO2の1 instanceを読み取ります。
 active profileを先に読み取ります。
-Profiles directoryからread-onlyのprofile catalogを取得し、active表示後に他profileをbackground preloadします。
+Profiles directoryからread-onlyのprofile catalogを取得します。初回起動はactive profileだけを読み取ります。Profile切替後は、直前のprofileを1件だけbackground preloadします。残りのprofileは選択時に読み取ります。
 
 - profileの`modlist.txt`
 - `mods/`内のMOD directory
@@ -1177,7 +1177,7 @@ Browser、Local Mod Knowledge、context projection、analysis、mutationを分�
 ### v0.1
 
 - 解決した7DTD + MO2の1 instanceとactive profileをread-onlyで読み取れる
-- Profiles directoryのread-only profile catalogを取得し、他profileをbackground preloadできる
+- Profiles directoryのread-only profile catalogを取得し、直前のprofileを1件だけbackground preloadできる
 - modlistからenabled状態とpriorityを取得できる
 - MODのfile list、ModInfo metadata、軽量なXML referenceを取得できる
 - raw情報、normalized value、source reference、diagnosticを保持できる
@@ -1274,7 +1274,7 @@ Mod Libraryのresult tableだけをスクロール可能にします。Library r
 Context columnは、ToolbarのContext buttonまたはCtrl/Cmd+Iで非表示にできます。
 非表示中もContext WebView2のstateとInspector stateを破棄しません。
 Mod Library columnはToolbarのMod Library buttonまたは`layout.setModListVisible`で非表示にできます。
-active profileを先に表示し、他profileはbackground preloadします。
+active profileを先に表示します。初回起動は他profileをpreloadしません。Profile切替後は直前のprofileを1件だけbackground preloadします。
 profile selectorはpending、loading、ready、failedを表示します。
 将来はContextをdrawerまたはoverlayへ折り畳める構造へ進めます。
 
@@ -1496,11 +1496,11 @@ MO2 write、AI、MCP、独自Browser engineは追加しません。
 
 ### 25.4 Phase6.7 起動表示、Chrome型Toolbar、MOD URL導線
 
-Desktop hostはWPF client area全体へ`LOADING PROFILE` overlayを表示します。
-WebView2初期化、source discovery、source load、foregroundのprofile switchをoverlay対象にします。
-background profile preloadはoverlay対象にしません。
+Desktop hostはWPF client area全体へ`LOADING PROFILE` overlayを表示します。overlayの対象はWebView2初期化です。Browserのactive tabを復元した後にoverlayを閉じます。
+Startupのsource discoveryとsource loadはbackground operationとして実行します。Browser toolbarとBrowser tabは操作可能です。Local paneはoperation railとskeletonを表示します。
+明示的なsource loadとprofile switchはLocal paneの操作を無効にします。Browser操作は継続できます。
 overlayは対象profile、operation phase、取得できるcompleted / totalを表示し、値がないphaseはindeterminate progressを表示します。
-loading中はclient areaの操作を無効にし、成功後は閉じます。失敗時は閉じて既存diagnosticを表示します。
+失敗時はoverlayを閉じ、既存stateとdiagnosticを保持します。
 operation stateは既存`OperationStateChanged`を使い、UiStateとbridge contractへ項目を追加しません。
 
 通常Toolbarは76pxのChrome型2段構成です。
@@ -1542,12 +1542,12 @@ Verified Websiteの404はBrowser diagnosticとして扱い、自動検索へ変�
 
 ### 25.5 Phase6.8 ロード遮断、Chrome palette、History page
 
-Desktop hostはWPF client areaのWebView2子windowを含めて入力を遮断します。
-foregroundのloading中はToolbar、Mod Library、Context、Browser tabの`IsEnabled`と`IsHitTestVisible`を無効にします。
-薄いグレーのloading panelはclient areaだけを覆います。
+Desktop hostはWebView2初期化中だけWPF client areaの入力を遮断します。
+Local Knowledgeのforeground loading中はMod LibraryとContextを無効にします。ToolbarとBrowser tabは有効です。
+薄いグレーのloading panelはWebView2初期化中だけclient areaを覆います。
 OSタイトルバーはloading中も操作できます。
 background profile preloadではloading panelを表示しません。
-loading完了または失敗後はclient UIを再有効化します。
+loading完了または失敗後はLocal UIを再有効化します。
 
 ModScopeが所有するsurfaceはChrome dark paletteを使います。
 baseは`#202124`、navigationは`#292a2d`、panelは`#303134`、borderは`#3c4043`です。
@@ -1577,7 +1577,11 @@ Profile projectionは、`modlist.txt`のraw line、enabled state、priority、Pr
 
 `Mo2SnapshotReader`は、正規化した`ModsPath`、parser version、schema versionをkeyにprocess-scoped static catalogを保持します。
 cacheはMO2のsource of truthを置き換えません。
-cacheはメモリ上の再生成可能な派生データです。
+cacheはメモリと`%LOCALAPPDATA%\\ModScope\\cache`の永続JSONから構成する、再生成可能な派生データです。
+永続cacheはMOD record、file inventory、XML observation、diagnostic、`LocalKnowledgeIndex`だけを保持します。Profile snapshotと`modlist.txt`は保持しません。
+永続cacheのfile inventoryは絶対pathを保持しません。現在の明示的な`ModsPath`からruntime pathを再構成します。
+永続cacheはformat version、parser version、schema version、cache key hash、metadata fingerprintで検証します。
+JSONの破損、version不一致、path不一致、metadata不一致はcache missとして扱います。cache書込みはtemporary fileからatomic replaceします。cache書込み失敗はMO2 readを失敗させません。
 
 cache hitの判定では、MOD treeをcontent readせずにrelative path、file size、最終更新時刻、reparse stateを比較します。
 metadataが変わった場合はstatic catalogを破棄し、静的MOD knowledgeを再生成します。
@@ -1587,7 +1591,8 @@ cache missではouter MOD単位のscanを最大2並列で実行します。
 
 初回読み込みとProfile switchはDesktop UI threadの外で実行します。
 active profileのsnapshotを先にactive sessionへ適用します。
-他profileのsnapshotはstatic catalogを再利用して1件ずつbackground preloadします。
+初回起動の他profileはpreloadしません。Profile switch成功後は、直前のprofileのsnapshotだけをstatic catalogを再利用してbackground preloadします。
+profile selectorで選択したprofileのsnapshotはprocess memoryへ保存します。同じprocess内の再切替では再projectionを行いません。
 background preloadはactive sessionとMOD一覧を置き換えません。
 profile switchはbackground preloadをキャンセルし、選択profileの読み込みを優先します。
 bridge stateはoperation kind、busy state、background flag、target profile nameを保持します。
@@ -1665,7 +1670,7 @@ profileに存在するがMOD directoryがないrecordは`Profile unresolved`と�
 MOD directoryに存在するがprofileに存在しないModletは、System Viewの`All`へ含めます。
 enabled、disabled、Review、Identity unresolved、Profile unresolvedを別Viewで扱います。
 profile selectorはMod Libraryへ移し、profile名とPending、Loading、Ready、Failedを表示します。
-active profileを先に表示し、他profileはactive表示後にbackground preloadします。
+active profileを先に表示します。初回起動は他profileをpreloadしません。Profile切替後は直前のprofileを1件だけbackground preloadします。
 検索drawerはMod LibraryのViewと別の補助導線として維持します。
 検索対象はdisplay name、directory name、MOD keyです。
 `ModInfo.xml`から得た有効なabsolute http / https Websiteを最優先します。

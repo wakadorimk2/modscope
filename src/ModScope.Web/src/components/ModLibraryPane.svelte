@@ -360,7 +360,17 @@
       </div>
     {/if}
   {:else}
-    <div class="mod-list-empty-state"><span class="eyebrow">LOCAL MODS</span><p class="subtle">Load an MO2 source to show the active profile.</p></div>
+    <div class="mod-list-empty-state" role={state.knowledge.operation.isBusy ? 'status' : undefined}>
+      <span class="eyebrow">LOCAL MODS</span>
+      {#if state.knowledge.operation.isBusy}
+        <p class="subtle">Preparing local MO2 knowledge. Browser remains available.</p>
+        <div class="mod-list-skeleton" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+      {:else}
+        <p class="subtle">Load an MO2 source to show the active profile.</p>
+      {/if}
+    </div>
   {/if}
 </main>
 
@@ -442,9 +452,41 @@
     white-space: nowrap;
   }
 
+  .mod-list-skeleton {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .mod-list-skeleton span {
+    display: block;
+    height: 28px;
+    border-radius: 7px;
+    background: linear-gradient(90deg, rgba(71, 85, 105, 0.28), rgba(100, 116, 139, 0.46), rgba(71, 85, 105, 0.28));
+    background-size: 240% 100%;
+    animation: mod-list-skeleton-pulse 1.4s ease-in-out infinite;
+  }
+
+  .mod-list-skeleton span:nth-child(2) {
+    width: 86%;
+  }
+
+  .mod-list-skeleton span:nth-child(3) {
+    width: 68%;
+  }
+
+  @keyframes mod-list-skeleton-pulse {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .mod-list-item-actions {
       transition: none;
+    }
+
+    .mod-list-skeleton span {
+      animation: none;
     }
   }
 </style>

@@ -52,8 +52,10 @@
   let runtimeGameVersion = '';
   let webObservedVersion = '';
 
+  $: knowledgeBlocksInteraction = state.knowledge.operation.isBusy
+    && !state.knowledge.operation.isBackground;
   $: operationBlocksInteraction = state.analysis.operation.isBusy
-    || (state.knowledge.operation.isBusy && !state.knowledge.operation.isBackground);
+    || knowledgeBlocksInteraction;
   $: operationRailVisible = state.knowledge.operation.isBusy;
   $: modSearchResults = searchCandidates(state.knowledge.candidates, modSearchQuery);
   $: inspectorCandidate = state.inspector
@@ -398,7 +400,7 @@
   <WorkspaceToolbar
     bind:address
     {state}
-    disabled={operationBlocksInteraction}
+    disabled={false}
     {showHtmlMoreMenu}
     error={lastError}
     onNavigate={navigate}

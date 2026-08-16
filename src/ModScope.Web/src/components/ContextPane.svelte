@@ -136,7 +136,9 @@
   <section class="panel source-discovery-panel">
     <div class="summary-header"><div><span class="eyebrow">{state.knowledge.session ? 'SETTINGS' : 'ONBOARDING'}</span><h2>{state.knowledge.session ? 'MO2 source' : 'Choose a local source'}</h2><p class="summary-meta">ModScope checks known MO2 locations and keeps this read-only.</p></div><span class="muted-badge">No absolute paths sent to Web</span></div>
     {#if state.knowledge.session}<p class="source-status-line">Active source · {state.knowledge.session.instanceName || 'Unknown instance'} · {state.knowledge.session.profileName || 'Profile unknown'}</p><div class="action-row"><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onDiscoverSources}>Reload source discovery</button><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onSelectRoot}>Change MO2 source</button></div>{/if}
-    {#if state.sourceDiscovery.candidates.length === 0}
+    {#if state.knowledge.operation.isBusy && !state.knowledge.session}
+      <p class="notice" role="status">Local MO2 knowledge is loading. Browser remains available while ModScope checks the source.</p>
+    {:else if state.sourceDiscovery.candidates.length === 0}
       <p class="notice">No MO2 source is ready. Scan again or choose an MO2 instance folder.</p>
     {:else}
       <div class="source-candidate-list">

@@ -252,9 +252,24 @@ public partial class MainWindow : Window
     {
         try
         {
-            await ToolbarShell.EnsureCoreWebView2Async();
-            await ModListWebView.EnsureCoreWebView2Async();
-            await ContextWebView.EnsureCoreWebView2Async();
+            var webAssetsPath = Path.Combine(AppContext.BaseDirectory, "WebAssets");
+            if (!Directory.Exists(webAssetsPath))
+            {
+                throw new DirectoryNotFoundException(
+                    $"The Web UI assets are missing: {webAssetsPath}. Run scripts/build.ps1.");
+            }
+
+            Task? discoveryTask = null;
+            if (!_sourceDiscoveryStarted)
+            {
+                _sourceDiscoveryStarted = true;
+                discoveryTask = _controller.DiscoverSourcesAsync(background: true);
+            }
+
+            await Task.WhenAll(
+                ToolbarShell.EnsureCoreWebView2Async(),
+                ModListWebView.EnsureCoreWebView2Async(),
+                ContextWebView.EnsureCoreWebView2Async());
             UpdateLoadingOverlay();
 
             ToolbarShell.NavigationStarting += AppShell_NavigationStarting;
@@ -267,32 +282,22 @@ public partial class MainWindow : Window
             ContextWebView.NavigationCompleted += AppShell_NavigationCompleted;
             ContextWebView.CoreWebView2.WebMessageReceived += AppShell_WebMessageReceived;
 
-            var webAssetsPath = Path.Combine(AppContext.BaseDirectory, "WebAssets");
-            if (!Directory.Exists(webAssetsPath))
-            {
-                throw new DirectoryNotFoundException(
-                    $"The Web UI assets are missing: {webAssetsPath}. Run scripts/build.ps1.");
-            }
-
             _webAssetsPath = webAssetsPath;
 
             ConfigureFrontend(ToolbarShell, webAssetsPath, "toolbar");
             ConfigureFrontend(ModListWebView, webAssetsPath, "mod-list");
             ConfigureFrontend(ContextWebView, webAssetsPath, "context");
 
-            if (!_sourceDiscoveryStarted)
+            if (discoveryTask is not null)
             {
-                _sourceDiscoveryStarted = true;
-                var discoveryTask = _controller.DiscoverSourcesAsync();
-                SendState();
-                await discoveryTask;
-                SendState();
+                _ = ObserveStartupDiscoveryAsync(discoveryTask);
             }
 
+            var remainingBrowserTabs = await RestoreBrowserTabsAsync();
             _startupLoading = false;
             UpdateLoadingOverlay();
-            await RestoreBrowserTabsAsync();
             SendState();
+            _ = RestoreRemainingBrowserTabsAfterFirstPaintAsync(remainingBrowserTabs);
         }
         catch (Exception exception)
         {
@@ -309,26 +314,92 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task RestoreBrowserTabsAsync()
+    private async Task<IReadOnlyList<BrowserTabRestoreState>> RestoreBrowserTabsAsync()
     {
         var persisted = _browserStateStore.Load();
         _browserHistory = persisted.History;
 
-        foreach (var tab in persisted.Tabs)
-        {
-            await CreateBrowserTabAsync(tab.TabId, tab.Url, tab.Title, activate: false);
-        }
+        var persistedTabs = persisted.Tabs.ToList();
+        var activePersistedTab = persisted.ActiveTabId is not null
+            ? persistedTabs.FirstOrDefault(tab => string.Equals(
+                tab.TabId,
+                persisted.ActiveTabId,
+                StringComparison.Ordinal))
+            : null;
 
-        if (_browserTabs.Count == 0)
+        if (activePersistedTab is not null)
+        {
+            await CreateBrowserTabAsync(
+                activePersistedTab.TabId,
+                activePersistedTab.Url,
+                activePersistedTab.Title,
+                activate: false);
+            await ActivateBrowserTabAsync(activePersistedTab.TabId);
+        }
+        else if (persistedTabs.Count > 0)
+        {
+            await CreateBrowserTabAsync(
+                persistedTabs[0].TabId,
+                persistedTabs[0].Url,
+                persistedTabs[0].Title,
+                activate: true);
+        }
+        else
         {
             await CreateBrowserTabAsync(null, null, null, activate: true);
+        }
+
+        var restoredTabId = _activeBrowserTabId;
+        return persistedTabs
+            .Where(tab => !string.Equals(tab.TabId, restoredTabId, StringComparison.Ordinal))
+            .ToList();
+    }
+
+    private async Task RestoreRemainingBrowserTabsAfterFirstPaintAsync(
+        IReadOnlyList<BrowserTabRestoreState> tabs)
+    {
+        if (tabs.Count == 0)
+        {
             return;
         }
 
-        var activeTabId = persisted.ActiveTabId is not null && _browserTabs.ContainsKey(persisted.ActiveTabId)
-            ? persisted.ActiveTabId
-            : _browserTabs.Keys.First();
-        await ActivateBrowserTabAsync(activeTabId);
+        await Dispatcher.InvokeAsync(
+            () => { },
+            System.Windows.Threading.DispatcherPriority.ContextIdle);
+        await RestoreRemainingBrowserTabsAsync(tabs);
+    }
+
+    private async Task RestoreRemainingBrowserTabsAsync(IEnumerable<BrowserTabRestoreState> tabs)
+    {
+        try
+        {
+            foreach (var tab in tabs)
+            {
+                await CreateBrowserTabAsync(tab.TabId, tab.Url, tab.Title, activate: false);
+            }
+
+            SendState();
+        }
+        catch (Exception exception)
+        {
+            _controller.SetStatus("Some saved browser tabs could not be restored.");
+            SendError("browser.tabs.restore.failed", exception.Message);
+        }
+    }
+
+    private async Task ObserveStartupDiscoveryAsync(Task discoveryTask)
+    {
+        try
+        {
+            await discoveryTask;
+        }
+        catch (Exception exception)
+        {
+            _controller.SetStatus("MO2 source discovery failed after Browser startup.");
+            SendError("knowledge.discovery.failed", exception.Message);
+        }
+
+        SendState();
     }
 
     private async Task<BrowserTabHostState> CreateBrowserTabAsync(
@@ -378,7 +449,7 @@ public partial class MainWindow : Window
             NavigateHome(tab);
         }
 
-        SetClientInteractionEnabled(!IsForegroundLoading());
+        SetClientInteractionEnabled(!_startupLoading);
 
         if (activate)
         {
@@ -1794,7 +1865,7 @@ public partial class MainWindow : Window
     private void UpdateLoadingOverlay()
     {
         var operation = _controller.CurrentOperation;
-        var showOverlay = IsForegroundLoading(operation);
+        var showOverlay = _startupLoading;
         if (showOverlay)
         {
             CloseMorePopupWithoutBroadcast();
@@ -1830,12 +1901,7 @@ public partial class MainWindow : Window
 
     private bool IsForegroundLoading()
     {
-        return IsForegroundLoading(_controller.CurrentOperation);
-    }
-
-    private bool IsForegroundLoading(KnowledgeOperationUiState operation)
-    {
-        return _startupLoading || (operation.IsBusy && !operation.IsBackground);
+        return _startupLoading;
     }
 
     private void SetClientInteractionEnabled(bool enabled)

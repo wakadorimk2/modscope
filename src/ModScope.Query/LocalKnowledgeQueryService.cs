@@ -278,6 +278,7 @@ public sealed class LocalKnowledgeQueryService : ILocalKnowledgeQuery
         var snapshot = _profileSnapshots.TryGetValue(profile.Name, out var cachedSnapshot)
             ? cachedSnapshot
             : _snapshotReader.Read(ToDefinition(nextSource), cancellationToken, progress);
+        _profileSnapshots[profile.Name] = snapshot;
 
         _source = nextSource;
         _snapshot = snapshot;

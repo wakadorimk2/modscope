@@ -50,6 +50,7 @@ public sealed class DesktopSessionController
     private CancellationTokenSource? _profilePreloadCancellation;
     private Task? _profilePreloadTask;
     private bool _startProfilePreloadAfterOperation;
+    private string? _profilePreloadTarget;
     private string? _baseDataPath;
     private bool _baseDataIsInferred;
     private string? _runtimeLogsPath;
@@ -309,12 +310,14 @@ public sealed class DesktopSessionController
         }
     }
 
-    public async Task DiscoverSourcesAsync(IReadOnlyList<string>? selectedRoots = null)
+    public async Task DiscoverSourcesAsync(
+        IReadOnlyList<string>? selectedRoots = null,
+        bool background = false)
     {
         ThrowIfAnalysisBusy();
         await StopBackgroundProfilePreloadAsync();
         await _operationGate.WaitAsync();
-        var operationToken = BeginOperation("source-discovery", null);
+        var operationToken = BeginOperation("source-discovery", null, background);
         var progress = CreateProgressReporter(operationToken);
         var loaded = false;
         try
@@ -451,7 +454,6 @@ public sealed class DesktopSessionController
         var session = _query.Load(source);
         ApplyLoadedSession(session, null);
         _sourceDiscovery = null;
-        StartBackgroundProfilePreload();
     }
 
     public async Task<bool> LoadVersionEvidenceManifestAsync(string manifestPath)
@@ -480,9 +482,13 @@ public sealed class DesktopSessionController
     public void SwitchProfile(string profileName)
     {
         ThrowIfAnalysisBusy();
+        var previousProfileName = _session?.ProfileName;
         var session = _query.SwitchProfile(profileName);
-        ApplyProfileSession(session);
-        StartBackgroundProfilePreload();
+        ApplyProfileSession(session, previousProfileName);
+        var targetProfileName = _profilePreloadTarget;
+        _profilePreloadTarget = null;
+        _startProfilePreloadAfterOperation = false;
+        StartBackgroundProfilePreload(targetProfileName);
     }
 
     public async Task<bool> SwitchProfileAsync(string profileName)
@@ -493,13 +499,14 @@ public sealed class DesktopSessionController
         await _operationGate.WaitAsync();
         var operationToken = BeginOperation("profile-switch", profileName.Trim());
         var progress = CreateProgressReporter(operationToken);
+        var previousProfileName = _session?.ProfileName;
         var switched = false;
         try
         {
             try
             {
                 var session = await Task.Run(() => _query.SwitchProfile(profileName, progress: progress));
-                ApplyProfileSession(session);
+                ApplyProfileSession(session, previousProfileName);
                 switched = true;
             }
             catch (Exception exception)
@@ -929,13 +936,16 @@ public sealed class DesktopSessionController
         }
     }
 
-    private long BeginOperation(string kind, string? targetProfileName)
+    private long BeginOperation(
+        string kind,
+        string? targetProfileName,
+        bool background = false)
     {
         var operationToken = Interlocked.Increment(ref _operationToken);
         _operation = new KnowledgeOperationUiState(
             kind,
             true,
-            false,
+            background,
             targetProfileName,
             InitialPhase(kind),
             null,
@@ -1057,7 +1067,9 @@ public sealed class DesktopSessionController
         if (_startProfilePreloadAfterOperation)
         {
             _startProfilePreloadAfterOperation = false;
-            StartBackgroundProfilePreload();
+            var targetProfileName = _profilePreloadTarget;
+            _profilePreloadTarget = null;
+            StartBackgroundProfilePreload(targetProfileName);
         }
     }
 
@@ -1081,15 +1093,19 @@ public sealed class DesktopSessionController
         OperationStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void StartBackgroundProfilePreload()
+    private void StartBackgroundProfilePreload(string? targetProfileName)
     {
-        if (_session is null)
+        if (_session is null || string.IsNullOrWhiteSpace(targetProfileName))
         {
             return;
         }
 
         var activeProfileName = _session.ProfileName;
         var pendingProfiles = _profiles
+            .Where(profile => string.Equals(
+                profile.ProfileName,
+                targetProfileName,
+                StringComparison.OrdinalIgnoreCase))
             .Where(profile => !string.Equals(
                 profile.ProfileName,
                 activeProfileName,
@@ -1109,7 +1125,7 @@ public sealed class DesktopSessionController
         var operationToken = BeginBackgroundOperation(
             "profile-preload",
             pendingProfiles[0],
-            pendingProfiles.Count);
+            1);
         _profilePreloadTask = Task.Run(async () =>
         {
             try
@@ -1119,7 +1135,7 @@ public sealed class DesktopSessionController
                     cancellation.Token.ThrowIfCancellationRequested();
                     var profileName = pendingProfiles[index];
                     SetProfileLoadState(profileName, "loading");
-                    SetBackgroundProgress(operationToken, index, pendingProfiles.Count, profileName);
+                    SetBackgroundProgress(operationToken, index, 1, profileName);
 
                     try
                     {
@@ -1127,7 +1143,7 @@ public sealed class DesktopSessionController
                             () => _query.WarmProfile(profileName, cancellation.Token),
                             cancellation.Token);
                         SetProfileLoadState(profileName, "ready");
-                        SetBackgroundProgress(operationToken, index + 1, pendingProfiles.Count, profileName);
+                        SetBackgroundProgress(operationToken, index + 1, 1, profileName);
                     }
                     catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
                     {
@@ -1319,7 +1335,7 @@ public sealed class DesktopSessionController
         _deploymentDiagnostics = Array.Empty<DeploymentDiagnostic>();
     }
 
-    private void ApplyProfileSession(KnowledgeSessionReadModel session)
+    private void ApplyProfileSession(KnowledgeSessionReadModel session, string? previousProfileName)
     {
         _session = session;
         _sessionNexusFileVersionObservations.Clear();
@@ -1339,7 +1355,8 @@ public sealed class DesktopSessionController
         {
             _statusMessage = $"Switched to profile {session.ProfileName}. Observe a page to search local MODs.";
         }
-        _startProfilePreloadAfterOperation = true;
+        _profilePreloadTarget = previousProfileName;
+        _startProfilePreloadAfterOperation = previousProfileName is not null;
     }
 
     private void MarkCandidateLoadFailure(string candidateId, Exception exception)
@@ -1397,7 +1414,8 @@ public sealed class DesktopSessionController
         {
             _statusMessage = $"Loaded {_candidates.Count} MOD records. Observe a page to search local MODs.";
         }
-        _startProfilePreloadAfterOperation = true;
+        _profilePreloadTarget = null;
+        _startProfilePreloadAfterOperation = false;
     }
 
     private void ApplyInferredBaseData()

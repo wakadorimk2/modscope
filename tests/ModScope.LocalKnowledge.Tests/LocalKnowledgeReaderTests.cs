@@ -422,6 +422,111 @@ public sealed class LocalKnowledgeReaderTests
     }
 
     [Fact]
+    public void ReusesPersistentStaticCatalogAfterProcessCacheReset()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-persistent-cache-");
+        var cache = Directory.CreateTempSubdirectory("modscope-persistent-cache-store-");
+        try
+        {
+            CopyDirectory(FixtureRoot, root.FullName);
+            var reader = new Mo2SnapshotReader(cache.FullName);
+            var firstProgress = new RecordingProgress();
+            var first = reader.Read(CreateSource(root.FullName), progress: firstProgress);
+
+            var cacheFile = Assert.Single(cache.EnumerateFiles("static-catalog-*.json"));
+            var cacheJson = File.ReadAllText(cacheFile.FullName);
+            Assert.DoesNotContain(root.FullName, cacheJson, StringComparison.OrdinalIgnoreCase);
+
+            ClearProcessStaticCatalogCache();
+
+            var secondProgress = new RecordingProgress();
+            var second = new Mo2SnapshotReader(cache.FullName)
+                .Read(CreateSource(root.FullName), progress: secondProgress);
+
+            Assert.Equal(first.Index.ForwardReferences, second.Index.ForwardReferences);
+            Assert.Equal(first.Index.ReverseReferences, second.Index.ReverseReferences);
+            Assert.DoesNotContain(
+                secondProgress.Values,
+                progress => progress.Phase == "scanning-mod-folders");
+            Assert.Contains(
+                secondProgress.Values,
+                progress => progress.Phase == "reusing-static-knowledge");
+        }
+        finally
+        {
+            root.Delete(true);
+            cache.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void RebuildsPersistentStaticCatalogWhenCacheIsCorrupt()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-corrupt-cache-");
+        var cache = Directory.CreateTempSubdirectory("modscope-corrupt-cache-store-");
+        try
+        {
+            CopyDirectory(FixtureRoot, root.FullName);
+            var source = CreateSource(root.FullName);
+            _ = new Mo2SnapshotReader(cache.FullName).Read(source);
+
+            var cacheFile = Assert.Single(cache.EnumerateFiles("static-catalog-*.json"));
+            File.WriteAllText(cacheFile.FullName, "{ invalid cache json");
+            ClearProcessStaticCatalogCache();
+
+            var progress = new RecordingProgress();
+            var rebuilt = new Mo2SnapshotReader(cache.FullName)
+                .Read(source, progress: progress);
+
+            Assert.NotEmpty(rebuilt.Mods);
+            Assert.Contains(progress.Values, item => item.Phase == "scanning-mod-folders");
+            Assert.DoesNotContain(progress.Values, item => item.Phase == "reusing-static-knowledge");
+        }
+        finally
+        {
+            root.Delete(true);
+            cache.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void RebuildsPersistentStaticCatalogWhenCacheVersionDiffers()
+    {
+        var root = Directory.CreateTempSubdirectory("modscope-old-cache-");
+        var cache = Directory.CreateTempSubdirectory("modscope-old-cache-store-");
+        try
+        {
+            CopyDirectory(FixtureRoot, root.FullName);
+            var source = CreateSource(root.FullName);
+            _ = new Mo2SnapshotReader(cache.FullName).Read(source);
+
+            var cacheFile = Assert.Single(cache.EnumerateFiles("static-catalog-*.json"));
+            var cacheJson = File.ReadAllText(cacheFile.FullName);
+            Assert.Contains("\"CacheFormatVersion\":1", cacheJson, StringComparison.Ordinal);
+            File.WriteAllText(
+                cacheFile.FullName,
+                cacheJson.Replace(
+                    "\"CacheFormatVersion\":1",
+                    "\"CacheFormatVersion\":0",
+                    StringComparison.Ordinal));
+            ClearProcessStaticCatalogCache();
+
+            var progress = new RecordingProgress();
+            var rebuilt = new Mo2SnapshotReader(cache.FullName)
+                .Read(source, progress: progress);
+
+            Assert.NotEmpty(rebuilt.Mods);
+            Assert.Contains(progress.Values, item => item.Phase == "scanning-mod-folders");
+            Assert.DoesNotContain(progress.Values, item => item.Phase == "reusing-static-knowledge");
+        }
+        finally
+        {
+            root.Delete(true);
+            cache.Delete(true);
+        }
+    }
+
+    [Fact]
     public void SnapshotIdIsStableForTheSameInput()
     {
         var first = ReadFixture();
@@ -642,6 +747,16 @@ public sealed class LocalKnowledgeReaderTests
         AppContext.BaseDirectory,
         "Fixtures",
         "7dtd-mo2-minimal");
+
+    private static void ClearProcessStaticCatalogCache()
+    {
+        var field = typeof(Mo2SnapshotReader).GetField(
+            "StaticCatalogCache",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        var cache = field?.GetValue(null)
+            ?? throw new InvalidOperationException("Static catalog cache field was not found.");
+        cache.GetType().GetMethod("Clear")?.Invoke(cache, null);
+    }
 
     private sealed class RecordingProgress : IProgress<LocalKnowledgeProgress>
     {

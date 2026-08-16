@@ -1,12 +1,28 @@
+using System.Collections.Concurrent;
 using System.Text;
+using System.Text.Json;
 
 namespace ModScope.LocalKnowledge;
 
 public sealed class Mo2SnapshotReader : IMo2SnapshotReader
 {
-    private static readonly object StaticCatalogCacheGate = new();
-    private static readonly Dictionary<string, StaticModCatalog> StaticCatalogCache =
+    private const int StaticCatalogCacheFormatVersion = 1;
+    private static readonly ConcurrentDictionary<string, StaticModCatalog> StaticCatalogCache =
         new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, object> StaticCatalogCacheGates =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly JsonSerializerOptions StaticCatalogJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+    private readonly string _persistentCacheDirectory;
+
+    public Mo2SnapshotReader(string? persistentCacheDirectory = null)
+    {
+        _persistentCacheDirectory = string.IsNullOrWhiteSpace(persistentCacheDirectory)
+            ? GetDefaultPersistentCacheDirectory()
+            : Path.GetFullPath(persistentCacheDirectory);
+    }
 
     public LocalModSnapshot Read(
         Mo2SourceDefinition source,
@@ -102,7 +118,7 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         };
     }
 
-    private static StaticModCatalog GetStaticCatalog(
+    private StaticModCatalog GetStaticCatalog(
         ValidatedSourcePaths paths,
         CancellationToken cancellationToken,
         IProgress<LocalKnowledgeProgress>? progress)
@@ -110,7 +126,8 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         var cacheKey = BuildStaticCatalogCacheKey(paths.ModsPath);
         progress?.Report(new LocalKnowledgeProgress("checking-cache"));
 
-        lock (StaticCatalogCacheGate)
+        var cacheGate = StaticCatalogCacheGates.GetOrAdd(cacheKey, static _ => new object());
+        lock (cacheGate)
         {
             if (StaticCatalogCache.TryGetValue(cacheKey, out var cached)
                 && IsStaticCatalogCurrent(cached, paths.ModsPath, cancellationToken))
@@ -119,10 +136,197 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
                 return cached;
             }
 
+            if (TryLoadPersistentStaticCatalog(cacheKey, paths.ModsPath, out var persisted)
+                && IsStaticCatalogCurrent(persisted, paths.ModsPath, cancellationToken))
+            {
+                StaticCatalogCache[cacheKey] = persisted;
+                progress?.Report(new LocalKnowledgeProgress("reusing-static-knowledge"));
+                return persisted;
+            }
+
             var rebuilt = BuildStaticCatalog(paths, cancellationToken, progress);
             StaticCatalogCache[cacheKey] = rebuilt;
+            TryPersistStaticCatalog(cacheKey, rebuilt);
             return rebuilt;
         }
+    }
+
+    private bool TryLoadPersistentStaticCatalog(
+        string cacheKey,
+        string modsPath,
+        out StaticModCatalog catalog)
+    {
+        catalog = null!;
+        var cachePath = GetPersistentCachePath(cacheKey);
+        if (!File.Exists(cachePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var json = File.ReadAllText(cachePath, Encoding.UTF8);
+            var persisted = JsonSerializer.Deserialize<PersistentStaticCatalogCache>(
+                json,
+                StaticCatalogJsonOptions);
+            if (persisted is null
+                || persisted.CacheFormatVersion != StaticCatalogCacheFormatVersion
+                || !string.Equals(
+                    persisted.CacheKeyHash,
+                    BuildPersistentCacheKeyHash(cacheKey),
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    persisted.ParserVersion,
+                    ParserMetadata.ParserVersion,
+                    StringComparison.Ordinal)
+                || persisted.SchemaVersion != ParserMetadata.SchemaVersion
+                || persisted.DirectoryNames is null
+                || persisted.Records is null
+                || persisted.Inventory is null
+                || persisted.Diagnostics is null
+                || persisted.MetadataFingerprint is null
+                || persisted.Index is null)
+            {
+                return false;
+            }
+
+            var inventory = persisted.Inventory
+                .Select(item => HydrateFileInventoryItem(modsPath, item))
+                .ToList()
+                .AsReadOnly();
+            catalog = new StaticModCatalog(
+                persisted.DirectoryNames!.AsReadOnly(),
+                persisted.Records!.AsReadOnly(),
+                inventory,
+                persisted.Diagnostics!.AsReadOnly(),
+                persisted.MetadataFingerprint!.AsReadOnly(),
+                persisted.Index!);
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException
+            or IOException
+            or UnauthorizedAccessException
+            or InvalidDataException
+            or NotSupportedException
+            or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static FileInventoryItem HydrateFileInventoryItem(
+        string modsPath,
+        PersistentFileInventoryItem item)
+    {
+        if (item.Source is null
+            || string.IsNullOrWhiteSpace(item.RelativePath)
+            || string.IsNullOrWhiteSpace(item.Sha256))
+        {
+            throw new InvalidDataException("The persistent MOD inventory contains an incomplete file entry.");
+        }
+
+        const string modsPrefix = "mods/";
+        var sourceRelativePath = ParsingUtilities.NormalizeRelativePath(item.Source.RelativePath);
+        if (!sourceRelativePath.StartsWith(modsPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("The persistent MOD inventory contains an invalid source path.");
+        }
+
+        var relativeToMods = sourceRelativePath[modsPrefix.Length..];
+        var normalizedModsPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(modsPath));
+        var fullPath = Path.GetFullPath(Path.Combine(
+            normalizedModsPath,
+            relativeToMods.Replace('/', Path.DirectorySeparatorChar)));
+        var modsPathPrefix = normalizedModsPath + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(modsPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("The persistent MOD inventory escapes the configured MOD path.");
+        }
+
+        return new FileInventoryItem(
+            fullPath,
+            item.RelativePath!,
+            item.Size,
+            item.Sha256!,
+            item.Source!);
+    }
+
+    private void TryPersistStaticCatalog(string cacheKey, StaticModCatalog catalog)
+    {
+        string? temporaryPath = null;
+        try
+        {
+            Directory.CreateDirectory(_persistentCacheDirectory);
+            var cachePath = GetPersistentCachePath(cacheKey);
+            temporaryPath = $"{cachePath}.{Guid.NewGuid():N}.tmp";
+            var payload = new PersistentStaticCatalogCache
+            {
+                CacheFormatVersion = StaticCatalogCacheFormatVersion,
+                CacheKeyHash = BuildPersistentCacheKeyHash(cacheKey),
+                ParserVersion = ParserMetadata.ParserVersion,
+                SchemaVersion = ParserMetadata.SchemaVersion,
+                DirectoryNames = catalog.DirectoryNames.ToList(),
+                Records = catalog.Records.ToList(),
+                Inventory = catalog.Inventory
+                    .Select(item => new PersistentFileInventoryItem
+                    {
+                        RelativePath = item.RelativePath,
+                        Size = item.Size,
+                        Sha256 = item.Sha256,
+                        Source = item.Source
+                    })
+                    .ToList(),
+                Diagnostics = catalog.Diagnostics.ToList(),
+                MetadataFingerprint = catalog.MetadataFingerprint.ToList(),
+                Index = catalog.Index
+            };
+            var json = JsonSerializer.Serialize(payload, StaticCatalogJsonOptions);
+            File.WriteAllText(temporaryPath, json, Encoding.UTF8);
+            File.Move(temporaryPath, cachePath, true);
+            temporaryPath = null;
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or JsonException
+            or NotSupportedException
+            or ArgumentException)
+        {
+            // Persistent cache is an optimization. A cache failure must not fail the MO2 read.
+        }
+        finally
+        {
+            if (temporaryPath is not null)
+            {
+                try
+                {
+                    File.Delete(temporaryPath);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
+        }
+    }
+
+    private string GetPersistentCachePath(string cacheKey)
+    {
+        return Path.Combine(
+            _persistentCacheDirectory,
+            $"static-catalog-{BuildPersistentCacheKeyHash(cacheKey)}.json");
+    }
+
+    private static string BuildPersistentCacheKeyHash(string cacheKey)
+    {
+        return ParsingUtilities.Sha256Hex(Encoding.UTF8.GetBytes(cacheKey));
+    }
+
+    private static string GetDefaultPersistentCacheDirectory()
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(localAppData, "ModScope", "cache");
     }
 
     private static StaticModCatalog BuildStaticCatalog(
@@ -1069,6 +1273,40 @@ public sealed class Mo2SnapshotReader : IMo2SnapshotReader
         IReadOnlyList<LocalModRecord> Records,
         IReadOnlyList<FileInventoryItem> Inventory,
         IReadOnlyList<Diagnostic> Diagnostics);
+
+    private sealed class PersistentStaticCatalogCache
+    {
+        public int CacheFormatVersion { get; set; }
+
+        public string? CacheKeyHash { get; set; }
+
+        public string? ParserVersion { get; set; }
+
+        public int SchemaVersion { get; set; }
+
+        public List<string>? DirectoryNames { get; set; }
+
+        public List<LocalModRecord>? Records { get; set; }
+
+        public List<PersistentFileInventoryItem>? Inventory { get; set; }
+
+        public List<Diagnostic>? Diagnostics { get; set; }
+
+        public List<MetadataFingerprintEntry>? MetadataFingerprint { get; set; }
+
+        public LocalKnowledgeIndex? Index { get; set; }
+    }
+
+    private sealed class PersistentFileInventoryItem
+    {
+        public string? RelativePath { get; set; }
+
+        public long Size { get; set; }
+
+        public string? Sha256 { get; set; }
+
+        public SourceReference? Source { get; set; }
+    }
 
     private sealed record StaticModCatalog(
         IReadOnlyList<string> DirectoryNames,

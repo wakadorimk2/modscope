@@ -545,6 +545,12 @@ public sealed class LocalKnowledgeQueryTests
 
             Assert.Equal("Alternate", switched.ProfileName);
             Assert.Equal(QueryProfileState.Listed, query.GetModCandidates().Single(candidate => candidate.DirectoryName == "Beta Mod").ProfileState);
+
+            var returnedProgress = new RecordingProgress();
+            var returned = query.SwitchProfile("Default", progress: returnedProgress);
+
+            Assert.Equal("Default", returned.ProfileName);
+            Assert.Empty(returnedProgress.Values);
         }
         finally
         {
