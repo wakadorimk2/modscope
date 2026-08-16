@@ -811,7 +811,7 @@ public partial class MainWindow : Window
     private void NavigateHome(BrowserTabHostState tab)
     {
         tab.InternalPage = "home";
-        tab.PendingNexusSearchName = null;
+        tab.PendingNexusSearchNames = Array.Empty<string>();
         tab.Url = "about:blank";
         tab.Title = "ModScope Home";
         tab.WebView.NavigateToString(HomeHtml);
@@ -821,7 +821,7 @@ public partial class MainWindow : Window
     private void NavigateHistory(BrowserTabHostState tab)
     {
         tab.InternalPage = "history";
-        tab.PendingNexusSearchName = null;
+        tab.PendingNexusSearchNames = Array.Empty<string>();
         tab.Url = "about:history";
         tab.Title = "History";
         tab.WebView.NavigateToString(RenderHistoryHtml());
@@ -836,7 +836,7 @@ public partial class MainWindow : Window
         }
 
         tab.InternalPage = "deployment-preview";
-        tab.PendingNexusSearchName = null;
+        tab.PendingNexusSearchNames = Array.Empty<string>();
         tab.Url = "about:deployment-preview";
         tab.Title = "Deployment preview";
         ConfigureFrontend(tab.WebView, _webAssetsPath, "deployment-preview");
@@ -981,14 +981,25 @@ public partial class MainWindow : Window
         return (path.Equals("/7daystodie/search", StringComparison.OrdinalIgnoreCase)
                 && uri.Query.Contains("gsearch=", StringComparison.OrdinalIgnoreCase))
             || (path.Equals("/games/7daystodie/mods", StringComparison.OrdinalIgnoreCase)
-                && uri.Query.Contains("keyword=", StringComparison.OrdinalIgnoreCase));
+                 && uri.Query.Contains("keyword=", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Uri BuildNexusSearchUri(Uri source, string targetName)
+    {
+        var path = source.AbsolutePath;
+        var parameter = path.TrimEnd('/').Equals("/7daystodie/search", StringComparison.OrdinalIgnoreCase)
+            ? "gsearch"
+            : "keyword";
+        return new Uri(
+            $"{source.Scheme}://{source.Authority}{path}?{parameter}={Uri.EscapeDataString(targetName)}",
+            UriKind.Absolute);
     }
 
     private async Task<bool> TryResolveNexusSearchAsync(BrowserTabHostState tab)
     {
-        var targetName = tab.PendingNexusSearchName;
-        tab.PendingNexusSearchName = null;
-        if (string.IsNullOrWhiteSpace(targetName)
+        var targetNames = tab.PendingNexusSearchNames;
+        tab.PendingNexusSearchNames = Array.Empty<string>();
+        if (targetNames.Count == 0
             || tab.WebView.CoreWebView2 is null
             || tab.WebView.Source is not { } source
             || !IsNexusSearchUri(source))
@@ -996,8 +1007,11 @@ public partial class MainWindow : Window
             return false;
         }
 
-        var normalizedTargetName = NormalizeNexusName(targetName);
-        if (normalizedTargetName.Length == 0)
+        var normalizedTargetNames = targetNames
+            .Select(NormalizeNexusName)
+            .Where(name => name.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
+        if (normalizedTargetNames.Count == 0)
         {
             _controller.SetStatus("Nexus search needs a usable MOD name.");
             return false;
@@ -1028,7 +1042,7 @@ public partial class MainWindow : Window
                 }
 
                 var linkText = textElement.GetString();
-                if (NormalizeNexusName(linkText ?? string.Empty) != normalizedTargetName)
+                if (!normalizedTargetNames.Contains(NormalizeNexusName(linkText ?? string.Empty)))
                 {
                     continue;
                 }
@@ -1043,7 +1057,20 @@ public partial class MainWindow : Window
             {
                 var resolvedUri = new Uri(matches.Single(), UriKind.Absolute);
                 tab.Navigate(resolvedUri);
-                _controller.SetStatus($"Resolved Nexus MOD page for {targetName}.");
+                _controller.SetStatus($"Resolved Nexus MOD page for {targetNames[0]}.");
+                return true;
+            }
+
+            var remainingNames = targetNames
+                .Skip(1)
+                .Where(name => NormalizeNexusName(name).Length > 0)
+                .ToArray();
+            if (remainingNames.Length > 0)
+            {
+                tab.Navigate(
+                    BuildNexusSearchUri(source, remainingNames[0]),
+                    remainingNames);
+                _controller.SetStatus($"Nexus search is trying another MOD name for {targetNames[0]}.");
                 return true;
             }
 
@@ -1577,9 +1604,15 @@ public partial class MainWindow : Window
                     break;
                 }
                 activeTab.Url = uri.ToString();
+                var nexusSearchNames = IsNexusSearchUri(uri)
+                    ? payload.NexusSearchNames
+                        ?? (string.IsNullOrWhiteSpace(payload.NexusSearchName)
+                            ? null
+                            : new[] { payload.NexusSearchName })
+                    : null;
                 activeTab.Navigate(
                     uri,
-                    IsNexusSearchUri(uri) ? payload.NexusSearchName : null);
+                    nexusSearchNames);
                 SendState(command.RequestId, sourceWebView);
                 break;
             }
@@ -2009,7 +2042,7 @@ public partial class MainWindow : Window
             : documentTitle;
         if (!e.IsSuccess)
         {
-            tab.PendingNexusSearchName = null;
+            tab.PendingNexusSearchNames = Array.Empty<string>();
             if (!ReferenceEquals(tab, ActiveBrowserTab))
             {
                 SaveBrowserState();

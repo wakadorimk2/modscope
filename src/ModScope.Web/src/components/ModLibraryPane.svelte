@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DeploymentEntryUiState, ModCandidateUiState, UiState } from '../contracts';
+  import { resolveModWebsite, type ModWebsiteLink } from '../mod-links';
 
   export let state: UiState;
   export let operationRailVisible = false;
@@ -38,12 +39,6 @@
     if (selectionScope && selectionScope !== nextSelectionScope) selectedModKey = null;
     selectionScope = nextSelectionScope;
   }
-
-  type ModWebsiteLink = {
-    url: string | null;
-    status: 'Verified' | 'Inferred' | 'No usable URL';
-    nexusSearchName?: string;
-  };
 
   function formatLabel(value: string | null | undefined): string {
     if (!value) return 'Unknown';
@@ -105,30 +100,22 @@
     });
   }
 
-  function isWebsiteUrl(value: string | null | undefined): value is string {
-    const trimmed = value?.trim();
-    if (!trimmed) return false;
-    try {
-      const url = new URL(trimmed);
-      return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-      return false;
+  function websiteButtonLabel(website: ModWebsiteLink): string {
+    switch (website.kind) {
+      case 'nexus': return 'Nexus';
+      case 'website': return 'Website';
+      case 'nexus-search': return 'Nexus search';
+      default: return 'No usable URL';
     }
   }
 
-  function resolveModWebsite(candidate: ModCandidateUiState): ModWebsiteLink {
-    if (isWebsiteUrl(candidate.website)) {
-      return { url: candidate.website.trim(), status: 'Verified' };
-    }
-    const name = [candidate.displayName, candidate.directoryName, candidate.modKey]
-      .map((value) => value?.trim() ?? '')
-      .find((value) => value.length > 0) ?? '';
-    if (!name) return { url: null, status: 'No usable URL' };
-    return {
-      url: `https://www.nexusmods.com/games/7daystodie/mods?keyword=${encodeURIComponent(name)}`,
-      status: 'Inferred',
-      nexusSearchName: name
-    };
+  function websiteButtonAriaLabel(website: ModWebsiteLink, candidate: ModCandidateUiState): string {
+    const action = website.kind === 'nexus'
+      ? 'Open exact Nexus page'
+      : website.kind === 'website'
+        ? 'Open source website'
+        : 'Open inferred Nexus search';
+    return `${action} for ${modDisplayName(candidate)}`;
   }
 
   function selectMod(modKey: string) {
@@ -377,7 +364,7 @@
                           </button>
                           <div class="mod-library-row-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
                             {#if website.url}
-                              <button type="button" class="secondary-button mod-library-row-action" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
+                              <button type="button" class="secondary-button mod-library-row-action" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={websiteButtonAriaLabel(website, candidate)} onclick={() => onOpenModPage(candidate)}>{websiteButtonLabel(website)}</button>
                             {:else}
                               <span class="mod-library-row-action-unavailable" aria-label="No usable URL">No usable URL</span>
                             {/if}
@@ -430,7 +417,7 @@
                             </button>
                             <div class="mod-library-row-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
                               {#if website.url}
-                                <button type="button" class="secondary-button mod-library-row-action" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
+                                <button type="button" class="secondary-button mod-library-row-action" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={websiteButtonAriaLabel(website, candidate)} onclick={() => onOpenModPage(candidate)}>{websiteButtonLabel(website)}</button>
                               {:else}
                                 <span class="mod-library-row-action-unavailable" aria-label="No usable URL">No usable URL</span>
                               {/if}

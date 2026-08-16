@@ -17,7 +17,8 @@ public sealed class BridgeProtocolTests
               "command": "browser.navigate",
               "payload": {
                 "url": "https://www.nexusmods.com/7daystodie/search/?gsearch=Alpha",
-                "nexusSearchName": "Alpha Mod"
+                "nexusSearchName": "Alpha Mod",
+                "nexusSearchNames": ["Alpha Mod", "Alpha Directory"]
               }
             }
             """);
@@ -29,6 +30,7 @@ public sealed class BridgeProtocolTests
         Assert.Equal("browser.navigate", envelope.Command);
         Assert.Equal("https://www.nexusmods.com/7daystodie/search/?gsearch=Alpha", payload.Url);
         Assert.Equal("Alpha Mod", payload.NexusSearchName);
+        Assert.Equal(new[] { "Alpha Mod", "Alpha Directory" }, payload.NexusSearchNames);
     }
 
     [Fact]
@@ -56,10 +58,11 @@ public sealed class BridgeProtocolTests
     public void SerializeNavigatePayloadUsesCamelCaseSearchName()
     {
         var json = JsonSerializer.Serialize(
-            new NavigatePayload("https://example.test/search", "Alpha Mod"),
+            new NavigatePayload("https://example.test/search", "Alpha Mod", new[] { "Alpha Mod", "Alpha Directory" }),
             BridgeProtocol.JsonOptions);
 
         Assert.Contains("\"nexusSearchName\":\"Alpha Mod\"", json);
+        Assert.Contains("\"nexusSearchNames\":[\"Alpha Mod\",\"Alpha Directory\"]", json);
     }
 
     [Fact]
