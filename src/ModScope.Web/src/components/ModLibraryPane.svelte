@@ -154,6 +154,10 @@
     return inspectorOpen && inspectorModKey === modKey ? 'Close Inspector' : 'Inspect evidence';
   }
 
+  function inspectorButtonLabel(modKey: string): string {
+    return inspectorOpen && inspectorModKey === modKey ? 'Close' : 'Inspect';
+  }
+
   function operationLabel(): string {
     const operation = state.knowledge.operation;
     const profile = operation.targetProfileName ? ` ${operation.targetProfileName}` : '';
@@ -376,7 +380,7 @@
                             {:else}
                               <span class="mod-library-row-action-unavailable" aria-label="No usable URL">No usable URL</span>
                             {/if}
-                            <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title={inspectorActionLabel(candidate.modKey)} aria-label={`${inspectorActionLabel(candidate.modKey)} for ${modDisplayName(candidate)}`} aria-pressed={inspectorOpen && inspectorModKey === candidate.modKey} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                            <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title={inspectorActionLabel(candidate.modKey)} aria-label={`${inspectorActionLabel(candidate.modKey)} for ${modDisplayName(candidate)}`} aria-pressed={inspectorOpen && inspectorModKey === candidate.modKey} onclick={() => onOpenInspectorForMod(candidate.modKey)}><span class="mod-library-inspect-icon" aria-hidden="true">{inspectorOpen && inspectorModKey === candidate.modKey ? '×' : '⌕'}</span><span class="mod-library-inspect-label">{inspectorButtonLabel(candidate.modKey)}</span></button>
                           </div>
                         </div>
                       </td>
@@ -429,7 +433,7 @@
                               {:else}
                                 <span class="mod-library-row-action-unavailable" aria-label="No usable URL">No usable URL</span>
                               {/if}
-                              <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title={inspectorActionLabel(candidate.modKey)} aria-label={`${inspectorActionLabel(candidate.modKey)} for ${modDisplayName(candidate)}`} aria-pressed={inspectorOpen && inspectorModKey === candidate.modKey} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                              <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title={inspectorActionLabel(candidate.modKey)} aria-label={`${inspectorActionLabel(candidate.modKey)} for ${modDisplayName(candidate)}`} aria-pressed={inspectorOpen && inspectorModKey === candidate.modKey} onclick={() => onOpenInspectorForMod(candidate.modKey)}><span class="mod-library-inspect-icon" aria-hidden="true">{inspectorOpen && inspectorModKey === candidate.modKey ? '×' : '⌕'}</span><span class="mod-library-inspect-label">{inspectorButtonLabel(candidate.modKey)}</span></button>
                             </div>
                           </div>
                         </td>
@@ -667,6 +671,37 @@
     flex: 0 0 24px;
     padding: 0;
     font-size: 13px;
+  }
+
+  .mod-library-inspect-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .mod-library-table-row.mod-list-item-selected .mod-library-row-action-inspect {
+    width: auto;
+    min-width: 54px;
+    gap: 4px;
+    padding: 3px 6px;
+    border-color: rgba(125, 211, 252, 0.2);
+    background: rgba(14, 116, 144, 0.16);
+    color: #bae6fd;
+    font-size: 9px;
+  }
+
+  .mod-library-table-row.mod-list-item-selected .mod-library-inspect-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: nowrap;
   }
 
   .mod-library-row-action-unavailable {

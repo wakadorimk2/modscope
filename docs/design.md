@@ -1722,3 +1722,56 @@ Websiteが無効または欠落する場合は、display name、directory name�
 検索結果から数値IDのMODリンクを抽出し、各検索名と正規化後に完全一致する候補が1件だけの場合に正規ページへ遷移します。
 曖昧な結果、検索結果の解析失敗、remote 404やnavigation failureはBrowser diagnosticまたは検索ページとして扱います。
 認識失敗時のlocal MOD選択も、同じ検索結果から行います。
+
+### 25.7 Task-conditioned attention flow
+
+Task-conditioned attention flowは、全surfaceの情報階層を確認するheuristicとして適用します。
+eye-trackingは実施しません。視線の予測は`likely`または`heuristic`として扱います。
+
+このUIの主taskは、ユーザーがBrowserで現在のMOD pageを見ながら、MOD identity、Installed、Enabled、Version、Profileを確認し、必要な場合だけInspectorまたはOpen pageへ進むことです。
+confirmation pointは、RECOGNIZEの結論、4項目summary、evidence labelです。
+action pointは、明示的な`Inspect`、`Open page`、identity confirmation、または必要なsource操作です。
+
+Free-view saliencyとtask-driven scanpathを分けます。
+Free-viewでは中央Browser、RECOGNIZE heading、選択中Library rowが主要なanchorになり得ます。
+Task-driven scanpathは、次の順序を標準とします。
+
+`Browser page → RECOGNIZE conclusion → Installed / Enabled / Version / Profile → Needs review when applicable → Inspect or Open page`
+
+phaseごとのprimary anchorは、`Guess`ではBrowser page、`Scan`ではRECOGNIZE summary、`Confirm`ではevidence付きの4項目、`Act`では明示操作buttonとします。
+各phaseの強いanchorは1つにします。
+Browser、RECOGNIZE、Inspectorの遷移は、pane順序、共通label、選択状態、近接配置、inline progressive disclosureで接続します。
+
+Analysis lampの通常状態は、RECOGNIZE summaryと競合しない低い強度で表示します。
+`Issue`は、affected item、reason、resolution actionへ接続できる場合だけ強調します。
+`Unknown`と`Needs review`は文字で表示します。色だけで状態を表しません。
+
+Mod Libraryのselectionは、確認対象を示す一時的なpresentation stateです。
+selectionだけではpage、identity、write stateを変更しません。
+選択行では`Inspect` affordanceを低い強度で常時表示します。
+hoverまたはkeyboard focusでは補助actionを強調します。
+Libraryの`Inspect`はContextの同じInspector presentation stateへ接続します。
+
+Contextを非表示にした状態は、ユーザーが選択したexceptional stateです。
+Contextを自動表示しません。
+pane表示切替はlayout stateだけを変更し、Browser、recognition、selection、Inspector disclosure、write stateを破棄しません。
+
+Settingsはsource status、evidence、source actionの順で表示します。
+Analysisはstatus、inputs、conclusion、analysis actionの順で表示します。
+Deployment previewはsafety summary、targetとdiff、diagnosticとrollback、explicit approvalの順で表示します。
+Deploymentのpreview、diff、rollback、explicit approvalとcontrolled write sequenceは維持します。
+
+InspectorはRECOGNIZE直下のinline panelです。
+Inspectorは自動展開しません。
+`Inspect`または`Close Inspector`で開閉します。
+InspectorはBrowserを覆いません。
+Conclusion-first、closed disclosure、raw XML、XPath、diagnosticの詳細分離を維持します。
+
+### 25.8 Attention flowの実装境界
+
+この適用で変更する対象は、frontendの表示階層、spacing、focus、action affordance、visual emphasisです。
+Bridge contract、C# DTO、Query projection、MO2 read/write boundaryは変更しません。
+新しいObserve、Identity confirm、Browser engine、write commandは追加しません。
+
+自動確認、静的visual review、Owner Playcheckは別の証拠として記録します。
+Owner Playcheckでは、1920×1080のBrowser-first表示、RECOGNIZEからInspectorへの遷移、Library selectionの非破壊性、pane切替、loading中のBrowser操作、Settings、Analysis、Deployment previewを確認します。

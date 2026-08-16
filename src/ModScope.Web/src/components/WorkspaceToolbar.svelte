@@ -300,6 +300,15 @@
     color: #8ab4f8;
   }
 
+  .mock-toolbar-controls-row .pane-toggle-button {
+    color: #858b93;
+  }
+
+  .mock-toolbar-controls-row .pane-toggle-button.active {
+    background: rgba(138, 180, 248, 0.1);
+    color: #a9c8f2;
+  }
+
   .mock-toolbar-controls-row .shortcut-hint {
     color: #6f747a;
   }

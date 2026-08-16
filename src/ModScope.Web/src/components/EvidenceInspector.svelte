@@ -381,7 +381,7 @@
 <style>
   .inspector-reference-shell {
     border-color: rgba(56, 189, 248, 0.2);
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.48));
+    background: var(--chrome-panel);
   }
 
   .inspector-reference-shell .inspector-panel-heading {
@@ -391,7 +391,7 @@
 
   .inspector-reference-conclusion {
     border-color: rgba(56, 189, 248, 0.32);
-    background: linear-gradient(145deg, rgba(14, 116, 144, 0.22), rgba(30, 41, 59, 0.54));
+    background: var(--chrome-panel-2);
   }
 
   .inspector-reference-conclusion .inspector-conclusion-status-item {

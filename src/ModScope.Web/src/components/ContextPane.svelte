@@ -262,7 +262,13 @@
     {:else if hasConclusion && state.localContext}
       <div class="context-reference-grid" aria-label="Local MOD context">
         {#each localContextCells as cell}
-          <div class="context-reference-cell">
+          <div
+            class="context-reference-cell"
+            class:context-reference-cell-version={cell.label === 'Version'}
+            class:context-reference-cell-version-review={cell.label === 'Version' && localContextReviewItems.length > 0}
+            id={cell.label === 'Version' ? 'recognize-version' : undefined}
+            aria-describedby={cell.label === 'Version' && localContextReviewItems.length > 0 ? 'recognize-review-cue' : undefined}
+          >
             <span class="context-reference-label">{cell.label}</span>
             <strong class:context-reference-value-positive={cell.tone === 'positive'} class:context-reference-value-unknown={cell.tone === 'unknown'}>{cell.value}</strong>
             <span class="context-reference-evidence context-reference-evidence-{cell.evidence.toLowerCase()}" aria-label={`Evidence: ${cell.evidence}`}><i aria-hidden="true"></i>{cell.evidence}</span>
@@ -270,7 +276,7 @@
         {/each}
       </div>
       {#if localContextReviewItems.length > 0}
-        <aside class="context-reference-review" aria-label="Needs review">
+        <aside id="recognize-review-cue" class="context-reference-review" aria-label="Needs review">
           <strong>Needs review</strong>
           <ul>
             {#each localContextReviewItems as item}<li>{item}</li>{/each}
@@ -405,6 +411,10 @@
     background: rgba(15, 23, 42, 0.44);
   }
 
+  .context-reference-cell-version-review {
+    border-color: rgba(250, 204, 21, 0.42);
+  }
+
   .context-reference-label {
     color: #94a3b8;
     font-size: 10px;
@@ -427,7 +437,7 @@
   }
 
   .context-reference-value-unknown {
-    color: #fde68a !important;
+    color: #cbd5e1 !important;
   }
 
   .context-reference-evidence {
@@ -462,7 +472,7 @@
   .context-reference-review {
     display: grid;
     gap: 6px;
-    margin-top: 12px;
+    margin-top: 8px;
     padding: 10px 11px;
     border-left: 2px solid #facc15;
     background: rgba(120, 53, 15, 0.2);
@@ -487,7 +497,9 @@
     display: flex;
     flex-wrap: wrap;
     gap: 7px;
-    margin-top: 14px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
   }
 
   .context-reference-action {
