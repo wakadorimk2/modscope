@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ModScope UI Reference</title>
-  <link rel="stylesheet" href="assets/style.css?v=2026-08-16T00:26:00.443855+00:00">
+  <link rel="stylesheet" href="assets/style.css?v=2026-08-16T00:42:51.384634+00:00">
 
 
   <!-- html block の inline script より先に RHWState を定義する必要があるため head に置く -->
-  <script src="assets/interactive-state.js?v=2026-08-16T00:26:00.443855+00:00"></script>
+  <script src="assets/interactive-state.js?v=2026-08-16T00:42:51.384634+00:00"></script>
 </head>
 <body>
   <div class="app" data-document-id="modscope-ui-reference">
@@ -631,6 +631,38 @@
 .ms-boundary strong {
   color: #234b78;
 }
+/* The published preview is the FHD presentation surface. */
+.is-published .doc-shell,
+.is-published .canvas.is-focus .doc-shell {
+  width: 100%;
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+.is-published .paper {
+  width: 100%;
+  padding-left: clamp(24px, 3vw, 64px);
+  padding-right: clamp(24px, 3vw, 64px);
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+}
+.is-published .block-content {
+  max-width: none;
+  overflow-x: hidden;
+}
+.is-published .ms-reference,
+.is-published .ms-stage {
+  width: 100%;
+  max-width: none;
+}
+.is-published .ms-stage {
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+}
+.is-published .ms-workspace {
+  min-height: 0;
+}
 @media (max-width: 900px) {
   .ms-stage {
     min-height: 520px;
@@ -778,7 +810,7 @@
 </section>
 <section class="review-block" id="review-task" data-review-block="review-task" data-block-type="html" data-review-required="true">
 <h2>Owner review task</h2>
-<div class="block-content"><p>このreferenceは、実装のpixel仕様ではありません。30秒taskで、表示中MODのlocal状態、evidence state、次actionを確認できることを検証します。</p>
+<div class="block-content"><p>このreferenceは、実装のpixel仕様ではありません。通常reviewer画面はコメント確認用です。FHD表示は「公開プレビュー」で確認します。30秒taskで、表示中MODのlocal状態、evidence state、次actionを確認できることを検証します。</p>
 <div class="ms-review-panel">
   <div class="ms-review-list">
     <h3>30秒task</h3>
@@ -824,8 +856,8 @@
       </button>
     </div>
   </div>
-  <script src="assets/publish-export.js?v=2026-08-16T00:26:00.443855+00:00"></script>
-  <script src="assets/review-comments.js?v=2026-08-16T00:26:00.443855+00:00"></script>
-  <script src="assets/task-checklist.js?v=2026-08-16T00:26:00.443855+00:00"></script>
+  <script src="assets/publish-export.js?v=2026-08-16T00:42:51.384634+00:00"></script>
+  <script src="assets/review-comments.js?v=2026-08-16T00:42:51.384634+00:00"></script>
+  <script src="assets/task-checklist.js?v=2026-08-16T00:42:51.384634+00:00"></script>
 </body>
 </html>
