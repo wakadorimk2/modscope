@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ModScope UI Reference</title>
-  <link rel="stylesheet" href="assets/style.css?v=2026-08-16T00:07:38.125328+00:00">
+  <link rel="stylesheet" href="assets/style.css?v=2026-08-16T00:26:00.443855+00:00">
 
 
   <!-- html block の inline script より先に RHWState を定義する必要があるため head に置く -->
-  <script src="assets/interactive-state.js?v=2026-08-16T00:07:38.125328+00:00"></script>
+  <script src="assets/interactive-state.js?v=2026-08-16T00:26:00.443855+00:00"></script>
 </head>
 <body>
   <div class="app" data-document-id="modscope-ui-reference">
@@ -211,6 +211,7 @@
   background: var(--ms-panel);
 }
 .ms-library {
+  min-width: 0;
   border-right: 1px solid var(--ms-border);
 }
 .ms-context {
@@ -259,16 +260,19 @@
   letter-spacing: 0;
 }
 .ms-table-wrap {
+  min-width: 0;
   overflow: hidden;
 }
-.ms-table {
+.ms-reference .ms-table {
+  min-width: 0;
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
 .ms-table th,
 .ms-table td {
-  padding: 8px 8px;
+  padding: 5px 5px;
   border-bottom: 1px solid rgba(60, 64, 67, 0.68);
   text-align: left;
   vertical-align: middle;
@@ -278,9 +282,10 @@
   padding-bottom: 7px;
   color: var(--ms-dim);
   font-size: 9px;
+  white-space: nowrap;
 }
 .ms-table .order {
-  width: 29px;
+  width: 10%;
   color: var(--ms-dim);
   text-align: right;
 }
@@ -288,12 +293,13 @@
   width: 40%;
 }
 .ms-table th:nth-child(3) {
-  width: 30%;
+  width: 28%;
 }
 .ms-table th:nth-child(4) {
-  width: 26%;
+  width: 22%;
 }
 .ms-table td {
+  min-width: 0;
   overflow: hidden;
   color: var(--ms-text);
   font-size: 11px;
@@ -311,6 +317,10 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 10px;
 }
 .ms-status i,
@@ -550,8 +560,8 @@
   font-size: 11px;
   font-weight: 800;
 }
-.ms-marker-1 { top: 22%; left: 59%; }
-.ms-marker-2 { top: 52%; left: 16%; }
+.ms-marker-1 { top: 52%; left: 16%; }
+.ms-marker-2 { top: 22%; left: 59%; }
 .ms-marker-3 { top: 49%; right: 19%; }
 .ms-marker-4 { top: 74%; right: 16%; }
 .ms-annotation {
@@ -759,8 +769,8 @@
     <span class="ms-callout-marker ms-marker-4">4</span>
   </div>
   <div class="ms-annotation" aria-label="Reference annotations">
-    <div class="ms-annotation-item"><b>1</b><strong>Browser-first</strong><br>外部pageを最大の主面にします。</div>
-    <div class="ms-annotation-item"><b>2</b><strong>Compact table</strong><br>序数、Name、State、Versionを固定します。</div>
+    <div class="ms-annotation-item"><b>1</b><strong>Compact table</strong><br>序数、Name、State、Versionを固定します。</div>
+    <div class="ms-annotation-item"><b>2</b><strong>Browser-first</strong><br>外部pageを最大の主面にします。</div>
     <div class="ms-annotation-item"><b>3</b><strong>Evidence text</strong><br>ObservedとUnknownをtextで区別します。</div>
     <div class="ms-annotation-item"><b>4</b><strong>Explicit action</strong><br>Needs reviewと次actionを分離します。</div>
   </div>
@@ -814,8 +824,8 @@
       </button>
     </div>
   </div>
-  <script src="assets/publish-export.js?v=2026-08-16T00:07:38.125328+00:00"></script>
-  <script src="assets/review-comments.js?v=2026-08-16T00:07:38.125328+00:00"></script>
-  <script src="assets/task-checklist.js?v=2026-08-16T00:07:38.125328+00:00"></script>
+  <script src="assets/publish-export.js?v=2026-08-16T00:26:00.443855+00:00"></script>
+  <script src="assets/review-comments.js?v=2026-08-16T00:26:00.443855+00:00"></script>
+  <script src="assets/task-checklist.js?v=2026-08-16T00:26:00.443855+00:00"></script>
 </body>
 </html>

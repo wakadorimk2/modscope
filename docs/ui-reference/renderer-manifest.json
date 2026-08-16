@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
   "renderer_version": "1.9.0",
-  "generated_at": "2026-08-16T00:07:38.125328+00:00",
+  "generated_at": "2026-08-16T00:26:00.443855+00:00",
   "input": {
     "path": "C:\\Users\\wakad\\projects\\modscope\\docs\\ui-reference\\document-model.json",
-    "sha256": "513e52c3cfaa07debaf34bb794ac3ce82936a624357e4e226b6f216c4a393192"
+    "sha256": "6e8e496837896f3c89214ab9f12d94f003c11a0b151f8544269cd939f9f296d6"
   },
   "document": {
     "id": "modscope-ui-reference",
