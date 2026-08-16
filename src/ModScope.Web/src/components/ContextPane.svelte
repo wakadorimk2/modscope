@@ -2,6 +2,7 @@
   import type { BridgeErrorPayload, DiagnosticUiState, LocalContextUiState, ModCandidateUiState, UiState } from '../contracts';
 
   import type { ContextMode } from './ui-types';
+  import { resolveModWebsite } from '../mod-links';
 
   export let state: UiState;
   export let mode: ContextMode = 'context';
@@ -56,7 +57,7 @@
   $: localContextCandidate = state.localContext?.localModKey
     ? state.knowledge.candidates.find((candidate) => candidate.modKey === state.localContext?.localModKey) ?? null
     : null;
-  $: localContextPageUrl = localContextCandidate ? resolveModPageUrl(localContextCandidate) : null;
+  $: localContextPageUrl = localContextCandidate ? resolveModWebsite(localContextCandidate).url : null;
   $: canOpenLocalInspector = state.localContext?.status === 'installed' && Boolean(state.localContext?.localModKey);
 
   type DiagnosticGroup = { diagnostic: DiagnosticUiState; count: number };
@@ -130,25 +131,6 @@
     return normalizedValue(context.status) === 'installed' && !resolvedText(context.knownVersion)
       ? ['Installed version has no confirmed source observation.']
       : [];
-  }
-
-  function isWebsiteUrl(value: string | null | undefined): value is string {
-    const trimmed = value?.trim();
-    if (!trimmed) return false;
-    try {
-      const url = new URL(trimmed);
-      return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }
-
-  function resolveModPageUrl(candidate: ModCandidateUiState): string | null {
-    if (isWebsiteUrl(candidate.website)) return candidate.website.trim();
-    const name = [candidate.displayName, candidate.directoryName, candidate.modKey]
-      .map((value) => value?.trim() ?? '')
-      .find((value) => value.length > 0) ?? '';
-    return name ? `https://www.nexusmods.com/games/7daystodie/mods?keyword=${encodeURIComponent(name)}` : null;
   }
 
   function openLocalModPage() {
@@ -363,7 +345,7 @@
 
 {#if modSearchOpen}
   <button type="button" class="drawer-backdrop" aria-label="Close MOD search" onclick={onCloseModSearch}></button>
-  <aside class="mod-search-drawer" aria-labelledby="mod-search-title"><div class="drawer-heading"><div><span class="eyebrow">MOD CATALOG</span><h2 id="mod-search-title">{modSearchMode === 'recognition' ? 'Choose a local MOD' : 'Search all MODs'}</h2></div><button class="icon-button" type="button" title="Close MOD search" aria-label="Close MOD search" onclick={onCloseModSearch}>×</button></div><p class="subtle mod-search-description">Search by display name, directory name, or MOD key. Website links use verified values or inferred Nexus destinations.</p><label class="mod-search-field"><span>Search MODs</span><input bind:value={modSearchQuery} aria-label="Search MODs" placeholder="e.g. Alpha Mod" /></label>
+  <aside class="mod-search-drawer" aria-labelledby="mod-search-title"><div class="drawer-heading"><div><span class="eyebrow">MOD CATALOG</span><h2 id="mod-search-title">{modSearchMode === 'recognition' ? 'Choose a local MOD' : 'Search all MODs'}</h2></div><button class="icon-button" type="button" title="Close MOD search" aria-label="Close MOD search" onclick={onCloseModSearch}>×</button></div><p class="subtle mod-search-description">Search by display name, directory name, or MOD key. Website links use exact package identity, source Website, or inferred Nexus destinations.</p><label class="mod-search-field"><span>Search MODs</span><input bind:value={modSearchQuery} aria-label="Search MODs" placeholder="e.g. Alpha Mod" /></label>
     {#if modSearchQuery.trim().length === 0}<p class="empty-state mod-search-empty">Enter a search term to show matching MODs.</p>{:else if modSearchResults.length === 0}<p class="empty-state mod-search-empty">No matching MODs were found.</p>{:else}<div class="mod-search-results" aria-live="polite"><p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>{#each modSearchResults as candidate (candidate.modKey)}<article class="mod-search-card"><button type="button" class="mod-card-main" aria-label={`Inspect ${candidate.displayName || candidate.modKey}`} onclick={() => onOpenModPage(candidate)}><strong>{candidate.displayName || candidate.directoryName || candidate.modKey}</strong><span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span></button><div class="mod-card-meta"><span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span><span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span><span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span></div>{#if modSearchMode === 'recognition'}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onChooseModForRecognition(candidate)}>Use for recognition</button>{/if}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onOpenInspectorForMod(candidate.modKey)}>Inspect evidence</button></article>{/each}</div>{/if}
   </aside>
 {/if}

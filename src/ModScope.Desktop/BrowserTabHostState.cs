@@ -23,14 +23,18 @@ internal sealed class BrowserTabHostState
     public bool IsDeploymentPreview =>
         string.Equals(InternalPage, "deployment-preview", StringComparison.Ordinal);
 
-    public string? PendingNexusSearchName { get; set; }
+    public IReadOnlyList<string> PendingNexusSearchNames { get; set; } = Array.Empty<string>();
 
-    public void Navigate(Uri uri, string? nexusSearchName = null)
+    public void Navigate(Uri uri, IReadOnlyList<string>? nexusSearchNames = null)
     {
         InternalPage = null;
-        PendingNexusSearchName = string.IsNullOrWhiteSpace(nexusSearchName)
-            ? null
-            : nexusSearchName.Trim();
+        PendingNexusSearchNames = nexusSearchNames is null
+            ? Array.Empty<string>()
+            : nexusSearchNames
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         WebView.Source = uri;
     }
 }

@@ -1495,7 +1495,7 @@ Runtime comparisonの実行導線はDebugへ残します。
 
 通常のMod Libraryは、`#`、`Name`、`State`、`Version`のcompact tableを表示します。
 `State`とevidence stateは文字で表示し、色やlampだけに依存しません。`Version`を確認できない場合は`Unknown`を表示します。
-role、assessment、profile state、priority、verified Website状態はhover、keyboard focus、Inspectorで表示します。
+role、assessment、profile state、priority、Websiteのsource状態はhover、keyboard focus、Inspectorで表示します。
 disabled MODは名前、背景、lampを灰色系で表示します。
 MOD名はellipsisで省略します。
 Website導線、Inspector導線、ModScopeの固定順序、priority順は維持します。
@@ -1553,18 +1553,20 @@ View countとSearch後のresult countを分けて表示します。
 通常のMod Libraryはprofile selectorとcompact tableを表示します。列と表示規則はPhase6.6に従います。
 profile編集とDeployment previewはMod Library modeまたはMore menuから開きます。
 
-MOD Websiteは`Verified`、`Inferred`、`No usable URL`へ分類します。
-有効な既存Websiteはそのまま開きます。
-無効または欠落する場合はdisplay name、directory name、MOD keyから7DTD Nexus検索URLを作ります。
-検索結果から`/7daystodie/mods/{numericId}`形式のリンクを抽出し、検索名と正規化後に完全一致する候補が1件だけの場合に正規ページへ遷移します。
+MOD Websiteは`Exact`、`Source`、`Inferred`、`No usable URL`へ分類します。
+`packageRelation.identityState`が`Exact`で、単一の正のNexus `modId`を持つ場合は、Nexus MOD正規URLを最優先します。
+有効な既存Websiteは`Source`としてそのまま開きます。Nexusの数値MOD URLは正規URLへ整えます。
+Websiteが無効または欠落する場合はdisplay name、directory name、MOD keyを順に7DTD Nexus検索へ使います。
+検索結果から`/7daystodie/mods/{numericId}`形式のリンクを抽出し、各検索名と正規化後に完全一致する候補が1件だけの場合に正規ページへ遷移します。
 一致しない場合、複数候補の場合、検索結果を解析できない場合は検索ページを表示したままにします。
 `Inferred`はクリック可能ですが、ページの存在確認ではありません。
 `No usable URL`はbuttonにせず、既存のBrowser scheme検証を維持します。
 
-`browser.navigate`のoptionalな`nexusSearchName`は、推定MOD検索の一時的なnavigation intentです。
-手入力の検索URL、通常のURL移動、Verified Websiteには付けません。
-`nexusSearchName`はUiStateや永続Local Knowledgeへ保存しません。
-Verified Websiteの404はBrowser diagnosticとして扱い、自動検索へ変更しません。
+`browser.navigate`のoptionalな`nexusSearchNames`は、推定MOD検索の一時的なnavigation intentです。
+手入力の検索URL、通常のURL移動、Source Websiteには付けません。
+既存clientの`nexusSearchName`も後方互換のため受け付けます。
+`nexusSearchNames`はUiStateや永続Local Knowledgeへ保存しません。
+Source Websiteの404はBrowser diagnosticとして扱い、自動検索へ変更しません。
 
 ### 25.5 Phase6.8 ロード遮断、Chrome palette、History page
 
@@ -1587,13 +1589,14 @@ History metadataはbounded local dataとして保存し、page本文、raw obser
 
 ### 25.6 Nexus検索によるMODページ解決
 
-推定MODページは、slug URLを直接開かず、7DTD Nexus検索を起点にします。
+ExactなNexus identityがあるMODは、検索を経由せずに数値`modId`の正規URLを開きます。
+identityが未解決の推定MODページは、slug URLを直接開かず、7DTD Nexus検索を起点にします。
 Desktop hostは検索結果のDOMから同一Nexus hostの数値ID MODリンクだけを読み取ります。
 表示名は大文字・小文字、アクセント、句読点、区切り文字を正規化して比較します。
-完全一致が1件だけの場合だけ、数値IDの正規URLへ遷移します。
+display name、directory name、MOD keyは順に試します。各検索名で完全一致が1件だけの場合だけ、数値IDの正規URLへ遷移します。
 曖昧な結果、空の結果、ログイン要求、DOM変更、解析失敗では検索ページを保持します。
 検索結果の最上位候補を根拠なく採用しません。
-Verified Websiteはsource referenceを優先し、404時も検索fallbackを行いません。
+Source Websiteはsource referenceを優先し、404時も検索fallbackを行いません。
 
 ### 24.3 読み込み性能とProfile投影
 
@@ -1699,8 +1702,9 @@ profile selectorはMod Libraryへ移し、profile名とPending、Loading、Ready
 active profileを先に表示します。初回起動は他profileをpreloadしません。Profile切替後は直前のprofileを1件だけbackground preloadします。
 検索drawerはMod LibraryのViewと別の補助導線として維持します。
 検索対象はdisplay name、directory name、MOD keyです。
-`ModInfo.xml`から得た有効なabsolute http / https Websiteを最優先します。
-Websiteが無効または欠落する場合は、MOD名から7DTD Nexus検索URLを作ります。
-検索結果から数値IDのMODリンクを抽出し、検索名と正規化後に完全一致する候補が1件だけの場合に正規ページへ遷移します。
+Exactなpackage identityから得たNexus `modId`を最優先します。
+次に、`ModInfo.xml`から得た有効なabsolute http / https Websiteを`Source`として扱います。
+Websiteが無効または欠落する場合は、display name、directory name、MOD keyから7DTD Nexus検索URLを作ります。
+検索結果から数値IDのMODリンクを抽出し、各検索名と正規化後に完全一致する候補が1件だけの場合に正規ページへ遷移します。
 曖昧な結果、検索結果の解析失敗、remote 404やnavigation failureはBrowser diagnosticまたは検索ページとして扱います。
 認識失敗時のlocal MOD選択も、同じ検索結果から行います。

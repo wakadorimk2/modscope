@@ -235,7 +235,10 @@ public sealed record BridgeMessageEnvelope(
     string? RequestId,
     object Payload);
 
-public sealed record NavigatePayload(string Url, string? NexusSearchName = null);
+public sealed record NavigatePayload(
+    string Url,
+    string? NexusSearchName = null,
+    IReadOnlyList<string>? NexusSearchNames = null);
 
 public sealed record BrowserTabPayload(string TabId);
 

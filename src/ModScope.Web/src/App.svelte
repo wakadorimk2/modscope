@@ -15,6 +15,7 @@
   import EvidenceInspector from './components/EvidenceInspector.svelte';
   import DeploymentPreviewSurface from './components/DeploymentPreviewSurface.svelte';
   import type { ContextMode, ModListMode } from './components/ui-types';
+  import { resolveModWebsite } from './mod-links';
 
   const requestedSurface = new URLSearchParams(window.location.search).get('surface');
   const surface = requestedSurface === 'toolbar'
@@ -347,28 +348,14 @@
     modSearchMode = 'browse';
   }
 
-  function isWebsiteUrl(value: string | null | undefined): value is string {
-    const trimmed = value?.trim();
-    if (!trimmed) return false;
-    try {
-      const url = new URL(trimmed);
-      return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }
-
-  function resolveModWebsite(candidate: ModCandidateUiState): { url: string | null; nexusSearchName?: string } {
-    if (isWebsiteUrl(candidate.website)) return { url: candidate.website.trim() };
-    const name = [candidate.displayName, candidate.directoryName, candidate.modKey].map((value) => value?.trim() ?? '').find((value) => value.length > 0) ?? '';
-    return name ? { url: `https://www.nexusmods.com/games/7daystodie/mods?keyword=${encodeURIComponent(name)}`, nexusSearchName: name } : { url: null };
-  }
-
   function openModPage(candidate: ModCandidateUiState) {
     const website = resolveModWebsite(candidate);
     if (!website.url) return;
     closeModSearch();
-    send('browser.navigate', { url: website.url, ...(website.nexusSearchName ? { nexusSearchName: website.nexusSearchName } : {}) });
+    send('browser.navigate', {
+      url: website.url,
+      ...(website.nexusSearchNames ? { nexusSearchNames: website.nexusSearchNames } : {})
+    });
   }
 
   function chooseModForRecognition(candidate: ModCandidateUiState) {

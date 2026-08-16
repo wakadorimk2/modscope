@@ -471,7 +471,7 @@ MO2 read-only境界、Query層、Bridge contract、Desktop host、Browser engine
 ### Phase 6.7：起動表示・Chrome風Toolbar・MOD URL導線整理（完了）
 
 LOADING PROFILE表示、Chrome型Toolbar、History page、Mod URL解決の境界を整理しました。
-Verified Websiteと一意一致したNexus検索結果だけを採用し、曖昧な候補は検索ページに残します。
+ExactなNexus identity、source-backed Website、一意一致したNexus検索結果を区別し、曖昧な候補は検索ページに残します。
 navigation intentはUiState、History metadata、Local Knowledgeへ保存しません。
 
 ### Phase 6.8：ロード遮断、Chrome palette、History page（完了）
@@ -481,8 +481,9 @@ HistoryにはURL、title、訪問時刻だけを保存し、page本文、absolut
 
 ### Phase 6.9：Nexus検索によるMODページ解決（完了）
 
-7DTD Nexus検索から同一hostの数値MOD IDを候補化します。
-正規化後の完全一致が1件の場合だけ遷移し、空、曖昧、解析不能な結果は検索ページに残します。
+Exactなpackage identityがある場合は7DTD Nexusの数値MOD IDから直接遷移します。
+identityがない場合は7DTD Nexus検索から同一hostの数値MOD IDを候補化します。
+検索名ごとの正規化後の完全一致が1件の場合だけ遷移し、空、曖昧、解析不能な結果は検索ページに残します。
 
 ### Phase 7：Controlled write（実装済み・freeze）
 
