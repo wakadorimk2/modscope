@@ -1,8 +1,11 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using ModScope.Desktop.Contracts;
 using ModScope.Query;
@@ -21,6 +24,14 @@ public partial class MainWindow : Window
     private bool _contextReady;
     private bool _sourceDiscoveryStarted;
     private bool _startupLoading = true;
+    private readonly CancellationTokenSource _shutdownCancellation = new();
+    private Task? _startupInitializationTask;
+    private Task? _startupDiscoveryTask;
+    private Task? _remainingBrowserTabsTask;
+    private Task? _shutdownTask;
+    private bool _isClosing;
+    private bool _allowWindowClose;
+    private bool _webViewsDisposed;
     private readonly BrowserStateStore _browserStateStore = BrowserStateStore.CreateDefault();
     private readonly Dictionary<string, BrowserTabHostState> _browserTabs = new(StringComparer.Ordinal);
     private IReadOnlyList<BrowserHistoryEntryUiState> _browserHistory = Array.Empty<BrowserHistoryEntryUiState>();
@@ -248,7 +259,12 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
     }
 
-    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        _startupInitializationTask ??= InitializeAsync();
+    }
+
+    private async Task InitializeAsync()
     {
         try
         {
@@ -264,12 +280,19 @@ public partial class MainWindow : Window
             {
                 _sourceDiscoveryStarted = true;
                 discoveryTask = _controller.DiscoverSourcesAsync(background: true);
+                _startupDiscoveryTask = discoveryTask;
             }
 
             await Task.WhenAll(
                 ToolbarShell.EnsureCoreWebView2Async(),
                 ModListWebView.EnsureCoreWebView2Async(),
-                ContextWebView.EnsureCoreWebView2Async());
+                ContextWebView.EnsureCoreWebView2Async())
+                .WaitAsync(_shutdownCancellation.Token);
+            if (_isClosing)
+            {
+                return;
+            }
+
             UpdateLoadingOverlay();
 
             ToolbarShell.NavigationStarting += AppShell_NavigationStarting;
@@ -298,11 +321,29 @@ public partial class MainWindow : Window
             }
 
             var remainingBrowserTabs = await RestoreBrowserTabsAsync();
+            if (_isClosing)
+            {
+                return;
+            }
+
             SendState();
-            _ = RestoreRemainingBrowserTabsAfterFirstPaintAsync(remainingBrowserTabs);
+            if (remainingBrowserTabs.Count > 0)
+            {
+                _remainingBrowserTabsTask = RestoreRemainingBrowserTabsAfterFirstPaintAsync(remainingBrowserTabs);
+                _ = _remainingBrowserTabsTask;
+            }
+        }
+        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+        {
+            Trace.WriteLine("[ModScope] startup phase=initialization canceled");
         }
         catch (Exception exception)
         {
+            if (_isClosing)
+            {
+                return;
+            }
+
             _startupLoading = false;
             LoadingOverlay.Visibility = Visibility.Collapsed;
             SetClientInteractionEnabled(true);
@@ -313,6 +354,172 @@ public partial class MainWindow : Window
             {
                 SendError("browser.initialization.failed", exception.Message);
             }
+        }
+    }
+
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        if (_allowWindowClose)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        if (_shutdownTask is not null)
+        {
+            return;
+        }
+
+        _shutdownTask = CompleteShutdownAndCloseAsync();
+    }
+
+    private async Task CompleteShutdownAndCloseAsync()
+    {
+        try
+        {
+            await ShutdownAsync();
+        }
+        catch (Exception exception)
+        {
+            Trace.WriteLine(
+                $"[ModScope] shutdown phase=async-wait failed type={exception.GetType().Name}");
+        }
+
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.ApplicationIdle,
+            new Action(() =>
+            {
+                _allowWindowClose = true;
+                Close();
+            }));
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        _isClosing = true;
+        DisposeWebViews();
+    }
+
+    private async Task ShutdownAsync()
+    {
+        _isClosing = true;
+        _shutdownCancellation.Cancel();
+        _controller.OperationStateChanged -= Controller_OperationStateChanged;
+
+        var pendingTasks = new[]
+        {
+            _startupInitializationTask,
+            _startupDiscoveryTask,
+            _remainingBrowserTabsTask
+        }
+        .OfType<Task>()
+        .Distinct()
+        .ToArray();
+
+        if (pendingTasks.Length > 0)
+        {
+            try
+            {
+                await Task.WhenAll(pendingTasks).WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            catch (TimeoutException)
+            {
+                Trace.WriteLine("[ModScope] shutdown phase=async-wait timed-out");
+            }
+            catch (Exception exception)
+            {
+                Trace.WriteLine(
+                    $"[ModScope] shutdown phase=async-wait failed type={exception.GetType().Name}");
+            }
+        }
+
+        DisposeWebViews();
+    }
+
+    private void DisposeWebViews()
+    {
+        if (_webViewsDisposed)
+        {
+            return;
+        }
+
+        _webViewsDisposed = true;
+        Loaded -= MainWindow_Loaded;
+        _controller.OperationStateChanged -= Controller_OperationStateChanged;
+
+        foreach (var tab in _browserTabs.Values.ToArray())
+        {
+            DetachBrowserEvents(tab.WebView);
+            BrowserHost.Children.Remove(tab.WebView);
+            DisposeWebView(tab.WebView);
+        }
+
+        _browserTabs.Clear();
+        _activeBrowserTabId = null;
+
+        DetachAppShellEvents(ToolbarShell);
+        DetachAppShellEvents(ModListWebView);
+        DetachAppShellEvents(ContextWebView);
+        DisposeWebView(ToolbarShell);
+        DisposeWebView(ModListWebView);
+        DisposeWebView(ContextWebView);
+
+        _toolbarReady = false;
+        _modListReady = false;
+        _contextReady = false;
+    }
+
+    private void DetachAppShellEvents(Microsoft.Web.WebView2.Wpf.WebView2 webView)
+    {
+        webView.NavigationStarting -= AppShell_NavigationStarting;
+        webView.NavigationCompleted -= AppShell_NavigationCompleted;
+
+        try
+        {
+            if (webView.CoreWebView2 is { } coreWebView)
+            {
+                coreWebView.WebMessageReceived -= AppShell_WebMessageReceived;
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or ObjectDisposedException)
+        {
+            Trace.WriteLine(
+                $"[ModScope] shutdown phase=detach-app-shell failed type={exception.GetType().Name}");
+        }
+    }
+
+    private void DetachBrowserEvents(Microsoft.Web.WebView2.Wpf.WebView2 webView)
+    {
+        webView.NavigationCompleted -= Browser_NavigationCompleted;
+
+        try
+        {
+            if (webView.CoreWebView2 is { } coreWebView)
+            {
+                coreWebView.DocumentTitleChanged -= Browser_DocumentTitleChanged;
+                coreWebView.WebMessageReceived -= Browser_WebMessageReceived;
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or ObjectDisposedException)
+        {
+            Trace.WriteLine(
+                $"[ModScope] shutdown phase=detach-browser failed type={exception.GetType().Name}");
+        }
+    }
+
+    private static void DisposeWebView(Microsoft.Web.WebView2.Wpf.WebView2 webView)
+    {
+        try
+        {
+            webView.Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (InvalidOperationException exception)
+        {
+            Trace.WriteLine(
+                $"[ModScope] shutdown phase=dispose-webview failed type={exception.GetType().Name}");
         }
     }
 
@@ -360,7 +567,7 @@ public partial class MainWindow : Window
     private async Task RestoreRemainingBrowserTabsAfterFirstPaintAsync(
         IReadOnlyList<BrowserTabRestoreState> tabs)
     {
-        if (tabs.Count == 0)
+        if (tabs.Count == 0 || _isClosing)
         {
             return;
         }
@@ -368,6 +575,11 @@ public partial class MainWindow : Window
         await Dispatcher.InvokeAsync(
             () => { },
             System.Windows.Threading.DispatcherPriority.ContextIdle);
+        if (_isClosing)
+        {
+            return;
+        }
+
         await RestoreRemainingBrowserTabsAsync(tabs);
     }
 
@@ -377,13 +589,32 @@ public partial class MainWindow : Window
         {
             foreach (var tab in tabs)
             {
+                if (_isClosing)
+                {
+                    return;
+                }
+
                 await CreateBrowserTabAsync(tab.TabId, tab.Url, tab.Title, activate: false);
+            }
+
+            if (_isClosing)
+            {
+                return;
             }
 
             SendState();
         }
+        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+        {
+            Trace.WriteLine("[ModScope] startup phase=browser-tab-restore canceled");
+        }
         catch (Exception exception)
         {
+            if (_isClosing)
+            {
+                return;
+            }
+
             _controller.SetStatus("Some saved browser tabs could not be restored.");
             SendError("browser.tabs.restore.failed", exception.Message);
         }
@@ -395,10 +626,24 @@ public partial class MainWindow : Window
         {
             await discoveryTask;
         }
+        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+        {
+            return;
+        }
         catch (Exception exception)
         {
+            if (_isClosing)
+            {
+                return;
+            }
+
             _controller.SetStatus("MO2 source discovery failed after Browser startup.");
             SendError("knowledge.discovery.failed", exception.Message);
+        }
+
+        if (_isClosing)
+        {
+            return;
         }
 
         SendState();
@@ -410,6 +655,11 @@ public partial class MainWindow : Window
         string? initialTitle,
         bool activate)
     {
+        if (_isClosing)
+        {
+            throw new OperationCanceledException(_shutdownCancellation.Token);
+        }
+
         var tabId = string.IsNullOrWhiteSpace(requestedTabId)
             ? NextBrowserTabId()
             : requestedTabId.Trim();
@@ -427,42 +677,62 @@ public partial class MainWindow : Window
         BrowserHost.Children.Add(webView);
         webView.Visibility = Visibility.Collapsed;
 
-        await webView.EnsureCoreWebView2Async();
-        webView.NavigationCompleted += Browser_NavigationCompleted;
-        webView.CoreWebView2.DocumentTitleChanged += Browser_DocumentTitleChanged;
-        webView.CoreWebView2.WebMessageReceived += Browser_WebMessageReceived;
+        try
+        {
+            await webView.EnsureCoreWebView2Async().WaitAsync(_shutdownCancellation.Token);
+            if (_isClosing)
+            {
+                throw new OperationCanceledException(_shutdownCancellation.Token);
+            }
 
-        if (IsDeploymentPreviewUrl(initialUrl))
-        {
-            NavigateDeploymentPreview(tab);
-        }
-        else if (IsHistoryUrl(initialUrl))
-        {
-            NavigateHistory(tab);
-        }
-        else if (IsExternalBrowserUrl(initialUrl, out var initialUri))
-        {
-            tab.Url = initialUri.ToString();
-            tab.InternalPage = null;
-            webView.Source = initialUri;
-        }
-        else
-        {
-            NavigateHome(tab);
-        }
+            webView.NavigationCompleted += Browser_NavigationCompleted;
+            webView.CoreWebView2.DocumentTitleChanged += Browser_DocumentTitleChanged;
+            webView.CoreWebView2.WebMessageReceived += Browser_WebMessageReceived;
 
-        SetClientInteractionEnabled(!_startupLoading);
+            if (IsDeploymentPreviewUrl(initialUrl))
+            {
+                NavigateDeploymentPreview(tab);
+            }
+            else if (IsHistoryUrl(initialUrl))
+            {
+                NavigateHistory(tab);
+            }
+            else if (IsExternalBrowserUrl(initialUrl, out var initialUri))
+            {
+                tab.Url = initialUri.ToString();
+                tab.InternalPage = null;
+                webView.Source = initialUri;
+            }
+            else
+            {
+                NavigateHome(tab);
+            }
 
-        if (activate)
-        {
-            await ActivateBrowserTabAsync(tabId);
+            SetClientInteractionEnabled(!_startupLoading);
+
+            if (activate)
+            {
+                await ActivateBrowserTabAsync(tabId);
+            }
+
+            return tab;
         }
-
-        return tab;
+        catch
+        {
+            BrowserHost.Children.Remove(webView);
+            _browserTabs.Remove(tabId);
+            DisposeWebView(webView);
+            throw;
+        }
     }
 
     private async Task ActivateBrowserTabAsync(string tabId)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         if (!_browserTabs.TryGetValue(tabId, out var tab))
         {
             throw new BridgeProtocolException("The browser tab was not found.");
@@ -479,6 +749,11 @@ public partial class MainWindow : Window
         if (tab.WebView.CoreWebView2 is not null)
         {
             await ObservePageAsync(null, null, tab);
+        }
+
+        if (_isClosing)
+        {
+            return;
         }
 
         SaveBrowserState();
@@ -1809,6 +2084,11 @@ public partial class MainWindow : Window
         string? requestId = null,
         Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         var browserTab = ActiveBrowserTab;
         if (browserTab?.WebView.CoreWebView2 is null
             || ((!_toolbarReady && !_modListReady && !_contextReady)
@@ -1850,6 +2130,11 @@ public partial class MainWindow : Window
 
     private void Controller_OperationStateChanged(object? sender, EventArgs e)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         if (Dispatcher.CheckAccess())
         {
             UpdateLoadingOverlay();
@@ -1859,6 +2144,11 @@ public partial class MainWindow : Window
 
         _ = Dispatcher.InvokeAsync(() =>
         {
+            if (_isClosing)
+            {
+                return;
+            }
+
             UpdateLoadingOverlay();
             SendState();
         });
@@ -1866,6 +2156,11 @@ public partial class MainWindow : Window
 
     private void UpdateLoadingOverlay()
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         var operation = _controller.CurrentOperation;
         var showOverlay = _startupLoading;
         if (showOverlay)
@@ -1908,6 +2203,11 @@ public partial class MainWindow : Window
 
     private void SetClientInteractionEnabled(bool enabled)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         if (!enabled)
         {
             CloseMorePopupWithoutBroadcast();
@@ -1981,6 +2281,11 @@ public partial class MainWindow : Window
         string? requestId = null,
         Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         _controller.SetStatus(message);
         if (targetWebView?.CoreWebView2 is null
             && !_toolbarReady

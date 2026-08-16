@@ -80,6 +80,20 @@ frontend buildは'scripts/build.ps1'で実行します。
 
 v0.1は、旧来の「source snapshotとAI用indexだけ」の縛りでは定義しません。現在の製品仮説は、7DTD + MO2のLocal Mod Knowledgeと、最小のBrowse → Recognize → Local awareness → Inspectの縦切りです。
 
+## Desktopの起動経路
+
+`ModScope.Desktop`は`StartupUri`で`MainWindow`を生成しません。
+`App`は、WPFの画面とWebView2を生成する前に、現在のプロセスのJob Object所属を確認しますの。
+
+- ExplorerなどのJob Object外から起動した場合は、そのプロセスが`MainWindow`を表示しますの。
+- CodexなどのJob Object内から起動した場合は、`CreateProcessW`と`CREATE_BREAKAWAY_FROM_JOB`で自己再起動しますの。
+- 自己再起動では、元のコマンドライン引数と作業ディレクトリを維持しますの。
+- 内部起動マーカーで、自己再起動の再帰を防止しますの。
+- 再起動後のプロセスがJob Object外なら、そのプロセスだけが`MainWindow`とWebView2を初期化しますの。
+- 再起動後もJob Object内の場合、またはJob確認・自己再起動に失敗した場合は、WebView2を生成せず安全終了しますの。
+- Job Objectから離脱できない場合に、ShellExecuteへ自動フォールバックしませんの。
+- 起動診断は`%TEMP%\\ModScope-startup.log`へ、起動段階とJob状態を記録しますの。コマンドライン、プロンプト、秘密情報、不要な絶対パスは記録しませんの。
+
 ## 作業判断基準
 
 作業を始める前に、次の2点を確認します。
