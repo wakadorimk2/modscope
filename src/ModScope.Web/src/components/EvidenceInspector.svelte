@@ -137,13 +137,13 @@
   }
 </script>
 
-<section class="panel inspector-panel inspector-reference-shell" aria-labelledby="inspector-title">
+<section class="panel inspector-panel inspector-inline-panel inspector-reference-shell" aria-labelledby="inspector-title">
   <div class="drawer-heading inspector-panel-heading">
     <div>
       <span class="eyebrow">INSPECTOR</span>
       <h2 id="inspector-title">{inspector?.directoryName || 'Loading evidence'}</h2>
     </div>
-    <button class="secondary-button" type="button" onclick={onClose}>Back to Context</button>
+    <button class="secondary-button" type="button" onclick={onClose}>Close Inspector</button>
   </div>
 
   {#if inspector}

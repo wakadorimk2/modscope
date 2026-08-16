@@ -3275,6 +3275,26 @@ select,
   border-radius: 2px;
 }
 
+.inspector-inline-region {
+  min-width: 0;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.inspector-inline-panel {
+  min-width: 0;
+  margin: 0;
+  border-top-color: var(--chrome-border);
+  border-right-color: var(--chrome-border);
+  border-bottom-color: var(--chrome-border);
+  border-left: 2px solid var(--chrome-blue);
+  box-shadow: none;
+}
+
+.inspector-inline-region[hidden] {
+  display: none;
+}
+
 @media (max-width: 1180px) {
   .toolbar-controls-row {
     gap: 5px;

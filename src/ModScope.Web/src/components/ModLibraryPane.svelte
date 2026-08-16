@@ -5,6 +5,8 @@
   export let state: UiState;
   export let operationRailVisible = false;
   export let operationBlocksInteraction = false;
+  export let inspectorOpen = false;
+  export let inspectorModKey: string | null = null;
   export let deploymentDraftEntries: DeploymentEntryUiState[] = [];
   export let onSwitchProfile: (event: Event) => void;
   export let onStartDeploymentEdit: () => void;
@@ -144,6 +146,10 @@
       `Priority ${candidate.priority ?? 'Unknown'}`,
       website
     ].join(' · ');
+  }
+
+  function inspectorActionLabel(modKey: string): string {
+    return inspectorOpen && inspectorModKey === modKey ? 'Close Inspector' : 'Inspect evidence';
   }
 
   function operationLabel(): string {
@@ -368,7 +374,7 @@
                             {:else}
                               <span class="mod-library-row-action-unavailable" aria-label="No usable URL">No usable URL</span>
                             {/if}
-                            <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                            <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title={inspectorActionLabel(candidate.modKey)} aria-label={`${inspectorActionLabel(candidate.modKey)} for ${modDisplayName(candidate)}`} aria-pressed={inspectorOpen && inspectorModKey === candidate.modKey} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
                           </div>
                         </div>
                       </td>
@@ -421,7 +427,7 @@
                               {:else}
                                 <span class="mod-library-row-action-unavailable" aria-label="No usable URL">No usable URL</span>
                               {/if}
-                              <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                              <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title={inspectorActionLabel(candidate.modKey)} aria-label={`${inspectorActionLabel(candidate.modKey)} for ${modDisplayName(candidate)}`} aria-pressed={inspectorOpen && inspectorModKey === candidate.modKey} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
                             </div>
                           </div>
                         </td>

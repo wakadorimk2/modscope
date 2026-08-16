@@ -1377,7 +1377,7 @@ candidate recordにはMOD key、display name、directory name、match kind、str
 disabled、profile外のreadable MODを候補へ含めます。
 unresolved recordは候補へ表示できますが、自動確認の対象にしません。
 page本文、GamePath、MO2 path、LocalModSnapshotはWeb stateへ送信しません。
-`autoInspectToken`は自動Inspector表示を一度だけ通知するopaque tokenです。
+`autoInspectToken`はBridge互換性のためstateへ保持します。Frontendはこのtokenの受信をInspector展開条件に使いません。
 
 ### 24.3.3 Phase6 analysis bridge and display rules
 
@@ -1479,12 +1479,18 @@ Installedが確認済みでもversion sourceを確認できない場合は、`Ve
 `Needs review`はevidence不足を示すreview cueです。Inspectorまたは別のread actionへ進むために使います。`latest`または`outdated`の判定を意味せず、その判定へ変換しません。
 priority、raw diagnostic、XML、provenanceなどの詳細は通常Contextへ詰め込まず、Inspector、Settings、Analysis、Debugの責務へ段階的に開示します。
 Analysisは小さなstatus lampで`Running`、`Not assessed`、`Assessed`、`Issue`を文字とtooltipで示します。
-lampはInspector modeを開きます。
+lampはAnalysis導線を開きます。
 確認済みMODがある場合はMOD Inspectorを開き、確認済みMODがない場合はactive profileのDiagnosisを開きます。
 
-Inspectorは右ペイン内の置換modeです。
+`state.inspector`を受信しても、通常Contextの表示をInspectorへ自動切替しません。
+InspectorはContextの`RECOGNIZE`直下へinline panelとして表示します。
+`Inspect`を明示操作した場合だけpanelを展開します。
+`Close Inspector`または同じ`Inspect`導線でpanelを折りたたみます。
+同じMODの再Inspectは開閉toggleです。別MODのInspectはpanelを開いたまま対象だけを切り替えます。
+Mod LibraryのInspect導線も同じPresentation stateへ接続します。
+ページ遷移、Identity変更、Profile変更ではInspectorを閉じ、`RECOGNIZE`を維持します。
 固定overlayと背景backdropは使用しません。
-Inspectorの上部に`Back to Context`を表示します。
+Inspectorの上部に`Close Inspector`を表示します。
 結論は最初から表示し、static evidence、runtime evidence、raw XML、patch operation、raw diagnosticは閉じた状態にします。
 Metadata、Role、related evidence、Version、Compatibility、Analysis、Files、XML、Diagnostics、Provenanceも`details`へ統一し、初期状態を閉じます。
 同じMODの再描画では開閉状態を維持し、別MODの表示では開閉状態をリセットします。
@@ -1505,7 +1511,8 @@ Website導線、Inspector導線、ModScopeの固定順序、priority順は維持
 Context、Settings、Debug、Analysisのmode切替はMore menuから維持します。
 通常Contextから独立した`ANALYSIS`、`DIAGNOSTICS`、`STATIC EVIDENCE`の展開カードを削除します。
 raw diagnosticはDebugだけに表示します。
-InspectorはContext WebView内で完結し、中央BrowserとBrowser chromeを覆いません。
+InspectorはContext WebView内の`RECOGNIZE`直下で完結し、中央BrowserとBrowser chromeを覆いません。
+Inspectorの折りたたみ状態はPresentation stateとして保持し、Context paneの表示切替でstateとdisclosure stateを破棄しません。
 通常Contextの背景と境界は低コントラストにし、中央Web pageを主役として維持します。
 Inspector、Settings、Analysis、Deployment previewは、ModScope所有surfaceの共通visual languageを使います。Chrome dark palette、pane heading、pane separator、evidence stateの文字表示、action hierarchy、progressive disclosureを共有します。
 visual languageの統一は表示上の変更だけです。各surfaceの既存の機能境界と責務を移しません。

@@ -12,7 +12,6 @@
   import WorkspaceToolbar from './components/WorkspaceToolbar.svelte';
   import ModLibraryPane from './components/ModLibraryPane.svelte';
   import ContextPane from './components/ContextPane.svelte';
-  import EvidenceInspector from './components/EvidenceInspector.svelte';
   import DeploymentPreviewSurface from './components/DeploymentPreviewSurface.svelte';
   import type { ContextMode, ModListMode } from './components/ui-types';
   import { resolveModWebsite } from './mod-links';
@@ -30,12 +29,9 @@
   let address = initialState.browser.url;
   let contextMode: ContextMode = 'context';
   let modListMode: ModListMode = 'browse';
-  let contextPanelMode: 'context' | 'inspector' = 'context';
-  let inspectorView: 'mod' | 'diagnosis' = 'mod';
+  let inspectorOpen = false;
   let inspectorModKey: string | null = null;
   let pendingInspectorModKey: string | null = null;
-  let dismissedInspectorModKey: string | null = null;
-  let handledAutoInspectToken: string | null = null;
   let inspectorFilesOpen = false;
   let modSearchOpen = false;
   let modSearchMode: 'browse' | 'recognition' = 'browse';
@@ -53,6 +49,11 @@
   let runtimeToolVersion = '';
   let runtimeGameVersion = '';
   let webObservedVersion = '';
+  let inspectorPresentationChannel: BroadcastChannel | null = null;
+
+  type InspectorPresentationMessage =
+    | { kind: 'open'; modKey: string }
+    | { kind: 'close' };
 
   $: knowledgeBlocksInteraction = state.knowledge.operation.isBusy
     && !state.knowledge.operation.isBackground;
@@ -75,12 +76,46 @@
     bridge = createBridge(handleHostMessage);
     showHtmlMoreMenu = !bridge.isDesktopHost;
     const disconnect = bridge.connect();
+    if (typeof BroadcastChannel !== 'undefined') {
+      inspectorPresentationChannel = new BroadcastChannel('modscope-inspector-presentation');
+      inspectorPresentationChannel.addEventListener('message', handleInspectorPresentationMessage);
+    }
     window.addEventListener('keydown', handleShortcut);
     return () => {
       disconnect();
+      inspectorPresentationChannel?.removeEventListener('message', handleInspectorPresentationMessage);
+      inspectorPresentationChannel?.close();
+      inspectorPresentationChannel = null;
       window.removeEventListener('keydown', handleShortcut);
     };
   });
+
+  function handleInspectorPresentationMessage(event: MessageEvent) {
+    const value = event.data;
+    if (!value || typeof value !== 'object') return;
+    const message = value as { kind?: unknown; modKey?: unknown };
+    if (message.kind === 'open' && typeof message.modKey === 'string' && message.modKey.length > 0) {
+      if (inspectorModKey !== message.modKey) {
+        inspectorFilesOpen = false;
+        webObservedVersion = '';
+      }
+      pendingInspectorModKey = message.modKey;
+      inspectorOpen = true;
+      contextMode = 'context';
+      inspectorModKey = message.modKey;
+    } else if (message.kind === 'close') {
+      pendingInspectorModKey = null;
+      inspectorOpen = false;
+    }
+  }
+
+  function broadcastInspectorPresentation(message: InspectorPresentationMessage) {
+    try {
+      inspectorPresentationChannel?.postMessage(message);
+    } catch {
+      // Presentation sync is optional. Bridge state remains authoritative.
+    }
+  }
 
   function normalizeContextMode(value: string | undefined): ContextMode {
     return value === 'settings' || value === 'debug' || value === 'analysis' ? value : 'context';
@@ -94,6 +129,13 @@
     if (message.kind === 'state') {
       const addressIsBeingEdited = document.activeElement instanceof HTMLInputElement
         && document.activeElement.classList.contains('toolbar-address');
+      const previousState = state;
+      const pageChanged = previousState.browser.url !== message.payload.browser.url
+        || previousState.browser.activeTabId !== message.payload.browser.activeTabId;
+      const profileChanged = previousState.knowledge.session?.profileName !== message.payload.knowledge.session?.profileName;
+      const identityChanged = previousState.identity.candidateIdentity !== message.payload.identity.candidateIdentity
+        || previousState.identity.selectedLocalModKey !== message.payload.identity.selectedLocalModKey
+        || previousState.localContext?.localModKey !== message.payload.localContext?.localModKey;
       state = message.payload;
       browserHostReady = Boolean(
         state.browser.activeTabId
@@ -121,25 +163,23 @@
         deploymentApplyPending = false;
       }
 
-      if (!inspectorTransitionPending && surface === 'context' && state.inspector?.modKey) {
-        if (state.identity.autoInspectToken && state.identity.autoInspectToken !== handledAutoInspectToken) {
-          handledAutoInspectToken = state.identity.autoInspectToken;
-          dismissedInspectorModKey = null;
-        }
-        if (state.inspector.modKey !== dismissedInspectorModKey) {
-          if (state.inspector.modKey !== inspectorModKey) {
-            inspectorFilesOpen = false;
-            webObservedVersion = '';
-          }
-          contextMode = 'context';
-          contextPanelMode = 'inspector';
-          inspectorView = 'mod';
-          inspectorModKey = state.inspector.modKey;
-        }
+      if (!inspectorTransitionPending && (pageChanged || profileChanged || identityChanged) && inspectorOpen) {
+        inspectorOpen = false;
+        inspectorModKey = null;
+        inspectorFilesOpen = false;
+        webObservedVersion = '';
+        broadcastInspectorPresentation({ kind: 'close' });
+      } else if (!inspectorTransitionPending && (pageChanged || profileChanged || identityChanged) && inspectorModKey) {
+        inspectorModKey = null;
+        inspectorFilesOpen = false;
+        webObservedVersion = '';
       }
 
-      if (!inspectorTransitionPending && contextPanelMode === 'inspector' && inspectorView === 'mod' && inspectorModKey && state.inspector?.modKey !== inspectorModKey) {
-        closeInspector();
+      if (!inspectorTransitionPending && inspectorOpen && inspectorModKey && state.inspector?.modKey !== inspectorModKey) {
+        inspectorOpen = false;
+        inspectorModKey = null;
+        inspectorFilesOpen = false;
+        webObservedVersion = '';
       }
       return;
     }
@@ -147,9 +187,9 @@
     if (message.kind === 'error') {
       if (pendingInspectorModKey !== null) {
         pendingInspectorModKey = null;
-        contextPanelMode = 'context';
-        inspectorView = 'mod';
+        inspectorOpen = false;
         inspectorModKey = null;
+        broadcastInspectorPresentation({ kind: 'close' });
       }
       lastError = message.payload;
       deploymentApplyPending = false;
@@ -160,8 +200,11 @@
     lastError = null;
     if (['browser.home', 'browser.newTab', 'browser.history', 'browser.selectHistory', 'browser.selectTab', 'browser.navigate', 'identity.confirm', 'knowledge.loadSource', 'knowledge.selectRoot', 'knowledge.selectSource', 'knowledge.switchProfile', 'knowledge.useFixture', 'knowledge.selectEvidenceManifest', 'deployment.preview', 'deployment.apply', 'game.launch'].includes(command)) {
       pendingInspectorModKey = null;
-      contextPanelMode = 'context';
+      inspectorOpen = false;
       inspectorModKey = null;
+      inspectorFilesOpen = false;
+      webObservedVersion = '';
+      broadcastInspectorPresentation({ kind: 'close' });
     }
     bridge?.send(command, payload);
   }
@@ -183,7 +226,11 @@
     contextMode = mode;
     if (mode !== 'context') {
       pendingInspectorModKey = null;
-      contextPanelMode = 'context';
+      inspectorOpen = false;
+      inspectorModKey = null;
+      inspectorFilesOpen = false;
+      webObservedVersion = '';
+      broadcastInspectorPresentation({ kind: 'close' });
     }
     send('layout.setContextMode', { mode });
   }
@@ -297,23 +344,21 @@
     const inspectorChanged = inspectorModKey !== modKey;
     if (inspectorChanged) webObservedVersion = '';
     pendingInspectorModKey = modKey;
+    inspectorOpen = true;
     contextMode = 'context';
-    contextPanelMode = 'inspector';
-    inspectorView = 'mod';
     inspectorModKey = modKey;
-    dismissedInspectorModKey = null;
     if (inspectorChanged) inspectorFilesOpen = false;
+    broadcastInspectorPresentation({ kind: 'open', modKey });
     send('inspector.open', { modKey });
     send('layout.setContextMode', { mode: 'context' });
   }
 
   function openProfileDiagnosis() {
     pendingInspectorModKey = null;
+    inspectorOpen = false;
     contextMode = 'analysis';
-    contextPanelMode = 'inspector';
-    inspectorView = 'diagnosis';
     inspectorModKey = null;
-    dismissedInspectorModKey = null;
+    broadcastInspectorPresentation({ kind: 'close' });
     send('layout.setContextMode', { mode: 'analysis' });
   }
 
@@ -322,17 +367,26 @@
     else openProfileDiagnosis();
   }
 
-  function openCurrentInspector() {
-    if (state.localContext?.localModKey) openInspectorForMod(state.localContext.localModKey);
+  function toggleCurrentInspector() {
+    if (inspectorOpen) {
+      closeInspector();
+    } else if (state.localContext?.localModKey) {
+      openInspectorForMod(state.localContext.localModKey);
+    }
+  }
+
+  function toggleInspectorForMod(modKey: string) {
+    if (inspectorOpen && inspectorModKey === modKey) {
+      closeInspector();
+    } else {
+      openInspectorForMod(modKey);
+    }
   }
 
   function closeInspector() {
     pendingInspectorModKey = null;
-    dismissedInspectorModKey = state.inspector?.modKey ?? inspectorModKey;
-    contextPanelMode = 'context';
-    inspectorView = 'mod';
-    inspectorModKey = null;
-    inspectorFilesOpen = false;
+    inspectorOpen = false;
+    broadcastInspectorPresentation({ kind: 'close' });
     setContextMode('context');
   }
 
@@ -416,6 +470,8 @@
     {state}
     {operationRailVisible}
     {operationBlocksInteraction}
+    {inspectorOpen}
+    {inspectorModKey}
     deploymentDraftEntries={deploymentDraftEntries}
     onSwitchProfile={switchProfile}
     onStartDeploymentEdit={startDeploymentEdit}
@@ -423,7 +479,7 @@
     onDraftChange={(entries) => (deploymentDraftEntries = entries)}
     onPreviewDeployment={previewDeployment}
     onLaunchGame={launchGame}
-    onOpenInspectorForMod={openInspectorForMod}
+    onOpenInspectorForMod={toggleInspectorForMod}
     onOpenModPage={openModPage}
     onCollapse={() => send('layout.setModListVisible', { visible: false })}
   />
@@ -443,7 +499,11 @@
     <ContextPane
       {state}
       mode={contextMode}
-      {contextPanelMode}
+      {inspectorOpen}
+      inspector={state.inspector}
+      {inspectorCandidate}
+      {inspectorConflictGroups}
+      {inspectorRuntimeItems}
       {operationBlocksInteraction}
       error={lastError}
       bind:pageDetailsOpen
@@ -462,7 +522,7 @@
       onSelectEvidenceManifest={selectEvidenceManifest}
       onObserve={observe}
       onOpenAnalysis={openAnalysisInspector}
-      onOpenInspector={openCurrentInspector}
+      onToggleInspector={toggleCurrentInspector}
       onOpenModSearch={openModSearch}
       onCloseModSearch={closeModSearch}
       onOpenModPage={openModPage}
@@ -474,23 +534,11 @@
       onAnalyzeConflicts={() => send('analysis.analyzeConflicts')}
       onCompareRuntimeEvidence={compareRuntimeEvidence}
       onUseAnalysisFixture={() => send('analysis.useFixture')}
-      onOpenInspectorForMod={openInspectorForMod}
+      onOpenInspectorForMod={toggleInspectorForMod}
+      onSetWebVersionObservation={setWebVersionObservation}
+      onObserveNexusFileVersion={observeNexusFileVersion}
+      bind:inspectorFilesOpen
+      bind:webObservedVersion
     />
-    {#if contextMode === 'context' && state.knowledge.session && contextPanelMode === 'inspector' && inspectorView === 'mod'}
-      <EvidenceInspector
-        {state}
-        inspector={state.inspector}
-        {inspectorCandidate}
-        {inspectorConflictGroups}
-        {inspectorRuntimeItems}
-        {operationBlocksInteraction}
-        bind:inspectorFilesOpen
-        bind:webObservedVersion
-        onClose={closeInspector}
-        onSetWebVersionObservation={setWebVersionObservation}
-        onObserveNexusFileVersion={observeNexusFileVersion}
-        onStartStaticAnalysis={startStaticAnalysis}
-      />
-    {/if}
   </main>
 {/if}

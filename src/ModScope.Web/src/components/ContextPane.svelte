@@ -1,12 +1,26 @@
 <script lang="ts">
-  import type { BridgeErrorPayload, DiagnosticUiState, LocalContextUiState, ModCandidateUiState, UiState } from '../contracts';
+  import type {
+    BridgeErrorPayload,
+    DiagnosticUiState,
+    InspectorUiState,
+    LocalContextUiState,
+    ModCandidateUiState,
+    RuntimeEvidenceComparisonItemUiState,
+    SemanticConflictGroupUiState,
+    UiState
+  } from '../contracts';
 
   import type { ContextMode } from './ui-types';
   import { resolveModWebsite } from '../mod-links';
+  import EvidenceInspector from './EvidenceInspector.svelte';
 
   export let state: UiState;
   export let mode: ContextMode = 'context';
-  export let contextPanelMode: 'context' | 'inspector' = 'context';
+  export let inspectorOpen = false;
+  export let inspector: InspectorUiState | null = null;
+  export let inspectorCandidate: ModCandidateUiState | null = null;
+  export let inspectorConflictGroups: SemanticConflictGroupUiState[] = [];
+  export let inspectorRuntimeItems: RuntimeEvidenceComparisonItemUiState[] = [];
   export let operationBlocksInteraction = false;
   export let error: BridgeErrorPayload | null = null;
   export let pageDetailsOpen = false;
@@ -25,7 +39,7 @@
   export let onSelectEvidenceManifest: () => void;
   export let onObserve: () => void;
   export let onOpenAnalysis: () => void;
-  export let onOpenInspector: () => void;
+  export let onToggleInspector: () => void;
   export let onOpenModSearch: (mode?: 'browse' | 'recognition') => void;
   export let onCloseModSearch: () => void;
   export let onOpenModPage: (candidate: ModCandidateUiState) => void;
@@ -38,6 +52,10 @@
   export let onCompareRuntimeEvidence: () => void;
   export let onUseAnalysisFixture: () => void;
   export let onOpenInspectorForMod: (modKey: string) => void;
+  export let onSetWebVersionObservation: () => void;
+  export let onObserveNexusFileVersion: () => void;
+  export let inspectorFilesOpen = false;
+  export let webObservedVersion = '';
 
   type ContextCell = {
     label: 'Installed' | 'Enabled' | 'Version' | 'Profile';
@@ -226,7 +244,7 @@
   </section>
 {/if}
 
-{#if mode === 'context' && state.knowledge.session && contextPanelMode === 'context'}
+{#if mode === 'context' && state.knowledge.session}
   <section class="panel context-summary-panel" aria-labelledby="recognize-title">
     <div class="recognize-header"><div><span class="eyebrow">RECOGNIZE</span>{#if hasConclusion && state.localContext}<h2 id="recognize-title">{contextConclusionLabel(state.localContext.status)}</h2><p class="summary-meta">{state.localContext.candidateIdentity || state.identity.candidateIdentity || state.observation?.title || 'Current page'}</p>{:else if state.observation}<h2 id="recognize-title">Couldn’t recognize this page</h2>{:else}<h2 id="recognize-title">Browse a MOD page</h2>{/if}</div><button class="analysis-lamp" class:analysis-lamp-issue={analysisSummaryStatusClass() === 'analysis-status-different'} class:analysis-lamp-ready={analysisSummaryStatusClass() === 'analysis-status-ready'} disabled={operationBlocksInteraction} title={`Open analysis · ${analysisSummaryStatus()}`} aria-label={`Open analysis · ${analysisSummaryStatus()}`} onclick={onOpenAnalysis}><span class="analysis-lamp-dot" aria-hidden="true"></span><span>{analysisSummaryStatus()}</span></button></div>
     {#if operationBlocksInteraction}
@@ -259,9 +277,9 @@
           </ul>
         </aside>
       {/if}
-      {#if canOpenLocalInspector || (localContextCandidate && localContextPageUrl)}
+      {#if canOpenLocalInspector || inspectorOpen || (localContextCandidate && localContextPageUrl)}
         <div class="context-reference-actions">
-          {#if canOpenLocalInspector}<button class="primary-button context-reference-action" type="button" disabled={operationBlocksInteraction} onclick={onOpenInspector}>Open Inspector</button>{/if}
+          {#if canOpenLocalInspector || inspectorOpen}<button class="primary-button context-reference-action" type="button" disabled={operationBlocksInteraction} aria-expanded={inspectorOpen} aria-controls="inspector-inline-panel" onclick={onToggleInspector}>{inspectorOpen ? 'Close Inspector' : 'Inspect'}</button>{/if}
           {#if localContextCandidate && localContextPageUrl}<button class="secondary-button context-reference-action" type="button" disabled={operationBlocksInteraction} onclick={openLocalModPage}>Open page</button>{/if}
         </div>
       {/if}
@@ -292,6 +310,25 @@
       {#if state.knowledge.candidates.length > 0}<p class="subtle">Search the local MOD catalog to confirm the page identity.</p><div class="action-row"><button class="primary-button" type="button" disabled={operationBlocksInteraction} onclick={() => onOpenModSearch('recognition')}>Search local MODs</button><button class="secondary-button" type="button" disabled={operationBlocksInteraction} onclick={() => onConfirmIdentity(null)}>Mark as not installed</button></div>{:else}<p class="notice">No local MOD candidates are loaded. Open Debug to load a profile.</p><div class="action-row"><button class="secondary-button" type="button" onclick={() => onSetContextMode('debug')}>Open Debug</button><button class="secondary-button" type="button" onclick={() => onConfirmIdentity(null)}>Mark as not installed</button></div>{/if}
     {:else}<p class="subtle">ModScope will observe the current page and show local context here.</p>{/if}
   </section>
+{/if}
+
+{#if mode === 'context' && state.knowledge.session && (inspectorOpen || inspector)}
+  <div id="inspector-inline-panel" class="inspector-inline-region" hidden={!inspectorOpen} aria-hidden={inspectorOpen ? 'false' : 'true'}>
+    <EvidenceInspector
+      {state}
+      {inspector}
+      {inspectorCandidate}
+      {inspectorConflictGroups}
+      {inspectorRuntimeItems}
+      {operationBlocksInteraction}
+      bind:inspectorFilesOpen
+      bind:webObservedVersion
+      onClose={onToggleInspector}
+      onSetWebVersionObservation={onSetWebVersionObservation}
+      onObserveNexusFileVersion={onObserveNexusFileVersion}
+      onStartStaticAnalysis={onStartStaticAnalysis}
+    />
+  </div>
 {/if}
 
 {#if mode === 'analysis' && state.knowledge.session}
