@@ -1265,9 +1265,13 @@ WPFはwindow、WebView2 host、Toolbar用のnative More Popup、native bridgeを
 
 Toolbarは全列にまたがる86pxの2段構成です。上段はtab row、下段はnavigation rowです。History pageを開いてもhost rowは拡張しません。
 下段は、左からMod Library (`mod-list`)、Browser、Contextのresponsive三列です。
-FHDの基準比率は、Mod Libraryを`minmax(235px, 18%)`、Browserを`minmax(0, 1fr)`、Contextを`minmax(290px, 23%)`とします。Browserを最大の主面にします。
-狭いviewportでは基準比率を`20% / minmax(0, 1fr) / 28%`へ調整します。Browserのflexibleな中央列は維持します。
+FHDの基準比率は、Mod Libraryを`18*`、Browserを`59*`、Contextを`23*`とします。Browserを最大の主面にします。
+狭いviewportのreferenceは`20% / minmax(0, 1fr) / 28%`の視覚比率を示します。Desktop hostの実装は、この比率を固定値へ変換せず、side paneの最小幅とBrowserの最小幅で制約します。
 Mod LibraryとBrowser、BrowserとContextの境界にはpane separatorを表示します。separatorは各paneの境界を示し、contentへ重ねません。
+Desktop hostの実装は、各境界に幅6pxのNative WPF `GridSplitter`を使用します。Mod Libraryの幅は220pxから480px、Contextの幅は240pxから480px、Browserの最小幅は480pxです。
+初回起動は`18* / 59* / 23*`で配置し、Loaded後にside paneをdevice-independent pixelの固定幅へ確定します。Browserは残り幅を使用します。
+固定幅とMod Library、Contextの表示状態は、全profileと全pageで共通のapp-local設定として`%LOCALAPPDATA%/ModScope/panel-layout.json`へ保存します。保存値がない場合は初回比率へ戻します。壊れた値や範囲外の値は初期値へ戻します。保存に失敗してもUI操作を停止しません。
+Window幅が不足する場合は、Browserの最小幅とside paneの最小幅を優先して現在の表示幅だけを調整します。保存した幅は変更しません。Window幅が戻ると保存幅へ復元します。
 Moreの展開内容はToolbar rowの高さを変更しません。
 Desktop executableでは、MoreのWPF Popupを`ToolbarHost`の下側へ配置し、Browser、Mod Library、Contextへ重ねて表示します。
 WPF Popupの`StaysOpen`は`False`です。
@@ -1281,6 +1285,7 @@ Mod Libraryのresult tableだけをスクロール可能にします。Library r
 Context columnは、ToolbarのContext buttonまたはCtrl/Cmd+Iで非表示にできます。
 非表示中もContext WebView2のstateとInspector stateを破棄しません。
 Mod Library columnはToolbarのMod Library buttonまたは`layout.setModListVisible`で非表示にできます。
+Paneの表示切替は直前の固定幅を保持します。再表示と再起動では保存した幅と表示状態を復元します。Toolbarの高さは86pxで固定し、pane順序、Bridge contract v2、C# DTO、MO2 read/write境界は変更しません。
 active profileを先に表示します。初回起動は他profileをpreloadしません。Profile切替後は直前のprofileを1件だけbackground preloadします。
 profile selectorはpending、loading、ready、failedを表示します。
 将来はContextをdrawerまたはoverlayへ折り畳める構造へ進めます。

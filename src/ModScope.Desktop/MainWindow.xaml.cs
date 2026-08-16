@@ -5,6 +5,8 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using ModScope.Desktop.Contracts;
@@ -18,6 +20,13 @@ public partial class MainWindow : Window
     private const double MorePopupRightInset = 64;
     private const double ModListColumnWeight = 18;
     private const double ContextColumnWeight = 23;
+    private const double BrowserColumnWeight = 59;
+    private const double ModListMinimumWidth = 220;
+    private const double ModListMaximumWidth = 480;
+    private const double ContextMinimumWidth = 240;
+    private const double ContextMaximumWidth = 480;
+    private const double BrowserMinimumWidth = 480;
+    private const double PaneSplitterWidth = 6;
 
     private const string AppHostName = "appassets.modscope";
     private readonly DesktopSessionController _controller = new();
@@ -35,6 +44,7 @@ public partial class MainWindow : Window
     private bool _allowWindowClose;
     private bool _webViewsDisposed;
     private readonly BrowserStateStore _browserStateStore = BrowserStateStore.CreateDefault();
+    private readonly PanelLayoutStateStore _panelLayoutStateStore = PanelLayoutStateStore.CreateDefault();
     private readonly Dictionary<string, BrowserTabHostState> _browserTabs = new(StringComparer.Ordinal);
     private IReadOnlyList<BrowserHistoryEntryUiState> _browserHistory = Array.Empty<BrowserHistoryEntryUiState>();
     private string? _activeBrowserTabId;
@@ -42,6 +52,11 @@ public partial class MainWindow : Window
     private string? _webAssetsPath;
     private bool _moreOpen;
     private LayoutUiState _lastLayout = new(true, true);
+    private double? _rememberedModListWidth;
+    private double? _rememberedContextWidth;
+    private bool _panelLayoutArranged;
+    private bool _isApplyingPanelLayout;
+    private bool _panelSplitterDragging;
 
     private const string HomeHtml = """
         <!doctype html>
@@ -256,6 +271,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ConfigurePanelLayoutConstraints();
+        RestorePanelLayout();
         UpdateLoadingOverlay();
         _controller.OperationStateChanged += Controller_OperationStateChanged;
         Loaded += MainWindow_Loaded;
@@ -263,6 +280,9 @@ public partial class MainWindow : Window
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        FreezeInitialPanelWidths();
+        _panelLayoutArranged = true;
+        ClampLivePanelWidths();
         _startupInitializationTask ??= InitializeAsync();
     }
 
@@ -361,6 +381,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
+        SavePanelLayout();
         if (_allowWindowClose)
         {
             return;
@@ -1375,26 +1396,325 @@ public partial class MainWindow : Window
         button.Opacity = active ? 1.0 : 0.78;
     }
 
-    private void ApplyContextVisible(bool visible)
+    private void ConfigurePanelLayoutConstraints()
     {
-        _controller.SetContextVisible(visible);
-        ContextColumn.Width = visible
-            ? new GridLength(ContextColumnWeight, GridUnitType.Star)
-            : new GridLength(0);
-        ContextShell.Visibility = visible
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        ModListColumn.MinWidth = ModListMinimumWidth;
+        ModListColumn.MaxWidth = ModListMaximumWidth;
+        ModListSplitterColumn.Width = new GridLength(PaneSplitterWidth, GridUnitType.Pixel);
+        BrowserColumn.MinWidth = BrowserMinimumWidth;
+        ContextSplitterColumn.Width = new GridLength(PaneSplitterWidth, GridUnitType.Pixel);
+        ContextColumn.MinWidth = ContextMinimumWidth;
+        ContextColumn.MaxWidth = ContextMaximumWidth;
     }
 
-    private void ApplyModListVisible(bool visible)
+    private void RestorePanelLayout()
     {
+        var persisted = _panelLayoutStateStore.Load();
+        if (persisted is null)
+        {
+            _controller.SetModListVisible(true);
+            _controller.SetContextVisible(true);
+            _lastLayout = _lastLayout with
+            {
+                ModListVisible = true,
+                ContextVisible = true
+            };
+            ModListSplitter.Visibility = Visibility.Visible;
+            ContextSplitter.Visibility = Visibility.Visible;
+            return;
+        }
+
+        _rememberedModListWidth = persisted.ModListWidth;
+        _rememberedContextWidth = persisted.ContextWidth;
+        ApplyModListVisible(persisted.ModListVisible, persist: false);
+        ApplyContextVisible(persisted.ContextVisible, persist: false);
+    }
+
+    private void FreezeInitialPanelWidths()
+    {
+        _isApplyingPanelLayout = true;
+        try
+        {
+            if (_lastLayout.ModListVisible)
+            {
+                RememberModListWidthIfNeeded();
+                SetColumnWidth(ModListColumn, GetModListWidth());
+            }
+
+            if (_lastLayout.ContextVisible)
+            {
+                RememberContextWidthIfNeeded();
+                SetColumnWidth(ContextColumn, GetContextWidth());
+            }
+        }
+        finally
+        {
+            _isApplyingPanelLayout = false;
+        }
+    }
+
+    private void ApplyContextVisible(bool visible, bool persist = true)
+    {
+        if (!visible)
+        {
+            RememberContextWidthIfNeeded();
+        }
+
+        _controller.SetContextVisible(visible);
+        _isApplyingPanelLayout = true;
+        try
+        {
+            ContextColumn.MinWidth = visible ? ContextMinimumWidth : 0;
+            ContextColumn.MaxWidth = visible
+                ? ContextMaximumWidth
+                : double.PositiveInfinity;
+            ContextColumn.Width = visible
+                ? new GridLength(GetContextWidth(), GridUnitType.Pixel)
+                : new GridLength(0);
+            ContextSplitterColumn.Width = visible
+                ? new GridLength(PaneSplitterWidth, GridUnitType.Pixel)
+                : new GridLength(0);
+            ContextShell.Visibility = visible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ContextSplitter.Visibility = visible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+        finally
+        {
+            _isApplyingPanelLayout = false;
+        }
+
+        _lastLayout = _lastLayout with { ContextVisible = visible };
+        ClampLivePanelWidths();
+        if (persist)
+        {
+            SavePanelLayout();
+        }
+    }
+
+    private void ApplyModListVisible(bool visible, bool persist = true)
+    {
+        if (!visible)
+        {
+            RememberModListWidthIfNeeded();
+        }
+
         _controller.SetModListVisible(visible);
-        ModListColumn.Width = visible
-            ? new GridLength(ModListColumnWeight, GridUnitType.Star)
-            : new GridLength(0);
-        ModListShell.Visibility = visible
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        _isApplyingPanelLayout = true;
+        try
+        {
+            ModListColumn.MinWidth = visible ? ModListMinimumWidth : 0;
+            ModListColumn.MaxWidth = visible
+                ? ModListMaximumWidth
+                : double.PositiveInfinity;
+            ModListColumn.Width = visible
+                ? new GridLength(GetModListWidth(), GridUnitType.Pixel)
+                : new GridLength(0);
+            ModListSplitterColumn.Width = visible
+                ? new GridLength(PaneSplitterWidth, GridUnitType.Pixel)
+                : new GridLength(0);
+            ModListShell.Visibility = visible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ModListSplitter.Visibility = visible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+        finally
+        {
+            _isApplyingPanelLayout = false;
+        }
+
+        _lastLayout = _lastLayout with { ModListVisible = visible };
+        ClampLivePanelWidths();
+        if (persist)
+        {
+            SavePanelLayout();
+        }
+    }
+
+    private void RememberModListWidthIfNeeded()
+    {
+        _rememberedModListWidth ??= GetClampedWidth(
+            ModListColumn.ActualWidth,
+            ModListMinimumWidth,
+            ModListMaximumWidth,
+            ModListColumnWeight);
+    }
+
+    private void RememberContextWidthIfNeeded()
+    {
+        _rememberedContextWidth ??= GetClampedWidth(
+            ContextColumn.ActualWidth,
+            ContextMinimumWidth,
+            ContextMaximumWidth,
+            ContextColumnWeight);
+    }
+
+    private double GetModListWidth()
+    {
+        return _rememberedModListWidth ??= GetClampedWidth(
+            ModListColumn.ActualWidth,
+            ModListMinimumWidth,
+            ModListMaximumWidth,
+            ModListColumnWeight);
+    }
+
+    private double GetContextWidth()
+    {
+        return _rememberedContextWidth ??= GetClampedWidth(
+            ContextColumn.ActualWidth,
+            ContextMinimumWidth,
+            ContextMaximumWidth,
+            ContextColumnWeight);
+    }
+
+    private double GetClampedWidth(
+        double actualWidth,
+        double minimum,
+        double maximum,
+        double weight)
+    {
+        var initialRatioWidth = Math.Max(0, LayoutGrid.ActualWidth - PaneSplitterWidth * 2);
+        var fallback = weight / (ModListColumnWeight + BrowserColumnWeight + ContextColumnWeight)
+            * initialRatioWidth;
+        if (!double.IsFinite(fallback) || fallback <= 0)
+        {
+            fallback = weight == ModListColumnWeight ? 280 : 320;
+        }
+
+        var candidate = double.IsFinite(actualWidth) && actualWidth > 0
+            ? actualWidth
+            : fallback;
+        return Math.Clamp(candidate, minimum, maximum);
+    }
+
+    private static void SetColumnWidth(ColumnDefinition column, double width)
+    {
+        column.Width = new GridLength(width, GridUnitType.Pixel);
+    }
+
+    private void SavePanelLayout()
+    {
+        _rememberedModListWidth ??= GetModListWidth();
+        _rememberedContextWidth ??= GetContextWidth();
+        _panelLayoutStateStore.Save(
+            new PanelLayoutPersistedState(
+                PanelLayoutStateStore.CurrentVersion,
+                _lastLayout.ModListVisible,
+                _lastLayout.ContextVisible,
+                _rememberedModListWidth.Value,
+                _rememberedContextWidth.Value));
+    }
+
+    private void ClampLivePanelWidths()
+    {
+        if (!_panelLayoutArranged
+            || _isApplyingPanelLayout
+            || _panelSplitterDragging
+            || !double.IsFinite(LayoutGrid.ActualWidth)
+            || LayoutGrid.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var modListVisible = _lastLayout.ModListVisible;
+        var contextVisible = _lastLayout.ContextVisible;
+        var modListWidth = modListVisible ? GetModListWidth() : 0;
+        var contextWidth = contextVisible ? GetContextWidth() : 0;
+        var splitterWidth = (modListVisible ? PaneSplitterWidth : 0)
+            + (contextVisible ? PaneSplitterWidth : 0);
+        var availableSideWidth = Math.Max(
+            0,
+            LayoutGrid.ActualWidth - BrowserMinimumWidth - splitterWidth);
+        var minimumSideWidth = (modListVisible ? ModListMinimumWidth : 0)
+            + (contextVisible ? ContextMinimumWidth : 0);
+        var desiredSideWidth = modListWidth + contextWidth;
+
+        if (desiredSideWidth > availableSideWidth)
+        {
+            var targetSideWidth = Math.Max(availableSideWidth, minimumSideWidth);
+            var reduction = desiredSideWidth - targetSideWidth;
+            var modListFlex = modListVisible
+                ? Math.Max(0, modListWidth - ModListMinimumWidth)
+                : 0;
+            var contextFlex = contextVisible
+                ? Math.Max(0, contextWidth - ContextMinimumWidth)
+                : 0;
+            var flexibleWidth = modListFlex + contextFlex;
+            if (flexibleWidth > 0)
+            {
+                if (modListVisible)
+                {
+                    modListWidth -= reduction * modListFlex / flexibleWidth;
+                }
+
+                if (contextVisible)
+                {
+                    contextWidth -= reduction * contextFlex / flexibleWidth;
+                }
+            }
+        }
+
+        _isApplyingPanelLayout = true;
+        try
+        {
+            if (modListVisible)
+            {
+                SetColumnWidth(
+                    ModListColumn,
+                    Math.Clamp(modListWidth, ModListMinimumWidth, ModListMaximumWidth));
+            }
+
+            if (contextVisible)
+            {
+                SetColumnWidth(
+                    ContextColumn,
+                    Math.Clamp(contextWidth, ContextMinimumWidth, ContextMaximumWidth));
+            }
+        }
+        finally
+        {
+            _isApplyingPanelLayout = false;
+        }
+    }
+
+    private void PanelSplitter_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        _panelSplitterDragging = true;
+    }
+
+    private void PanelSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        _panelSplitterDragging = false;
+        if (e.Canceled || !_panelLayoutArranged || _isClosing)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(sender, ModListSplitter) && _lastLayout.ModListVisible)
+        {
+            _rememberedModListWidth = GetClampedWidth(
+                ModListColumn.ActualWidth,
+                ModListMinimumWidth,
+                ModListMaximumWidth,
+                ModListColumnWeight);
+            SetColumnWidth(ModListColumn, _rememberedModListWidth.Value);
+        }
+        else if (ReferenceEquals(sender, ContextSplitter) && _lastLayout.ContextVisible)
+        {
+            _rememberedContextWidth = GetClampedWidth(
+                ContextColumn.ActualWidth,
+                ContextMinimumWidth,
+                ContextMaximumWidth,
+                ContextColumnWeight);
+            SetColumnWidth(ContextColumn, _rememberedContextWidth.Value);
+        }
+
+        ClampLivePanelWidths();
+        SavePanelLayout();
     }
 
     private void ApplyContextMode(string mode)
@@ -1510,6 +1830,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
     {
+        ClampLivePanelWidths();
         if (!MorePopup.IsOpen)
         {
             return;

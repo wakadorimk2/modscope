@@ -32,21 +32,31 @@
             </Style.Triggers>
         </Style>
     </Window.Resources>
-    <Grid Background="#202124">
+    <Grid x:Name="LayoutGrid" Background="#202124">
         <Grid.RowDefinitions>
             <RowDefinition x:Name="ToolbarRow" Height="86" MinHeight="86" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="ModListColumn" Width="18*" />
-            <ColumnDefinition Width="59*" />
-            <ColumnDefinition x:Name="ContextColumn" Width="23*" />
+            <ColumnDefinition x:Name="ModListColumn"
+                              Width="18*"
+                              MinWidth="220"
+                              MaxWidth="480" />
+            <ColumnDefinition x:Name="ModListSplitterColumn" Width="6" />
+            <ColumnDefinition x:Name="BrowserColumn"
+                              Width="59*"
+                              MinWidth="480" />
+            <ColumnDefinition x:Name="ContextSplitterColumn" Width="6" />
+            <ColumnDefinition x:Name="ContextColumn"
+                              Width="23*"
+                              MinWidth="240"
+                              MaxWidth="480" />
         </Grid.ColumnDefinitions>
 
         <Border x:Name="ToolbarHost"
                 Grid.Row="0"
                 Grid.Column="0"
-                Grid.ColumnSpan="3"
+                Grid.ColumnSpan="5"
                 Margin="0"
                 Background="#292A2D"
                 BorderBrush="#3C4043"
@@ -65,7 +75,7 @@
         </Border>
 
         <Border Grid.Row="1"
-                Grid.Column="1"
+                Grid.Column="2"
                 Margin="0"
                 Background="#202124"
                 BorderBrush="#3C4043"
@@ -75,17 +85,53 @@
 
         <Border x:Name="ContextShell"
                 Grid.Row="1"
-                Grid.Column="2"
+                Grid.Column="4"
                 Margin="0"
                 Background="#303134">
             <wv2:WebView2 x:Name="ContextWebView" />
         </Border>
 
+        <GridSplitter x:Name="ModListSplitter"
+                      Grid.Row="1"
+                      Grid.Column="1"
+                      Width="6"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
+                      Background="Transparent"
+                      BorderBrush="#3C4043"
+                      BorderThickness="1,0,0,0"
+                      Cursor="SizeWE"
+                      ResizeDirection="Columns"
+                      ResizeBehavior="PreviousAndNext"
+                      ShowsPreview="False"
+                      DragStarted="PanelSplitter_DragStarted"
+                      DragCompleted="PanelSplitter_DragCompleted"
+                      AutomationProperties.Name="Resize Mod Library pane"
+                      Panel.ZIndex="20" />
+
+        <GridSplitter x:Name="ContextSplitter"
+                      Grid.Row="1"
+                      Grid.Column="3"
+                      Width="6"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
+                      Background="Transparent"
+                      BorderBrush="#3C4043"
+                      BorderThickness="1,0,0,0"
+                      Cursor="SizeWE"
+                      ResizeDirection="Columns"
+                      ResizeBehavior="PreviousAndNext"
+                      ShowsPreview="False"
+                      DragStarted="PanelSplitter_DragStarted"
+                      DragCompleted="PanelSplitter_DragCompleted"
+                      AutomationProperties.Name="Resize Context pane"
+                      Panel.ZIndex="20" />
+
         <Border x:Name="LoadingOverlay"
                 Grid.Row="0"
                 Grid.RowSpan="2"
                 Grid.Column="0"
-                Grid.ColumnSpan="3"
+                Grid.ColumnSpan="5"
                 Panel.ZIndex="100"
                 Background="#CC202124"
                 IsHitTestVisible="True"
