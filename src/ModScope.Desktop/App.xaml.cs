@@ -169,20 +169,16 @@ public partial class App : Application
         {
             WriteStartupDiagnostic(
                 "[ModScope] startup phase=job-probe detached-child-still-in-job");
-            failureMessage =
-                "ModScopeは安全なプロセス境界を確立できませんでした。\n\n"
-                + "ExplorerからModScopeを起動してください。";
-            return ProcessBoundaryDecision.Failed;
+            return ProcessBoundaryDecision.Continue;
         }
 
         if (!TryRelaunchOutsideJob(out var relaunchErrorCode))
         {
             WriteStartupDiagnostic(
                 $"[ModScope] startup phase=breakaway failed error={relaunchErrorCode}");
-            failureMessage =
-                "ModScopeはCodexのプロセス境界から離脱できませんでした。\n\n"
-                + "ExplorerからModScopeを起動してください。";
-            return ProcessBoundaryDecision.Failed;
+            WriteStartupDiagnostic(
+                "[ModScope] startup phase=breakaway fallback=continue-in-current-job");
+            return ProcessBoundaryDecision.Continue;
         }
 
         return ProcessBoundaryDecision.Relaunched;
@@ -222,6 +218,26 @@ public partial class App : Application
                 return false;
             }
 
+            string? launchDirectory;
+            try
+            {
+                launchDirectory = Environment.CurrentDirectory;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                launchDirectory = null;
+            }
+
+            if (string.IsNullOrWhiteSpace(launchDirectory) || !Directory.Exists(launchDirectory))
+            {
+                launchDirectory = Path.GetDirectoryName(processPath);
+            }
+
+            if (!string.IsNullOrWhiteSpace(launchDirectory) && !Directory.Exists(launchDirectory))
+            {
+                launchDirectory = null;
+            }
+
             var commandLine = new StringBuilder(Environment.CommandLine);
 
             if (!CreateProcessW(
@@ -232,7 +248,7 @@ public partial class App : Application
                     inheritHandles: false,
                     creationFlags,
                     environment: IntPtr.Zero,
-                    currentDirectory: Environment.CurrentDirectory,
+                    currentDirectory: launchDirectory,
                     ref startupInfo,
                     out var processInformation))
             {
