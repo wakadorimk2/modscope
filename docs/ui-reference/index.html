@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="ja" data-theme="light" data-density="compact">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ModScope UI Reference</title>
+  <link rel="stylesheet" href="assets/style.css?v=2026-08-16T00:07:38.125328+00:00">
+
+
+  <!-- html block の inline script より先に RHWState を定義する必要があるため head に置く -->
+  <script src="assets/interactive-state.js?v=2026-08-16T00:07:38.125328+00:00"></script>
+</head>
+<body>
+  <div class="app" data-document-id="modscope-ui-reference">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="brand-mark">
+          <span class="brand-glyph">RW</span>
+          <span class="brand-name">Reviewable HTML Workbench</span>
+        </span>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="toolset">
+        <select class="chip-select" id="filterSelect" data-i18n="filterLabel">
+          <option value="all" data-i18n="filterAll"></option>
+          <option value="hide-resolved" data-i18n="filterHideResolved"></option>
+          <option value="only-open" data-i18n="filterOnlyOpen"></option>
+        </select>
+        <button class="btn ghost" id="focusToggle" type="button" data-i18n-title="focusTitle" aria-pressed="false">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
+          <span class="ft-label" data-i18n="focusLabel"></span>
+        </button>
+        <button class="btn ghost" id="publishToggle" type="button" data-i18n-title="publishTitle" aria-pressed="false">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3C4.5 3 2 8 2 8s2.5 5 6 5 6-5 6-5-2.5-5-6-5Z"/><circle cx="8" cy="8" r="2"/></svg>
+          <span class="pt-label" data-i18n="publishLabel"></span>
+        </button>
+        <button class="btn ghost" id="themeToggle" type="button" data-i18n-title="themeTitle">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13"/></svg>
+          <span class="tt-label">Dark</span>
+        </button>
+      </div>
+    </header>
+    <main class="canvas" id="canvas">
+      <div class="doc-shell">
+        <div class="doc-grid">
+          <nav class="toc" aria-label="目次" data-i18n="tocLabel">
+            <p class="toc-h" data-i18n="tocHeader"></p>
+<ol class="toc-list">
+<li class="toc-h2"><a href="#reference-screen">Reference screen</a>
+<ol>
+</ol>
+</li>
+<li class="toc-h2"><a href="#review-task">Owner review task</a>
+<ol>
+</ol>
+</li>
+</ol>
+          </nav>
+          <article class="doc-main">
+            <div class="paper">
+              <header class="doc-headrow document-header" id="document-header" data-review-block="document-header" data-block-type="header" data-review-required="false">
+                <div class="doc-head-main">
+                  <p class="eyebrow"><a href="https://github.com/u-ichi/reviewable-html-workbench" target="_blank" rel="noopener">ModScope / UI reference</a></p>
+                  <h1 class="doc-title">ModScope UI Reference</h1>
+                  
+                </div>
+              </header>
+              <p class="doc-deck">UI原則を確認するための、再現可能なstatic mockupです。</p>
+              
+              <div class="meta-grid" aria-label="生成メタデータ"><div class="meta-cell"><div class="meta-key">Target</div><div class="meta-val">Power user</div></div><div class="meta-cell"><div class="meta-key">Viewport</div><div class="meta-val"><span class="mono">1920 × 1080</span></div></div><div class="meta-cell"><div class="meta-key">State</div><div class="meta-val">Mixed evidence</div></div></div>
+              <section class="summary"><div class="summary-h"><svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M3 8h10M3 12h6"/></svg>要約 (TL;DR)</div><p>Power user向けのBrowser-first三面構成とmixed evidence stateを示すstatic referenceです。</p></section>
+              <div class="prose autonum document-content" id="content">
+<section class="review-block" id="reference-screen" data-review-block="reference-screen" data-block-type="html" data-review-required="true">
+<h2>Reference screen</h2>
+<div class="block-content"><style>
+.ms-reference {
+  --ms-bg: #202124;
+  --ms-nav: #292a2d;
+  --ms-panel: #303134;
+  --ms-panel-2: #27282b;
+  --ms-border: #3c4043;
+  --ms-text: #e8eaed;
+  --ms-muted: #9aa0a6;
+  --ms-dim: #6f747a;
+  --ms-blue: #8ab4f8;
+  --ms-green: #81c995;
+  --ms-yellow: #fdd663;
+  --ms-red: #f28b82;
+  --ms-purple: #c58af9;
+  color: var(--ms-text);
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+.ms-reference-intro {
+  color: #41454c;
+  margin: 0 0 1rem;
+}
+.ms-stage {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 660px;
+  aspect-ratio: 16 / 9;
+  background: var(--ms-bg);
+  border: 1px solid #1b1c1e;
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(19, 23, 29, 0.18);
+}
+.ms-toolbar {
+  height: 86px;
+  background: var(--ms-nav);
+  border-bottom: 1px solid var(--ms-border);
+}
+.ms-tab-row,
+.ms-address-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+}
+.ms-tab-row {
+  height: 38px;
+  border-bottom: 1px solid #202124;
+}
+.ms-tab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 210px;
+  max-width: 310px;
+  height: 29px;
+  padding: 0 11px;
+  color: var(--ms-muted);
+  font-size: 12px;
+  border-radius: 7px 7px 0 0;
+}
+.ms-tab.active {
+  color: var(--ms-text);
+  background: var(--ms-panel);
+}
+.ms-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ms-blue);
+}
+.ms-tab-close {
+  margin-left: auto;
+  color: var(--ms-dim);
+}
+.ms-new-tab,
+.ms-nav-button,
+.ms-tool-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  color: var(--ms-muted);
+  background: transparent;
+  font: inherit;
+}
+.ms-new-tab {
+  width: 24px;
+  height: 24px;
+  font-size: 18px;
+}
+.ms-address-row {
+  height: 48px;
+}
+.ms-nav-button {
+  width: 27px;
+  height: 27px;
+  font-size: 16px;
+}
+.ms-address {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  height: 30px;
+  padding: 0 12px;
+  color: var(--ms-text);
+  background: #202124;
+  border: 1px solid var(--ms-border);
+  border-radius: 15px;
+  font-size: 12px;
+}
+.ms-address-lock {
+  margin-right: 8px;
+  color: var(--ms-green);
+  font-size: 11px;
+}
+.ms-tool-action {
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.ms-tool-action:hover,
+.ms-nav-button:hover {
+  color: var(--ms-text);
+  background: #3a3b3f;
+}
+.ms-workspace {
+  display: grid;
+  grid-template-columns: minmax(235px, 18%) minmax(0, 1fr) minmax(290px, 23%);
+  height: calc(100% - 86px);
+  min-height: 574px;
+}
+.ms-library,
+.ms-context {
+  background: var(--ms-panel);
+}
+.ms-library {
+  border-right: 1px solid var(--ms-border);
+}
+.ms-context {
+  border-left: 1px solid var(--ms-border);
+}
+.ms-pane-head,
+.ms-context-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--ms-border);
+}
+.ms-pane-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.ms-pane-meta,
+.ms-profile,
+.ms-context-kicker,
+.ms-page-kicker,
+.ms-table th,
+.ms-context-label,
+.ms-evidence-note {
+  color: var(--ms-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ms-pane-meta {
+  color: var(--ms-dim);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.ms-profile {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--ms-border);
+  line-height: 1.5;
+  text-transform: none;
+}
+.ms-profile strong {
+  display: block;
+  color: var(--ms-text);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.ms-table-wrap {
+  overflow: hidden;
+}
+.ms-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.ms-table th,
+.ms-table td {
+  padding: 8px 8px;
+  border-bottom: 1px solid rgba(60, 64, 67, 0.68);
+  text-align: left;
+  vertical-align: middle;
+}
+.ms-table th {
+  padding-top: 9px;
+  padding-bottom: 7px;
+  color: var(--ms-dim);
+  font-size: 9px;
+}
+.ms-table .order {
+  width: 29px;
+  color: var(--ms-dim);
+  text-align: right;
+}
+.ms-table th:nth-child(2) {
+  width: 40%;
+}
+.ms-table th:nth-child(3) {
+  width: 30%;
+}
+.ms-table th:nth-child(4) {
+  width: 26%;
+}
+.ms-table td {
+  overflow: hidden;
+  color: var(--ms-text);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-table tr.selected {
+  background: #35445b;
+  box-shadow: inset 2px 0 0 var(--ms-blue);
+}
+.ms-table tr.dimmed td {
+  color: #7c8187;
+}
+.ms-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+.ms-status i,
+.ms-evidence i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ms-muted);
+}
+.ms-status.enabled i,
+.ms-evidence.observed i {
+  background: var(--ms-green);
+}
+.ms-status.disabled i {
+  background: var(--ms-dim);
+}
+.ms-status.review i,
+.ms-evidence.unknown i {
+  background: var(--ms-yellow);
+}
+.ms-status.unresolved i {
+  background: var(--ms-red);
+}
+.ms-browser {
+  min-width: 0;
+  background: #f4f5f7;
+  color: #24262a;
+}
+.ms-pagebar {
+  height: 34px;
+  padding: 10px 17px;
+  color: #747a82;
+  background: #e5e7eb;
+  border-bottom: 1px solid #d1d5da;
+  font-size: 10px;
+}
+.ms-page {
+  height: calc(100% - 34px);
+  padding: 34px 6%;
+  overflow: hidden;
+}
+.ms-page-kicker {
+  color: #77818e;
+}
+.ms-page h2 {
+  margin: 8px 0 4px;
+  color: #1f2933;
+  font-size: clamp(20px, 2vw, 32px);
+  letter-spacing: -0.03em;
+}
+.ms-page-subtitle {
+  color: #5d6671;
+  font-size: 12px;
+}
+.ms-page-rule {
+  width: 100%;
+  margin: 24px 0;
+  border-top: 1px solid #d9dde2;
+}
+.ms-page-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.ms-page-section {
+  padding: 15px;
+  border: 1px solid #d9dde2;
+  background: #ffffff;
+  border-radius: 5px;
+}
+.ms-page-section strong {
+  display: block;
+  margin-bottom: 7px;
+  color: #2e3742;
+  font-size: 12px;
+}
+.ms-page-section p {
+  margin: 0;
+  color: #697381;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.ms-download {
+  display: inline-flex;
+  margin-top: 26px;
+  padding: 9px 14px;
+  color: #173d68;
+  background: #d9e9fb;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ms-context-head {
+  min-height: 52px;
+}
+.ms-context-head .ms-pane-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ms-context-head .ms-pane-title::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ms-blue);
+}
+.ms-context-body {
+  padding: 14px;
+}
+.ms-context-kicker {
+  color: var(--ms-blue);
+}
+.ms-context h3 {
+  margin: 8px 0 13px;
+  color: var(--ms-text);
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.ms-local-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+.ms-local-cell {
+  padding: 9px;
+  background: var(--ms-panel-2);
+  border: 1px solid var(--ms-border);
+}
+.ms-local-cell span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ms-muted);
+  font-size: 10px;
+}
+.ms-local-cell strong {
+  display: block;
+  color: var(--ms-text);
+  font-size: 12px;
+}
+.ms-positive {
+  color: var(--ms-green) !important;
+}
+.ms-unknown {
+  color: var(--ms-yellow) !important;
+}
+.ms-evidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  color: var(--ms-muted);
+  font-size: 9px;
+}
+.ms-review-box {
+  padding: 11px;
+  border-left: 2px solid var(--ms-yellow);
+  background: #342f24;
+}
+.ms-review-box strong {
+  display: block;
+  color: var(--ms-yellow);
+  font-size: 11px;
+}
+.ms-review-box p {
+  margin: 5px 0 0;
+  color: #d2c4a4;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.ms-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 14px;
+}
+.ms-action {
+  padding: 8px 10px;
+  color: var(--ms-text);
+  background: #3a3b3f;
+  border: 1px solid var(--ms-border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 10px;
+}
+.ms-action.primary {
+  color: #17283e;
+  background: var(--ms-blue);
+  border-color: var(--ms-blue);
+  font-weight: 700;
+}
+.ms-disclosure {
+  margin-top: 15px;
+  border-top: 1px solid var(--ms-border);
+}
+.ms-disclosure summary {
+  padding: 11px 0 8px;
+  color: var(--ms-muted);
+  cursor: default;
+  font-size: 10px;
+  list-style: none;
+}
+.ms-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+.ms-disclosure summary::before {
+  content: "›";
+  display: inline-block;
+  width: 14px;
+  color: var(--ms-blue);
+}
+.ms-disclosure code {
+  display: block;
+  padding: 8px;
+  overflow: hidden;
+  color: #b7c5d8;
+  background: #202124;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-callout-marker {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: #18202a;
+  background: var(--ms-blue);
+  border: 2px solid #e9f2ff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
+  font-size: 11px;
+  font-weight: 800;
+}
+.ms-marker-1 { top: 22%; left: 59%; }
+.ms-marker-2 { top: 52%; left: 16%; }
+.ms-marker-3 { top: 49%; right: 19%; }
+.ms-marker-4 { top: 74%; right: 16%; }
+.ms-annotation {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+  margin-top: 13px;
+}
+.ms-annotation-item {
+  min-height: 72px;
+  padding: 10px;
+  color: #4a5058;
+  background: #f7f8fa;
+  border: 1px solid #dfe3e8;
+  border-radius: 5px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.ms-annotation-item b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-right: 5px;
+  color: #fff;
+  background: #476f9f;
+  border-radius: 50%;
+  font-size: 9px;
+}
+.ms-review-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.ms-review-list,
+.ms-boundary {
+  padding: 14px 16px;
+  border: 1px solid #dfe3e8;
+  border-radius: 5px;
+}
+.ms-review-list {
+  background: #f7f8fa;
+}
+.ms-review-list h3,
+.ms-boundary h3 {
+  margin: 0 0 9px;
+  color: #303843;
+  font-size: 14px;
+}
+.ms-review-list ol {
+  margin: 0;
+  padding-left: 18px;
+  color: #4e5660;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.ms-boundary {
+  background: #eef4fb;
+}
+.ms-boundary p {
+  margin: 0;
+  color: #435163;
+  font-size: 11px;
+  line-height: 1.65;
+}
+.ms-boundary strong {
+  color: #234b78;
+}
+@media (max-width: 900px) {
+  .ms-stage {
+    min-height: 520px;
+  }
+  .ms-workspace {
+    grid-template-columns: 20% minmax(0, 1fr) 28%;
+  }
+  .ms-table th,
+  .ms-table td {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+  .ms-annotation {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+</style>
+<div class="ms-reference">
+  <p class="ms-reference-intro">1920 × 1080を基準にした、Browser-firstの三面構成です。左はMod Library、中央はBrowser、右はLocal contextとInspectorです。</p>
+  <div class="ms-stage" aria-label="ModScope UI reference screen">
+    <div class="ms-toolbar">
+      <div class="ms-tab-row">
+        <div class="ms-tab active"><span class="ms-tab-dot"></span><span>MOD page — Northern Lights</span><span class="ms-tab-close">×</span></div>
+        <div class="ms-tab"><span>History</span></div>
+        <button class="ms-new-tab" type="button" aria-label="New tab">+</button>
+      </div>
+      <div class="ms-address-row">
+        <button class="ms-nav-button" type="button" aria-label="Back">‹</button>
+        <button class="ms-nav-button" type="button" aria-label="Forward">›</button>
+        <button class="ms-nav-button" type="button" aria-label="Reload">↻</button>
+        <div class="ms-address"><span class="ms-address-lock">●</span> nexusmods.com/games/7daystodie/mods/4821</div>
+        <button class="ms-tool-action" type="button">History</button>
+        <button class="ms-tool-action" type="button">Library</button>
+        <button class="ms-tool-action" type="button">Context</button>
+      </div>
+    </div>
+    <div class="ms-workspace">
+      <aside class="ms-library" aria-label="Mod Library">
+        <div class="ms-pane-head">
+          <span class="ms-pane-title">Mod Library</span>
+          <span class="ms-pane-meta">All · 146</span>
+        </div>
+        <div class="ms-profile">Active profile<strong>Survival / 7DTD 2.5</strong></div>
+        <div class="ms-table-wrap">
+          <table class="ms-table" aria-label="Compact mod table">
+            <thead>
+              <tr><th class="order">#</th><th>Name</th><th>State</th><th>Version</th></tr>
+            </thead>
+            <tbody>
+              <tr class="selected">
+                <td class="order">12</td>
+                <td>Northern Lights</td>
+                <td><span class="ms-status enabled"><i></i>Enabled</span></td>
+                <td>1.4.2</td>
+              </tr>
+              <tr>
+                <td class="order">13</td>
+                <td>Patch Bridge</td>
+                <td><span class="ms-status review"><i></i>Needs review</span></td>
+                <td>Unknown</td>
+              </tr>
+              <tr>
+                <td class="order">14</td>
+                <td>Old Weather</td>
+                <td><span class="ms-status disabled"><i></i>Disabled</span></td>
+                <td>0.9.0</td>
+              </tr>
+              <tr class="dimmed">
+                <td class="order">15</td>
+                <td>Unknown Pack</td>
+                <td><span class="ms-status unresolved"><i></i>Unresolved</span></td>
+                <td>Unknown</td>
+              </tr>
+              <tr>
+                <td class="order">16</td>
+                <td>Vehicle Tuning</td>
+                <td><span class="ms-status enabled"><i></i>Enabled</span></td>
+                <td>2.1.0</td>
+              </tr>
+              <tr>
+                <td class="order">17</td>
+                <td>Night Trader</td>
+                <td><span class="ms-status enabled"><i></i>Enabled</span></td>
+                <td>1.0.6</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </aside>
+      <main class="ms-browser" aria-label="Browser surface">
+        <div class="ms-pagebar">Nexus Mods / 7 Days to Die / MOD</div>
+        <div class="ms-page">
+          <div class="ms-page-kicker">7 DAYS TO DIE · MOD</div>
+          <h2>Northern Lights</h2>
+          <div class="ms-page-subtitle">Environmental lighting and night visibility adjustments</div>
+          <div class="ms-page-rule"></div>
+          <div class="ms-page-grid">
+            <div class="ms-page-section"><strong>About this mod</strong><p>Improves night visibility while keeping the original survival atmosphere. The page remains the main discovery surface.</p></div>
+            <div class="ms-page-section"><strong>Compatibility</strong><p>Required game version is stated on the page. Local compatibility evidence stays in Context and Inspector.</p></div>
+          </div>
+          <div class="ms-download">Files · Description · Posts</div>
+        </div>
+      </main>
+      <aside class="ms-context" aria-label="Local context and Inspector">
+        <div class="ms-context-head">
+          <span class="ms-pane-title">Local context</span>
+          <span class="ms-pane-meta">Inspector</span>
+        </div>
+        <div class="ms-context-body">
+          <div class="ms-context-kicker">RECOGNIZE · OBSERVED</div>
+          <h3>Northern Lights</h3>
+          <div class="ms-local-grid">
+            <div class="ms-local-cell"><span>Installed</span><strong class="ms-positive">Yes</strong><div class="ms-evidence observed"><i></i>Observed</div></div>
+            <div class="ms-local-cell"><span>Enabled</span><strong class="ms-positive">Yes</strong><div class="ms-evidence observed"><i></i>Observed</div></div>
+            <div class="ms-local-cell"><span>Version</span><strong class="ms-unknown">Unknown</strong><div class="ms-evidence unknown"><i></i>Unknown</div></div>
+            <div class="ms-local-cell"><span>Profile</span><strong>Survival</strong><div class="ms-evidence observed"><i></i>Observed</div></div>
+          </div>
+          <div class="ms-review-box">
+            <strong>Needs review</strong>
+            <p>Installed version has no confirmed source observation. Inspect provenance before comparing versions.</p>
+          </div>
+          <div class="ms-actions">
+            <button class="ms-action primary" type="button">Open Inspector</button>
+            <button class="ms-action" type="button">Open page</button>
+          </div>
+          <details class="ms-disclosure">
+            <summary>Raw XML / XPath / diagnostic</summary>
+            <code>Config/world.xml · /blocks/block[@name='night']</code>
+          </details>
+        </div>
+      </aside>
+    </div>
+    <span class="ms-callout-marker ms-marker-1">1</span>
+    <span class="ms-callout-marker ms-marker-2">2</span>
+    <span class="ms-callout-marker ms-marker-3">3</span>
+    <span class="ms-callout-marker ms-marker-4">4</span>
+  </div>
+  <div class="ms-annotation" aria-label="Reference annotations">
+    <div class="ms-annotation-item"><b>1</b><strong>Browser-first</strong><br>外部pageを最大の主面にします。</div>
+    <div class="ms-annotation-item"><b>2</b><strong>Compact table</strong><br>序数、Name、State、Versionを固定します。</div>
+    <div class="ms-annotation-item"><b>3</b><strong>Evidence text</strong><br>ObservedとUnknownをtextで区別します。</div>
+    <div class="ms-annotation-item"><b>4</b><strong>Explicit action</strong><br>Needs reviewと次actionを分離します。</div>
+  </div>
+</div></div>
+</section>
+<section class="review-block" id="review-task" data-review-block="review-task" data-block-type="html" data-review-required="true">
+<h2>Owner review task</h2>
+<div class="block-content"><p>このreferenceは、実装のpixel仕様ではありません。30秒taskで、表示中MODのlocal状態、evidence state、次actionを確認できることを検証します。</p>
+<div class="ms-review-panel">
+  <div class="ms-review-list">
+    <h3>30秒task</h3>
+    <ol>
+      <li>表示中のMODがinstalledか確認する。</li>
+      <li>enabled状態とversion stateを確認する。</li>
+      <li>Observed、Unknown、Needs reviewを区別する。</li>
+      <li>次に開くread actionを選ぶ。</li>
+    </ol>
+  </div>
+  <div class="ms-boundary">
+    <h3>Trust boundary</h3>
+    <p><strong>selection</strong>だけではpage、identity、writeを変更しません。<br><strong>write</strong>はpreview、差分、rollback、explicit approvalを経由します。</p>
+  </div>
+</div></div>
+</section>
+              </div>
+            </div>
+          </article>
+          <aside class="cmt-rail" data-i18n="railLabel">
+            <div class="cmt-rail-h">
+              <span data-i18n="railHeader"></span>
+              <span class="cmt-rail-count" id="cmtCount">—</span>
+            </div>
+            <div class="cmt-layer" id="cmtLayer"></div>
+          </aside>
+        </div>
+      </div>
+    </main>
+    <div class="pub-exit" id="pubExit" role="status">
+      <span class="pe-label"><b data-i18n="publishExitLabel"></b></span>
+      <div class="pe-seg" role="group">
+        <button class="pe-w on" data-pw="standard" data-i18n="publishStandard"></button>
+        <button class="pe-w" data-pw="max" data-i18n="publishMax"></button>
+      </div>
+      <button class="pe-btn primary" id="pubDownloadBtn">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0 3-3M8 10 5 7M2.5 11v1.5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>
+        <span data-i18n="publishDownload"></span>
+      </button>
+      <button class="pe-btn" id="pubExitBtn">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        <span data-i18n="publishExit"></span>
+      </button>
+    </div>
+  </div>
+  <script src="assets/publish-export.js?v=2026-08-16T00:07:38.125328+00:00"></script>
+  <script src="assets/review-comments.js?v=2026-08-16T00:07:38.125328+00:00"></script>
+  <script src="assets/task-checklist.js?v=2026-08-16T00:07:38.125328+00:00"></script>
+</body>
+</html>

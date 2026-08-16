@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "renderer_version": "1.9.0",
+  "generated_at": "2026-08-16T00:07:38.125328+00:00",
+  "input": {
+    "path": "C:\\Users\\wakad\\projects\\modscope\\docs\\ui-reference\\document-model.json",
+    "sha256": "513e52c3cfaa07debaf34bb794ac3ce82936a624357e4e226b6f216c4a393192"
+  },
+  "document": {
+    "id": "modscope-ui-reference",
+    "title": "ModScope UI Reference"
+  },
+  "outputs": {
+    "index": "index.html",
+    "assets": [
+      "assets/style.css",
+      "assets/publish-overrides.css",
+      "assets/publish-export.js",
+      "assets/review-comments.js",
+      "assets/task-checklist.js",
+      "assets/interactive-state.js"
+    ],
+    "diagrams": [],
+    "images": []
+  },
+  "diagrams": [],
+  "review_blocks": [
+    {
+      "id": "document-header",
+      "type": "header",
+      "review_required": false
+    },
+    {
+      "id": "reference-screen",
+      "type": "html",
+      "review_required": true
+    },
+    {
+      "id": "review-task",
+      "type": "html",
+      "review_required": true
+    }
+  ]
+}

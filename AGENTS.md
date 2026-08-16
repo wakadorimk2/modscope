@@ -43,6 +43,8 @@ MO2のmods、profiles、downloads、MO2本体はsource of truthです。ModScope
 
 - `AGENTS.md`
 - `docs/design.md`
+- `docs/ui-principles.md`
+- `docs/ui-reference/`
 - `.serena/project.yml`
 - `global.json`
 - `ModScope.sln`

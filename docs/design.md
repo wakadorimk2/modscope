@@ -766,7 +766,7 @@ View countは、current snapshotにView条件を適用した件数です。free-
 
 Searchはdisplay name、directory name、MOD keyを対象にします。既存の名前正規化規則を使い、caseとUnicodeの差だけで候補を失いません。
 
-Default sortはNameです。State、Version、MO2 priorityをsort候補にします。欠落値は最後に置き、同じ値はstable MOD keyで決定します。Libraryのflat result tableはName、State、Versionを初期列にし、role、resolution state、priority、provenanceはdetailまたはInspectorへprogressive disclosureします。
+Default sortはViewの目的で決定します。Browseと`All`はName、`Enabled`と`Disabled`とDeploymentはMO2 priority / load order、`Review`と`Identity unresolved`と`Profile unresolved`とDiagnosisはactionable stateを使います。sort変更は明示操作です。Searchとfilter後も選択中のsort順を維持します。欠落値は最後に置き、同じ値はstable MOD keyで決定します。Libraryのflat result tableはName、State、Versionを初期列にし、role、resolution state、priority、provenanceはdetailまたはInspectorへprogressive disclosureします。詳細なUI patternは[UI原則](ui-principles.md)を参照します。
 
 Saved Viewは、View条件とsortをアプリ内metadataへ保存します。保存metadataはinstance/profile fingerprintへ紐づけます。MO2、Local Mod Knowledge、`modlist.txt`、page本文、cookie、absolute pathは保存しません。snapshot再読、profile切替、source更新後に条件を再評価します。scopeが一致しない場合は`Unavailable`を表示し、`All`へfallbackしません。
 
@@ -1194,6 +1194,9 @@ Browser、Local Mod Knowledge、context projection、analysis、mutationを分�
 
 2026-08-11のWeb UI実装依頼により、既存WPF画面をWeb frontendへ移行する縦切りを追加します。
 
+UIのtarget user、reusable pattern、evidence表示、action境界は、[UI原則](ui-principles.md)を正本とします。
+staticな基準画面は、[UI reference](ui-reference/index.html)で確認します。
+
 ### 24.1 Responsibility boundary
 
 - .NET / C#はsource of truthです。
@@ -1384,7 +1387,8 @@ Mod Libraryの標準表示は`All`です。
 generic warning、unknown role、diagnosticは`Review`のmembershipを生成しません。
 結果はflat tableで表示します。
 Searchはdisplay name、directory name、MOD keyを対象にします。
-Default sortはNameです。State、Version、MO2 priorityをsort候補にします。
+Default sortはViewの目的で決定します。Browseと`All`はName、`Enabled`と`Disabled`とDeploymentはMO2 priority / load order、`Review`と`Identity unresolved`と`Profile unresolved`とDiagnosisはactionable stateを使います。
+sort変更は明示操作です。Searchとfilter後も選択中のsort順を維持します。
 欠落値は最後に置き、同値はstable MOD keyで決定します。
 role assessmentはrow detailまたはInspectorへ段階表示します。
 role assessmentをSystem Viewのmembershipへ変換しません。
