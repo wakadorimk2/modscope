@@ -47,6 +47,7 @@
   let deploymentPreviewSearch = '';
   let lastError: BridgeErrorPayload | null = null;
   let bridge: Bridge | undefined;
+  let browserHostReady = false;
   let showHtmlMoreMenu = false;
   let runtimeToolVersion = '';
   let runtimeGameVersion = '';
@@ -56,6 +57,7 @@
     && !state.knowledge.operation.isBackground;
   $: operationBlocksInteraction = state.analysis.operation.isBusy
     || knowledgeBlocksInteraction;
+  $: browserToolbarDisabled = !browserHostReady;
   $: operationRailVisible = state.knowledge.operation.isBusy;
   $: modSearchResults = searchCandidates(state.knowledge.candidates, modSearchQuery);
   $: inspectorCandidate = state.inspector
@@ -92,6 +94,10 @@
       const addressIsBeingEdited = document.activeElement instanceof HTMLInputElement
         && document.activeElement.classList.contains('toolbar-address');
       state = message.payload;
+      browserHostReady = Boolean(
+        state.browser.activeTabId
+        && state.browser.tabs.some((tab) => tab.isActive)
+      );
       const requestedInspectorKey = pendingInspectorModKey;
       if (requestedInspectorKey && state.inspector?.modKey === requestedInspectorKey) {
         pendingInspectorModKey = null;
@@ -400,7 +406,7 @@
   <WorkspaceToolbar
     bind:address
     {state}
-    disabled={false}
+    disabled={browserToolbarDisabled}
     {showHtmlMoreMenu}
     error={lastError}
     onNavigate={navigate}

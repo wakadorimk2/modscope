@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<items>
+  <item name="A" value="base" tags="seed" />
+  <item name="B" value="remove" />
+  <item name="C" value="base" />
+  <item name="D" value="keep" />
+  <item name="E" />
+  <item name="Many" tags="left" />
+  <item name="Many" tags="right" />
+</items>

@@ -288,14 +288,16 @@ public partial class MainWindow : Window
             ConfigureFrontend(ModListWebView, webAssetsPath, "mod-list");
             ConfigureFrontend(ContextWebView, webAssetsPath, "context");
 
+            _startupLoading = false;
+            UpdateLoadingOverlay();
+            SendState();
+
             if (discoveryTask is not null)
             {
                 _ = ObserveStartupDiscoveryAsync(discoveryTask);
             }
 
             var remainingBrowserTabs = await RestoreBrowserTabsAsync();
-            _startupLoading = false;
-            UpdateLoadingOverlay();
             SendState();
             _ = RestoreRemainingBrowserTabsAfterFirstPaintAsync(remainingBrowserTabs);
         }
