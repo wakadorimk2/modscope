@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "observedAtUtc": "2026-08-16T00:00:00Z",
+  "artifacts": [
+    {
+      "artifactId": "toolkit-file",
+      "kind": "nexus-file",
+      "name": "Synthetic Toolkit",
+      "modId": "1234",
+      "fileId": "5678",
+      "sourceUrl": "https://evidence.example.invalid/toolkit/1234/5678?observed=manifest"
+    },
+    {
+      "artifactId": "bundle-file",
+      "kind": "nexus-file",
+      "name": "Synthetic Bundle",
+      "modId": "2345",
+      "fileId": "6789",
+      "sourceUrl": "https://evidence.example.invalid/bundle/2345/6789?observed=manifest"
+    }
+  ],
+  "packageBindings": [
+    {
+      "packageDirectory": "mods/Toolkit__Nexus-1234-5678",
+      "artifactIds": ["toolkit-file"]
+    },
+    {
+      "packageDirectory": "mods/Bundle__Nexus-2345-6789",
+      "artifactIds": ["bundle-file"]
+    }
+  ],
+  "versionObservations": [
+    {
+      "artifactId": "toolkit-file",
+      "rawValue": "1.2.3",
+      "role": "release"
+    },
+    {
+      "artifactId": "bundle-file",
+      "rawValue": "2.0.0",
+      "role": "release"
+    }
+  ]
+}
