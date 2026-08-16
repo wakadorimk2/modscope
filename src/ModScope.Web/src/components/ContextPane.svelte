@@ -67,6 +67,17 @@
     return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/:/g, ' · ').replace(/^./, (character) => character.toUpperCase());
   }
 
+  function contextConclusionLabel(status: string | null | undefined): string {
+    const normalized = (status ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+    if (normalized === 'installed') return 'Installed in active profile';
+    if (normalized === 'notinstalled') return 'Not installed in active profile';
+    return formatLabel(status);
+  }
+
+  function recognitionStrengthClass(strength: string | null | undefined): string {
+    return (strength ?? '').toLowerCase().replace(/[^a-z]+/g, '') === 'strong' ? 'status-ready' : '';
+  }
+
   function statusClass(status: string | undefined): string {
     return 'status-' + (status ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
   }
@@ -144,12 +155,12 @@
 
 {#if mode === 'context' && state.knowledge.session && contextPanelMode === 'context'}
   <section class="panel context-summary-panel" aria-labelledby="recognize-title">
-    <div class="recognize-header"><div><span class="eyebrow">RECOGNIZE</span>{#if hasConclusion}<h2 id="recognize-title">{state.localContext?.candidateIdentity || state.identity.candidateIdentity || state.observation?.title || 'Current page'}</h2>{:else if state.observation}<h2 id="recognize-title">Couldn’t recognize this page</h2>{:else}<h2 id="recognize-title">Browse a MOD page</h2>{/if}</div><button class="analysis-lamp" class:analysis-lamp-issue={analysisSummaryStatusClass() === 'analysis-status-different'} class:analysis-lamp-ready={analysisSummaryStatusClass() === 'analysis-status-ready'} disabled={operationBlocksInteraction} title={`Open analysis · ${analysisSummaryStatus()}`} aria-label={`Open analysis · ${analysisSummaryStatus()}`} onclick={onOpenAnalysis}><span class="analysis-lamp-dot" aria-hidden="true"></span><span>{analysisSummaryStatus()}</span></button></div>
+    <div class="recognize-header"><div><span class="eyebrow">RECOGNIZE</span>{#if hasConclusion && state.localContext}<h2 id="recognize-title">{contextConclusionLabel(state.localContext.status)}</h2><p class="summary-meta">{state.localContext.candidateIdentity || state.identity.candidateIdentity || state.observation?.title || 'Current page'}</p>{:else if state.observation}<h2 id="recognize-title">Couldn’t recognize this page</h2>{:else}<h2 id="recognize-title">Browse a MOD page</h2>{/if}</div><button class="analysis-lamp" class:analysis-lamp-issue={analysisSummaryStatusClass() === 'analysis-status-different'} class:analysis-lamp-ready={analysisSummaryStatusClass() === 'analysis-status-ready'} disabled={operationBlocksInteraction} title={`Open analysis · ${analysisSummaryStatus()}`} aria-label={`Open analysis · ${analysisSummaryStatus()}`} onclick={onOpenAnalysis}><span class="analysis-lamp-dot" aria-hidden="true"></span><span>{analysisSummaryStatus()}</span></button></div>
     {#if hasConclusion && state.localContext}
-      <div class="local-summary-line" aria-label="Local MOD summary"><span class="status-chip {statusClass(state.localContext.status)}">{formatLabel(state.localContext.status)}</span><span class="status-chip {statusClass(state.localContext.enabledState)}">{formatLabel(state.localContext.enabledState)}</span></div>
+      <div class="local-summary-line" aria-label="Minimal local MOD summary"><span class="status-chip {statusClass(state.localContext.status)}">{formatLabel(state.localContext.status)}</span><span class="status-chip {statusClass(state.localContext.enabledState)}">{formatLabel(state.localContext.enabledState)}</span></div>
       {#if state.localContext.status === 'installed' && state.localContext.localModKey}<button class="secondary-button action-button" disabled={operationBlocksInteraction} onclick={onOpenInspector}>Inspect MOD</button>{/if}
     {:else if state.observation}
-      <p class="subtle">Choose a local MOD or mark this page as not installed.</p>
+      <p class="subtle">Identity confirmation is required. Choose a local MOD or mark this page as not installed.</p>
       {#if state.identity.matches.length > 0}
         <div class="recognition-candidate-list" aria-label="Local MOD recognition candidates">
           {#each state.identity.matches.slice(0, 6) as match}
@@ -163,10 +174,9 @@
               >
                 <span class="recognition-candidate-heading">
                   <strong>{match.displayName || match.directoryName || match.modKey}</strong>
-                  <span class="status-chip {match.strength === 'strong' ? 'status-ready' : 'status-unknown'}">{formatLabel(match.strength)}</span>
+                  <span class="status-chip {recognitionStrengthClass(match.strength)}">{formatLabel(match.strength)}</span>
                 </span>
-                <span class="analysis-meta">{match.evidence}</span>
-                <span class="subtle">{match.profileState} · {match.enabledState} · {match.modKey}</span>
+                <span class="analysis-meta">Match evidence · {match.evidence}</span>
                 <span class="recognition-candidate-action-label">Use this MOD</span>
               </button>
             </article>

@@ -21,13 +21,17 @@
   export let onObserveNexusFileVersion: () => void;
   export let onStartStaticAnalysis: () => void;
 
+  function normalizedValue(value: string | null | undefined): string {
+    return (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+  }
+
   function formatLabel(value: string | null | undefined): string {
     if (!value) return 'Unknown';
-    return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/:/g, ' · ').replace(/^./, (character) => character.toUpperCase());
+    return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').replace(/:/g, ' · ').replace(/^./, (character) => character.toUpperCase());
   }
 
   function statusLabel(value: string | null | undefined): string {
-    const normalized = (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+    const normalized = normalizedValue(value);
     switch (normalized) {
       case 'updateavailable': return 'Update available';
       case 'uptodate': return 'Up to date';
@@ -35,6 +39,8 @@
       case 'notassessed': return 'Not assessed';
       case 'notcomparable': return 'Not comparable';
       case 'observed': return 'Observed';
+      case 'inferred': return 'Inferred';
+      case 'needsreview': return 'Needs review';
       case 'confirmed': return 'Confirmed';
       case 'unknown': return 'Unknown';
       default: return formatLabel(value);
@@ -42,14 +48,42 @@
   }
 
   function statusClass(status: string | undefined): string {
-    return 'status-' + (status ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
+    const normalized = normalizedValue(status);
+    const neutralStates = new Set([
+      'ambiguous',
+      'conflicting',
+      'humanreview',
+      'inferred',
+      'missing',
+      'needsreview',
+      'observed',
+      'partiallyresolved',
+      'unresolved',
+      'unknown'
+    ]);
+    if (!normalized || neutralStates.has(normalized)) return '';
+    return 'status-' + (status ?? '').toLowerCase().replace(/[^a-z]+/g, '-');
   }
 
   function identityLabel(value: string | null | undefined): string {
-    const normalized = (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
-    if (normalized === 'exact') return 'AutoResolved';
-    if (normalized === 'missing' || normalized === 'ambiguous' || normalized === 'conflicting' || normalized === 'unresolved') return 'Unresolved';
-    return formatLabel(value);
+    switch (normalizedValue(value)) {
+      case 'exact':
+      case 'autoresolved': return 'Auto resolved';
+      case 'humanreview': return 'Human review';
+      case 'partiallyresolved': return 'Partially resolved';
+      case 'missing': return 'Missing';
+      case 'ambiguous': return 'Ambiguous';
+      case 'conflicting': return 'Conflicting';
+      case 'unresolved': return 'Unresolved';
+      default: return formatLabel(value);
+    }
+  }
+
+  function reviewStateLabel(value: string | null | undefined): string | null {
+    const normalized = normalizedValue(value);
+    return normalized === 'humanreview' || normalized === 'needsreview' || normalized === 'review'
+      ? 'Needs review'
+      : null;
   }
 
   function nexusArtifact(relation: PackageRelationUiState): PackageRelationUiState['sourceArtifacts'][number] | null {
@@ -73,7 +107,7 @@
   $: inspectorNexusArtifact = inspector?.packageRelation ? nexusArtifact(inspector.packageRelation) : null;
 
   function analysisLabel(value: string | null | undefined): string {
-    const normalized = (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+    const normalized = normalizedValue(value);
     if (normalized === 'match') return 'Match';
     if (normalized === 'different' || normalized === 'conflict') return 'Different';
     if (normalized === 'possible') return 'Possible';
@@ -125,10 +159,11 @@
         <div class="inspector-conclusion-status-item"><span>Installed</span><strong>{inspector.conclusion?.installedVersion || inspector.modInfo?.version || 'Unknown'}</strong></div>
         <div class="inspector-conclusion-status-item"><span>{hasNexusApiObservation(inspector.packageRelation) ? 'Nexus File observed' : 'Latest observed'}</span><strong>{inspector.conclusion?.latestObservedVersion || 'Unknown'}</strong></div>
         <div class="inspector-conclusion-status-item"><span>Version status</span><strong class="status-chip {statusClass(inspector.conclusion?.versionStatus)}">{statusLabel(inspector.conclusion?.versionStatus)}</strong></div>
-        <div class="inspector-conclusion-status-item"><span>Game compatibility</span><strong class="status-chip {statusClass(inspector.conclusion?.compatibilityStatus)}">{formatLabel(inspector.conclusion?.compatibilityStatus)}</strong></div>
+        <div class="inspector-conclusion-status-item"><span>Game compatibility</span><strong class="status-chip {statusClass(inspector.conclusion?.compatibilityStatus)}">{statusLabel(inspector.conclusion?.compatibilityStatus)}</strong></div>
       </div>
       <div class="inspector-conclusion-explanation">
-        <p><span>Package identity</span> {formatLabel(inspector.conclusion?.identityState)} · confidence {inspector.conclusion?.identityConfidence || 'Unknown'}</p>
+        <p><span>Package identity</span> {identityLabel(inspector.conclusion?.identityState)} · confidence {inspector.conclusion?.identityConfidence || 'Unknown'}</p>
+        {#if reviewStateLabel(inspector.conclusion?.identityState)}<p><span>Review state</span> <span class="status-chip">{reviewStateLabel(inspector.conclusion?.identityState)}</span></p>{/if}
         <p><span>Why</span> {inspector.conclusion?.why || 'Conclusion evidence is not available.'}</p>
         <p><span>Compatibility reason</span> {inspector.conclusion?.compatibilityReason || 'No compatibility evidence was observed.'}</p>
         {#if inspector.conclusion?.compatibilityTarget}<p><span>Observed target</span> {inspector.conclusion.compatibilityTarget}</p>{/if}
@@ -142,17 +177,6 @@
         <span>Enabled</span><strong>{formatLabel(inspector.enabledState)}</strong>
         <span>Priority</span><strong>{inspector.priority ?? 'Unknown'}</strong>
       </div>
-      {#if inspector.conclusion?.compatibilitySourceSite || inspector.conclusion?.compatibilityTargetUrl || inspector.conclusion?.latestSourceSite || inspector.conclusion?.latestTargetUrl || inspector.conclusion?.selectedLatestReleaseUrl}
-        <p class="provenance-line inspector-conclusion-source">
-          Source · {inspector.conclusion.compatibilitySourceSite || inspector.conclusion.latestSourceSite || 'Web'} ·
-          {inspector.conclusion.compatibilityTargetUrl || inspector.conclusion.selectedLatestReleaseUrl || inspector.conclusion.latestTargetUrl || inspector.conclusion.compatibilitySource?.relativePath || inspector.conclusion.latestSource?.relativePath || 'Unknown'}
-          {#if inspector.conclusion.compatibilityObservedAtUtc}
-            · observed {inspector.conclusion.compatibilityObservedAtUtc}
-          {:else if inspector.conclusion.latestObservedAtUtc}
-            · observed {inspector.conclusion.latestObservedAtUtc}
-          {/if}
-        </p>
-      {/if}
     </section>
 
     {#key inspector.modKey}
@@ -181,12 +205,13 @@
 
       {#if inspector.packageRelation}
         <details class="drawer-section inspector-disclosure">
-            <summary class="inspector-disclosure-summary"><span class="eyebrow">VERSION EVIDENCE</span><span class="subtle">Identity, package, and release observations</span></summary>
+            <summary class="inspector-disclosure-summary"><span class="eyebrow">VERSION EVIDENCE</span><span class="subtle">Observed values · identity, package, and release observations</span></summary>
           <div class="inspector-conclusion-grid">
             <div><span>Identity</span><strong class="status-chip {statusClass(inspector.packageRelation.identityState)}">{identityLabel(inspector.packageRelation.identityState)}</strong></div>
-            <div><span>Version</span><strong class="status-chip {statusClass(inspector.packageRelation.comparison.status)}">{formatLabel(inspector.packageRelation.comparison.status)}</strong></div>
+            <div><span>Version</span><strong class="status-chip {statusClass(inspector.packageRelation.comparison.status)}">{statusLabel(inspector.packageRelation.comparison.status)}</strong></div>
             <div><span>Package</span><strong>{inspector.packageRelation.packageDirectoryName}</strong></div>
             <div><span>Modlets</span><strong>{inspector.packageRelation.modletCount}</strong></div>
+            {#if reviewStateLabel(inspector.packageRelation.identityState)}<div><span>Review state</span><strong class="status-chip">{reviewStateLabel(inspector.packageRelation.identityState)}</strong></div>{/if}
           </div>
           <div class="inspector-conclusion-grid">
             <div><span>Nexus MOD ID</span><strong>{inspectorNexusArtifact?.modId || inspector.packageRelation.packageModId || 'Unknown'}</strong></div>
