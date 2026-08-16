@@ -16,6 +16,8 @@ public partial class MainWindow : Window
 {
     private const double ToolbarCollapsedHeight = 76;
     private const double MorePopupRightInset = 64;
+    private const double ModListColumnWeight = 18;
+    private const double ContextColumnWeight = 23;
 
     private const string AppHostName = "appassets.modscope";
     private readonly DesktopSessionController _controller = new();
@@ -1377,7 +1379,7 @@ public partial class MainWindow : Window
     {
         _controller.SetContextVisible(visible);
         ContextColumn.Width = visible
-            ? new GridLength(2, GridUnitType.Star)
+            ? new GridLength(ContextColumnWeight, GridUnitType.Star)
             : new GridLength(0);
         ContextShell.Visibility = visible
             ? Visibility.Visible
@@ -1388,7 +1390,7 @@ public partial class MainWindow : Window
     {
         _controller.SetModListVisible(visible);
         ModListColumn.Width = visible
-            ? new GridLength(280)
+            ? new GridLength(ModListColumnWeight, GridUnitType.Star)
             : new GridLength(0);
         ModListShell.Visibility = visible
             ? Visibility.Visible
