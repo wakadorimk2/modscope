@@ -1326,7 +1326,7 @@ public partial class MainWindow : Window
         }
 
         UpdateMorePopupState(_lastLayout with { MoreOpen = open });
-        SendState(requestId, targetWebView);
+        SendLayoutState(requestId, targetWebView);
     }
 
     private void CloseMorePopupWithoutBroadcast()
@@ -1464,14 +1464,14 @@ public partial class MainWindow : Window
     {
         CloseMorePopupWithoutBroadcast();
         ApplyModListVisible(!_lastLayout.ModListVisible);
-        SendState();
+        SendLayoutState();
     }
 
     private void MoreContextVisibilityButton_Click(object sender, RoutedEventArgs e)
     {
         CloseMorePopupWithoutBroadcast();
         ApplyContextVisible(!_lastLayout.ContextVisible);
-        SendState();
+        SendLayoutState();
     }
 
     private void MorePopup_Closed(object? sender, EventArgs e)
@@ -1812,7 +1812,7 @@ public partial class MainWindow : Window
 
                 var payload = BridgeProtocol.ReadPayload<SetContextVisiblePayload>(command.Payload);
                 ApplyContextVisible(payload.Visible);
-                SendState(command.RequestId, sourceWebView);
+                SendLayoutState(command.RequestId, sourceWebView);
                 break;
             }
             case "layout.setModListVisible":
@@ -1825,7 +1825,7 @@ public partial class MainWindow : Window
 
                 var payload = BridgeProtocol.ReadPayload<SetModListVisiblePayload>(command.Payload);
                 ApplyModListVisible(payload.Visible);
-                SendState(command.RequestId, sourceWebView);
+                SendLayoutState(command.RequestId, sourceWebView);
                 break;
             }
             case "layout.setMoreOpen":
@@ -1851,14 +1851,14 @@ public partial class MainWindow : Window
             {
                 var payload = BridgeProtocol.ReadContextModePayload(command.Payload);
                 ApplyContextMode(payload.Mode);
-                SendState(command.RequestId, sourceWebView);
+                SendLayoutState(command.RequestId, sourceWebView);
                 break;
             }
             case "layout.setModListMode":
             {
                 var payload = BridgeProtocol.ReadModListModePayload(command.Payload);
                 ApplyModListMode(payload.Mode);
-                SendState(command.RequestId, sourceWebView);
+                SendLayoutState(command.RequestId, sourceWebView);
                 break;
             }
             case "inspector.open":
@@ -2332,6 +2332,28 @@ public partial class MainWindow : Window
 
         SendState(requestId, targetWebView);
         SendMessage("error", new BridgeErrorPayload(code, message), requestId, targetWebView);
+    }
+
+    private void SendLayoutState(
+        string? requestId = null,
+        Microsoft.Web.WebView2.Wpf.WebView2? targetWebView = null)
+    {
+        if (_isClosing)
+        {
+            return;
+        }
+
+        if (IsForegroundLoading())
+        {
+            CloseMorePopupWithoutBroadcast();
+        }
+
+        var layout = _controller.BuildLayoutState() with
+        {
+            MoreOpen = _moreOpen
+        };
+        UpdateMorePopupState(layout);
+        SendMessage("layout", layout, requestId, targetWebView);
     }
 
     private void SendMessage<T>(

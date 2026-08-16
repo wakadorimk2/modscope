@@ -561,6 +561,7 @@ export type BridgeErrorPayload = {
 export type HostMessage =
   | { kind: 'ready'; requestId?: string | null; payload: Record<string, never> }
   | { kind: 'state'; requestId?: string | null; payload: UiState }
+  | { kind: 'layout'; requestId?: string | null; payload: LayoutUiState }
   | { kind: 'error'; requestId?: string | null; payload: BridgeErrorPayload };
 
 export const initialState: UiState = {

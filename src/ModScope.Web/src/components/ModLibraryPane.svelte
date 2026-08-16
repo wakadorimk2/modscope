@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { DeploymentEntryUiState, ModCandidateUiState, UiState } from '../contracts';
+  import type { ModListMode } from './ui-types';
   import { resolveModWebsite, type ModWebsiteLink } from '../mod-links';
 
   export let state: UiState;
+  export let modListMode: ModListMode;
   export let operationRailVisible = false;
   export let operationBlocksInteraction = false;
   export let inspectorOpen = false;
@@ -32,7 +34,7 @@
   $: enabledCount = profileCandidates.filter((candidate) => candidate.enabledState === 'enabled').length;
   $: disabledCount = profileCandidates.filter((candidate) => candidate.enabledState === 'disabled').length;
   $: unresolvedCount = profileCandidates.filter((candidate) => candidate.profileState === 'unresolved').length;
-  $: deploymentEditMode = state.layout.modListMode === 'deployment-edit';
+  $: deploymentEditMode = modListMode === 'deployment-edit';
 
   $: {
     const nextSelectionScope = state.knowledge.session

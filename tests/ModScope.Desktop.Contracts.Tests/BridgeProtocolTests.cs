@@ -126,6 +126,27 @@ public sealed class BridgeProtocolTests
     }
 
     [Fact]
+    public void SerializesLayoutMessageWithoutFullStatePayload()
+    {
+        var json = BridgeProtocol.SerializeMessage(
+            "layout",
+            new LayoutUiState(false, true, "analysis", "deployment-edit", true),
+            "layout-1");
+        using var document = JsonDocument.Parse(json);
+        var payload = document.RootElement.GetProperty("payload");
+
+        Assert.Equal("layout", document.RootElement.GetProperty("kind").GetString());
+        Assert.Equal("layout-1", document.RootElement.GetProperty("requestId").GetString());
+        Assert.False(payload.GetProperty("contextVisible").GetBoolean());
+        Assert.True(payload.GetProperty("modListVisible").GetBoolean());
+        Assert.Equal("analysis", payload.GetProperty("contextMode").GetString());
+        Assert.Equal("deployment-edit", payload.GetProperty("modListMode").GetString());
+        Assert.True(payload.GetProperty("moreOpen").GetBoolean());
+        Assert.False(payload.TryGetProperty("browser", out _));
+        Assert.False(payload.TryGetProperty("knowledge", out _));
+    }
+
+    [Fact]
     public void SerializesModCandidateWebsiteInCamelCase()
     {
         var message = BridgeProtocol.SerializeMessage(

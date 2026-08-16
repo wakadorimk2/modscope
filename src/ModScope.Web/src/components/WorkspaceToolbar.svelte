@@ -1,9 +1,10 @@
 <script lang="ts">
   import WorkspaceActionsMenu from './WorkspaceActionsMenu.svelte';
   import type { ContextMode, ModListMode } from './ui-types';
-  import type { BridgeErrorPayload, UiState } from '../contracts';
+  import type { BridgeErrorPayload, LayoutUiState, UiState } from '../contracts';
 
   export let state: UiState;
+  export let layout: LayoutUiState;
   export let address = '';
   export let disabled = false;
   export let showHtmlMoreMenu = false;
@@ -84,26 +85,26 @@
       >History</button>
       <button
         class="pane-toggle-button toolbar-text-action"
-        class:active={state.layout.modListVisible}
+        class:active={layout.modListVisible}
         type="button"
-        title={state.layout.modListVisible ? 'Hide Mod Library pane' : 'Show Mod Library pane'}
-        aria-label={state.layout.modListVisible ? 'Hide Mod Library pane' : 'Show Mod Library pane'}
-        aria-pressed={state.layout.modListVisible}
+        title={layout.modListVisible ? 'Hide Mod Library pane' : 'Show Mod Library pane'}
+        aria-label={layout.modListVisible ? 'Hide Mod Library pane' : 'Show Mod Library pane'}
+        aria-pressed={layout.modListVisible}
         disabled={disabled}
         onclick={onToggleModList}
       >Library</button>
       <button
         class="pane-toggle-button toolbar-text-action"
-        class:active={state.layout.contextVisible}
+        class:active={layout.contextVisible}
         type="button"
-        title={state.layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
-        aria-label={state.layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
-        aria-pressed={state.layout.contextVisible}
+        title={layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
+        aria-label={layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
+        aria-pressed={layout.contextVisible}
         disabled={disabled}
         onclick={onToggleContext}
       >Context</button>
       <WorkspaceActionsMenu
-        layout={state.layout}
+        {layout}
         historyCount={state.browser.history.length}
         {disabled}
         showHtmlFallback={showHtmlMoreMenu}
