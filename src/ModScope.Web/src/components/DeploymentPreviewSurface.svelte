@@ -33,6 +33,29 @@
     if (!value) return 'Unknown';
     return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/^./, (character) => character.toUpperCase());
   }
+
+  function deploymentRiskLabel(): string {
+    const status = state.deployment.status.toLowerCase();
+    if (status === 'recovery-required') return 'Recovery required';
+    if (blockingDiagnosticCount > 0) return `Blocked by ${blockingDiagnosticCount} error${blockingDiagnosticCount === 1 ? '' : 's'}`;
+    if (state.deployment.canApply && state.deployment.planId) return 'Review required before apply';
+    return 'Apply blocked';
+  }
+
+  function deploymentRiskDescription(): string {
+    const status = state.deployment.status.toLowerCase();
+    if (status === 'recovery-required') return 'Resolve the recovery diagnostics before another deployment change.';
+    if (blockingDiagnosticCount > 0) return 'Resolve blocking diagnostics before explicit approval.';
+    if (state.deployment.canApply && state.deployment.planId) return 'The plan is ready for review. Explicit approval is still required.';
+    return 'The host has not produced an approvable deployment plan.';
+  }
+
+  function deploymentRollbackLabel(): string {
+    const status = state.deployment.status.toLowerCase();
+    if (status === 'recovery-required') return 'Recovery is required before another apply.';
+    if (status === 'applied') return 'The deployment was applied and verified.';
+    return 'ModScope backs up modlist.txt and uses the rollback path if verification fails.';
+  }
 </script>
 
 <main class="deployment-preview-surface">
@@ -47,6 +70,43 @@
     <div class="deployment-preview-summary-item"><span>MOD changes</span><strong>{state.deployment.modChanges.length}</strong><small>{enabledChangeCount} enabled-state · {orderChangeCount} order</small></div>
     <div class="deployment-preview-summary-item"><span>Junction changes</span><strong>{state.deployment.junctionChanges.length}</strong><small>{junctionCreateCount} create/adopt · {junctionRemoveCount} remove</small></div>
     <div class="deployment-preview-summary-item"><span>Diagnostics</span><strong>{state.deployment.diagnostics.length}</strong><small>{blockingDiagnosticCount} blocking</small></div>
+  </section>
+
+  <section class="deployment-preview-safety" aria-labelledby="deployment-safety-title">
+    <div>
+      <span class="eyebrow">CONTROLLED WRITE</span>
+      <h2 id="deployment-safety-title">Target, risk, and rollback</h2>
+    </div>
+    <dl class="deployment-preview-safety-grid">
+      <div>
+        <dt>Target</dt>
+        <dd><strong>{state.deployment.profileName || 'Unknown profile'}</strong><small>{state.deployment.junctionChanges.length} junction change(s) are listed below.</small></dd>
+      </div>
+      <div>
+        <dt>Risk</dt>
+        <dd><strong class="deployment-preview-risk">{deploymentRiskLabel()}</strong><small>{deploymentRiskDescription()}</small></dd>
+      </div>
+      <div>
+        <dt>Rollback</dt>
+        <dd><strong class="deployment-preview-rollback">{deploymentRollbackLabel()}</strong></dd>
+      </div>
+      <div>
+        <dt>Plan</dt>
+        <dd><code class="deployment-preview-plan-id">{state.deployment.planId || 'No active plan'}</code></dd>
+      </div>
+    </dl>
+    <details class="deployment-preview-junction-targets">
+      <summary>Junction targets · {state.deployment.junctionChanges.length}</summary>
+      {#if state.deployment.junctionChanges.length > 0}
+        <ul>
+          {#each state.deployment.junctionChanges as change, index (change.targetName + change.action + index)}
+            <li><strong>{change.targetName}</strong><span>{formatLabel(change.action)}</span></li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="subtle">No junction target is included in this plan.</p>
+      {/if}
+    </details>
   </section>
 
   <section class="deployment-preview-actions" aria-live="polite">
@@ -85,7 +145,137 @@
     </section>
     <section class="deployment-preview-section" aria-labelledby="deployment-diagnostics-title">
       <button class="deployment-preview-section-toggle" type="button" aria-expanded={diagnosticsOpen || searchActive} onclick={() => (diagnosticsOpen = !diagnosticsOpen)}><span id="deployment-diagnostics-title">DIAGNOSTICS</span><span>{diagnostics.length}/{state.deployment.diagnostics.length}</span></button>
-      {#if diagnosticsOpen || searchActive}<div class="deployment-preview-detail-list">{#if diagnostics.length === 0}<p class="empty-state">No diagnostics match this search.</p>{:else}{#each diagnostics as diagnostic, index (diagnostic.code + diagnostic.message + index)}<article class="deployment-preview-detail-row deployment-preview-diagnostic-row"><strong>{diagnostic.code}</strong><span>{diagnostic.message}</span></article>{/each}{/if}</div>{/if}
+      {#if diagnosticsOpen || searchActive}<div class="deployment-preview-detail-list">{#if diagnostics.length === 0}<p class="empty-state">No diagnostics match this search.</p>{:else}{#each diagnostics as diagnostic, index (diagnostic.code + diagnostic.message + index)}<article class="deployment-preview-detail-row deployment-preview-diagnostic-row"><strong>{diagnostic.code}</strong><span class="deployment-preview-diagnostic-severity">{formatLabel(diagnostic.severity)}</span><small>{diagnostic.message}{#if diagnostic.rawValue} · observed value: {diagnostic.rawValue}{/if}</small></article>{/each}{/if}</div>{/if}
     </section>
   </div>
 </main>
+
+<style>
+  .deployment-preview-safety {
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px solid rgba(125, 211, 252, 0.26);
+    border-radius: 10px;
+    background: rgba(14, 116, 144, 0.1);
+  }
+
+  .deployment-preview-safety h2 {
+    margin: 4px 0 0;
+    color: #f8fafc;
+    font-size: 18px;
+  }
+
+  .deployment-preview-safety-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0 0;
+  }
+
+  .deployment-preview-safety-grid > div {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.34);
+  }
+
+  .deployment-preview-safety-grid dt {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .deployment-preview-safety-grid dd {
+    display: grid;
+    gap: 5px;
+    margin: 5px 0 0;
+    overflow-wrap: anywhere;
+  }
+
+  .deployment-preview-safety-grid dd strong {
+    color: #f8fafc;
+    font-size: 12px;
+  }
+
+  .deployment-preview-safety-grid dd small {
+    color: #94a3b8;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .deployment-preview-risk {
+    color: #fde68a !important;
+  }
+
+  .deployment-preview-rollback {
+    color: #bae6fd !important;
+  }
+
+  .deployment-preview-plan-id {
+    overflow-wrap: anywhere;
+  }
+
+  .deployment-preview-junction-targets {
+    margin-top: 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+    padding-top: 10px;
+  }
+
+  .deployment-preview-junction-targets summary {
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .deployment-preview-junction-targets ul {
+    display: grid;
+    gap: 5px;
+    margin: 9px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .deployment-preview-junction-targets li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 8px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 7px;
+    background: rgba(15, 23, 42, 0.32);
+  }
+
+  .deployment-preview-junction-targets li strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: #e2e8f0;
+    font-size: 11px;
+  }
+
+  .deployment-preview-junction-targets li span {
+    flex: 0 0 auto;
+    color: #94a3b8;
+    font-size: 10px;
+  }
+
+  .deployment-preview-diagnostic-severity {
+    color: #fbbf24 !important;
+    text-align: right !important;
+  }
+
+  @media (max-width: 760px) {
+    .deployment-preview-safety-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .deployment-preview-junction-targets li {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 3px;
+    }
+  }
+</style>

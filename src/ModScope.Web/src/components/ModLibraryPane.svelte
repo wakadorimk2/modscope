@@ -17,6 +17,8 @@
 
   let draggedDeploymentEntryId: string | null = null;
   let deploymentDropGap: number | null = null;
+  let selectedModKey: string | null = null;
+  let selectionScope = '';
 
   $: profileCandidates = sortCandidates(
     state.knowledge.candidates.filter((candidate) => candidate.profileState !== 'unlisted')
@@ -28,6 +30,14 @@
   $: disabledCount = profileCandidates.filter((candidate) => candidate.enabledState === 'disabled').length;
   $: unresolvedCount = profileCandidates.filter((candidate) => candidate.profileState === 'unresolved').length;
   $: deploymentEditMode = state.layout.modListMode === 'deployment-edit';
+
+  $: {
+    const nextSelectionScope = state.knowledge.session
+      ? `${state.knowledge.session.snapshotId}:${state.knowledge.session.profileName}`
+      : '';
+    if (selectionScope && selectionScope !== nextSelectionScope) selectedModKey = null;
+    selectionScope = nextSelectionScope;
+  }
 
   type ModWebsiteLink = {
     url: string | null;
@@ -99,6 +109,25 @@
 
   function enabledLampLabel(candidate: ModCandidateUiState): string {
     return candidate.enabledState === 'enabled' ? 'Enabled' : formatLabel(candidate.enabledState);
+  }
+
+  function selectMod(modKey: string) {
+    selectedModKey = modKey;
+  }
+
+  function handleModSelectionKeydown(event: KeyboardEvent, modKey: string) {
+    if (event.key === 'Escape') {
+      if (selectedModKey === modKey) {
+        event.preventDefault();
+        selectedModKey = null;
+      }
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectMod(modKey);
+    }
   }
 
   function modTooltip(candidate: ModCandidateUiState): string {
@@ -275,15 +304,22 @@
           <div class="mod-list-section-label">PROFILE MODLIST · {profileCandidates.length}</div>
           <div class="mod-list-items">
             {#each profileCandidates as candidate (candidate.modKey)}
-              <article class="mod-list-item" class:mod-list-item-disabled={candidate.enabledState === 'disabled'} class:mod-list-item-unresolved={candidate.profileState === 'unresolved'} title={modTooltip(candidate)}>
+              {@const website = resolveModWebsite(candidate)}
+              <article class="mod-list-item" class:mod-list-item-selected={selectedModKey === candidate.modKey} class:mod-list-item-disabled={candidate.enabledState === 'disabled'} class:mod-list-item-unresolved={candidate.profileState === 'unresolved'} title={modTooltip(candidate)}>
                 <div class="mod-list-item-top">
-                  {#if resolveModWebsite(candidate).url}
-                    <button type="button" class="mod-list-item-main" aria-label={`Open ${modDisplayName(candidate)} page · ${resolveModWebsite(candidate).status}`} disabled={operationBlocksInteraction} onclick={() => onOpenModPage(candidate)}><strong>{modDisplayName(candidate)}</strong>{#if candidate.version}<span>v{candidate.version}</span>{/if}</button>
-                  {:else}
-                    <div class="mod-list-item-main mod-card-main-disabled"><strong>{modDisplayName(candidate)}</strong>{#if candidate.version}<span>v{candidate.version}</span>{/if}</div>
-                  {/if}
-                  <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} disabled={operationBlocksInteraction} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
-                  <span class="mod-enabled-lamp" class:enabled={candidate.enabledState === 'enabled'} class:disabled={candidate.enabledState !== 'enabled'} role="img" aria-label={enabledLampLabel(candidate)}></span>
+                  <button type="button" class="mod-list-item-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} disabled={operationBlocksInteraction} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
+                    <strong>{modDisplayName(candidate)}</strong>
+                    {#if candidate.version}<span class="mod-list-item-version">v{candidate.version}</span>{/if}
+                    <span class="mod-enabled-lamp" class:enabled={candidate.enabledState === 'enabled'} class:disabled={candidate.enabledState !== 'enabled'} role="img" aria-label={enabledLampLabel(candidate)}></span>
+                  </button>
+                  <div class="mod-list-item-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
+                    {#if website.url}
+                      <button type="button" class="secondary-button mod-list-item-website" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} disabled={operationBlocksInteraction} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
+                    {:else}
+                      <span class="mod-list-item-website mod-list-item-website-unavailable" aria-label="No usable URL">No usable URL</span>
+                    {/if}
+                    <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} disabled={operationBlocksInteraction} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                  </div>
                 </div>
                 <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)}</span>
               </article>
@@ -298,13 +334,22 @@
           {#if unlistedProfileCandidates.length > 0}
             <div class="mod-list-items">
               {#each unlistedProfileCandidates as candidate (candidate.modKey)}
-                <article class="mod-list-item mod-list-item-unresolved" title={modTooltip(candidate)}>
+                {@const website = resolveModWebsite(candidate)}
+                <article class="mod-list-item mod-list-item-unresolved" class:mod-list-item-selected={selectedModKey === candidate.modKey} title={modTooltip(candidate)}>
                   <div class="mod-list-item-top">
-                    {#if resolveModWebsite(candidate).url}
-                      <button type="button" class="mod-list-item-main" aria-label={`Open ${modDisplayName(candidate)} page · ${resolveModWebsite(candidate).status}`} disabled={operationBlocksInteraction} onclick={() => onOpenModPage(candidate)}><strong>{modDisplayName(candidate)}</strong>{#if candidate.version}<span>v{candidate.version}</span>{/if}</button>
-                    {:else}<div class="mod-list-item-main mod-card-main-disabled"><strong>{modDisplayName(candidate)}</strong></div>{/if}
-                    <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} disabled={operationBlocksInteraction} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
-                    <span class="mod-enabled-lamp disabled" role="img" aria-label={enabledLampLabel(candidate)}></span>
+                    <button type="button" class="mod-list-item-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} disabled={operationBlocksInteraction} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
+                      <strong>{modDisplayName(candidate)}</strong>
+                      {#if candidate.version}<span class="mod-list-item-version">v{candidate.version}</span>{/if}
+                      <span class="mod-enabled-lamp disabled" role="img" aria-label={enabledLampLabel(candidate)}></span>
+                    </button>
+                    <div class="mod-list-item-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
+                      {#if website.url}
+                        <button type="button" class="secondary-button mod-list-item-website" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} disabled={operationBlocksInteraction} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
+                      {:else}
+                        <span class="mod-list-item-website mod-list-item-website-unavailable" aria-label="No usable URL">No usable URL</span>
+                      {/if}
+                      <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} disabled={operationBlocksInteraction} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                    </div>
                   </div>
                   <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)} · Profile outside</span>
                 </article>
@@ -318,3 +363,88 @@
     <div class="mod-list-empty-state"><span class="eyebrow">LOCAL MODS</span><p class="subtle">Load an MO2 source to show the active profile.</p></div>
   {/if}
 </main>
+
+<style>
+  .mod-list-item-selected {
+    border-color: rgba(125, 211, 252, 0.72);
+    background: rgba(14, 116, 144, 0.18);
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.16);
+  }
+
+  .mod-list-item-select {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 1px 2px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #e2e8f0;
+    text-align: left;
+  }
+
+  .mod-list-item-select:hover:not(:disabled),
+  .mod-list-item-select:focus-visible {
+    background: rgba(56, 189, 248, 0.1);
+  }
+
+  .mod-list-item-select strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #f8fafc;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mod-list-item-version {
+    flex: 0 0 auto;
+    color: #94a3b8;
+    font-size: 10px;
+  }
+
+  .mod-list-item-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 140ms ease;
+  }
+
+  .mod-list-item:hover .mod-list-item-actions,
+  .mod-list-item:focus-within .mod-list-item-actions,
+  .mod-list-item-selected .mod-list-item-actions {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .mod-list-item-actions .mod-list-item-inspect {
+    opacity: 1;
+  }
+
+  .mod-list-item-website {
+    min-height: 26px;
+    padding: 4px 7px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .mod-list-item-website-unavailable {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    color: #64748b;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mod-list-item-actions {
+      transition: none;
+    }
+  }
+</style>
