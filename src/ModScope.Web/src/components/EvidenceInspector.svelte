@@ -137,7 +137,7 @@
   }
 </script>
 
-<section class="panel inspector-panel" aria-labelledby="inspector-title">
+<section class="panel inspector-panel inspector-reference-shell" aria-labelledby="inspector-title">
   <div class="drawer-heading inspector-panel-heading">
     <div>
       <span class="eyebrow">INSPECTOR</span>
@@ -165,7 +165,7 @@
         </div>
       </div>
     {:else}
-    <section class="drawer-section inspector-human-conclusion" aria-labelledby="inspector-conclusion-title">
+    <section class="drawer-section inspector-human-conclusion inspector-reference-conclusion" aria-labelledby="inspector-conclusion-title">
       <div class="inspector-conclusion-heading">
         <div>
           <span class="eyebrow">CONCLUSION</span>
@@ -377,3 +377,63 @@
     <p class="empty-state">Inspector evidence is loading.</p>
   {/if}
 </section>
+
+<style>
+  .inspector-reference-shell {
+    border-color: rgba(56, 189, 248, 0.2);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.48));
+  }
+
+  .inspector-reference-shell .inspector-panel-heading {
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  .inspector-reference-conclusion {
+    border-color: rgba(56, 189, 248, 0.32);
+    background: linear-gradient(145deg, rgba(14, 116, 144, 0.22), rgba(30, 41, 59, 0.54));
+  }
+
+  .inspector-reference-conclusion .inspector-conclusion-status-item {
+    border-color: rgba(148, 163, 184, 0.16);
+    background: rgba(15, 23, 42, 0.5);
+  }
+
+  .inspector-reference-shell .inspector-disclosure {
+    border-top-color: rgba(148, 163, 184, 0.16);
+  }
+
+  .inspector-reference-shell .inspector-disclosure-summary {
+    min-height: 30px;
+    padding: 7px 0;
+    list-style: none;
+  }
+
+  .inspector-reference-shell .inspector-disclosure-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .inspector-reference-shell .inspector-disclosure-summary::before {
+    content: '›';
+    display: inline-block;
+    width: 14px;
+    color: #7dd3fc;
+    font-size: 16px;
+    line-height: 1;
+    vertical-align: -1px;
+  }
+
+  .inspector-reference-shell .inspector-disclosure[open] .inspector-disclosure-summary::before {
+    transform: rotate(90deg);
+  }
+
+  @media (max-width: 520px) {
+    .inspector-reference-conclusion .inspector-conclusion-heading {
+      display: grid;
+    }
+
+    .inspector-reference-conclusion .inspector-conclusion-status-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

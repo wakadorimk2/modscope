@@ -3,9 +3,18 @@
   --chrome-base: #202124;
   --chrome-navigation: #292a2d;
   --chrome-panel: #303134;
+  --chrome-panel-2: #27282b;
   --chrome-border: #3c4043;
   --chrome-text: #e8eaed;
   --chrome-muted: #9aa0a6;
+  --chrome-dim: #6f747a;
+  --chrome-blue: #8ab4f8;
+  --chrome-green: #81c995;
+  --chrome-yellow: #fdd663;
+  --chrome-red: #f28b82;
+  --chrome-purple: #c58af9;
+  --chrome-surface-radius: 4px;
+  --chrome-control-radius: 4px;
   color: var(--chrome-text);
   background: var(--chrome-base);
   font-synthesis: none;
@@ -2832,5 +2841,458 @@ dd {
 @media (prefers-reduced-motion: reduce) {
   .local-skeleton {
     animation: none;
+  }
+}
+
+/*
+ * UI reference baseline: 1920 x 1080, Browser-first, mixed evidence.
+ * Keep this block scoped to existing surface and component classes.
+ */
+
+.toolbar-surface,
+.mod-list-surface,
+.shell,
+.deployment-preview-surface {
+  color: var(--chrome-text);
+}
+
+.toolbar-surface {
+  min-height: 86px;
+  background: var(--chrome-navigation);
+}
+
+.toolbar-tabs-row {
+  flex: 0 0 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-bottom-color: var(--chrome-base);
+  background: var(--chrome-base);
+}
+
+.toolbar-tabs-row .browser-tabs {
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.toolbar-controls-row {
+  flex: 0 0 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  background: var(--chrome-navigation);
+}
+
+.browser-tab {
+  min-width: 210px;
+  max-width: 310px;
+  height: 29px;
+  border-radius: 7px 7px 0 0;
+  background: transparent;
+}
+
+.browser-tab.active {
+  border-color: transparent;
+  background: var(--chrome-panel);
+}
+
+.browser-tab-select {
+  padding: 0 4px 0 11px;
+}
+
+.toolbar-tabs-row .browser-new-tab {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+  margin-left: 2px;
+}
+
+.toolbar-navigation .icon-button,
+.toolbar-actions .pane-toggle-button,
+.toolbar-actions .history-button {
+  width: 27px;
+  height: 27px;
+  flex-basis: 27px;
+  border-radius: 4px;
+}
+
+.toolbar-omnibox {
+  height: 30px;
+  padding: 2px 3px 2px 12px;
+  border-color: var(--chrome-border);
+  border-radius: 15px;
+  background: var(--chrome-base);
+}
+
+.toolbar-address {
+  height: 24px;
+}
+
+.toolbar-omnibox .toolbar-go-button {
+  width: 26px;
+  height: 26px;
+  flex-basis: 26px;
+}
+
+.toolbar-context-button,
+.more-button,
+.workspace-actions-menu-popover,
+.workspace-actions-menu-popover button {
+  border-radius: var(--chrome-control-radius);
+}
+
+.toolbar-context-button {
+  border-color: var(--chrome-border);
+  background: var(--chrome-panel);
+  color: var(--chrome-blue);
+}
+
+.more-button {
+  border-color: var(--chrome-border);
+  background: var(--chrome-panel);
+  color: var(--chrome-text);
+}
+
+.workspace-actions-menu-popover {
+  border-color: var(--chrome-border);
+  background: var(--chrome-base);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+}
+
+.workspace-actions-menu-label {
+  color: var(--chrome-blue);
+}
+
+.shell {
+  height: 100%;
+  min-height: 100%;
+  padding: 12px 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--chrome-panel);
+}
+
+.mod-list-surface {
+  height: 100%;
+  min-height: 100%;
+  padding: 12px 13px;
+  overflow-x: hidden;
+  background: var(--chrome-panel);
+}
+
+.mod-list-header {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.mod-list-title-row h1 {
+  font-size: 13px;
+}
+
+.mod-list-profile-picker {
+  margin-top: 10px;
+  gap: 4px;
+  font-size: 10px;
+}
+
+.mod-list-profile-picker select {
+  height: 30px;
+  border-radius: var(--chrome-control-radius);
+  background: var(--chrome-panel-2);
+}
+
+.mod-list-compact-summary {
+  margin-top: 9px;
+  color: var(--chrome-muted);
+}
+
+.mod-list-scroll {
+  margin-top: 11px;
+}
+
+.mod-list-items {
+  gap: 0;
+}
+
+.mod-list-item {
+  padding: 6px 5px;
+  border: 0;
+  border-bottom: 1px solid rgba(60, 64, 67, 0.68);
+  border-radius: 0;
+  background: transparent;
+}
+
+.mod-list-item:hover,
+.mod-list-item:focus-within {
+  border-color: rgba(60, 64, 67, 0.68);
+  background: #3a3b3f;
+}
+
+.mod-list-item.mod-list-item-selected {
+  border-bottom-color: rgba(60, 64, 67, 0.68);
+  border-left: 2px solid var(--chrome-blue);
+  background: #35445b;
+  box-shadow: none;
+}
+
+.mod-list-item-disabled {
+  background: rgba(39, 40, 43, 0.72);
+}
+
+.mod-list-item-top {
+  gap: 5px;
+}
+
+.mod-list-item-select {
+  border-radius: 0;
+}
+
+.mod-list-item-select strong {
+  font-size: 11px;
+}
+
+.mod-list-item-actions {
+  min-width: 0;
+  gap: 3px;
+}
+
+.mod-list-item-website {
+  max-width: 84px;
+  overflow: hidden;
+  padding: 3px 5px;
+  border-radius: var(--chrome-control-radius);
+  font-size: 9px;
+  text-overflow: ellipsis;
+}
+
+.mod-list-item-inspect {
+  border-radius: var(--chrome-control-radius);
+}
+
+.profile-outside-section {
+  margin-top: 11px;
+  border-top-color: var(--chrome-border);
+}
+
+.panel,
+.inspector-panel,
+.deployment-preview-summary-item,
+.deployment-preview-action-bar,
+.deployment-apply-confirmation,
+.deployment-preview-section,
+.analysis-card,
+.evidence-card,
+.diagnosis-row,
+.evidence-row,
+.runtime-comparison-row,
+.source-candidate-card,
+.recognition-candidate,
+.mod-summary-card,
+.mod-search-card,
+.analysis-developer-tools,
+.compatibility-evidence-item,
+.inspector-analysis-summary,
+.inspector-human-conclusion,
+.deployment-preview-safety {
+  border-radius: var(--chrome-surface-radius);
+  box-shadow: none;
+}
+
+.panel {
+  margin-bottom: 10px;
+  padding: 12px;
+  border-color: var(--chrome-border);
+  background: var(--chrome-panel);
+}
+
+.eyebrow,
+.deployment-mode-label {
+  color: var(--chrome-blue);
+}
+
+.muted-badge,
+.status-chip,
+.role-chip,
+.analysis-lamp {
+  border-radius: var(--chrome-control-radius);
+}
+
+.muted-badge,
+.status-chip,
+.role-chip {
+  padding: 3px 6px;
+}
+
+.context-mode-switch {
+  border-radius: var(--chrome-control-radius);
+  background: var(--chrome-panel-2);
+}
+
+.context-mode-switch button {
+  border-radius: 3px;
+}
+
+.context-summary-panel,
+.analysis-panel,
+.inspector-panel,
+.diagnostics-panel,
+.page-details,
+.developer-tools {
+  background: var(--chrome-panel);
+  box-shadow: none;
+}
+
+.summary-grid div,
+.page-details-grid div,
+.profile-count-grid div,
+.inspector-conclusion-status-item,
+.deployment-preview-safety-grid > div {
+  border-radius: 2px;
+  background: var(--chrome-panel-2);
+}
+
+.analysis-panel {
+  border-color: rgba(197, 138, 249, 0.32);
+}
+
+.inspector-panel {
+  max-height: none;
+  background: var(--chrome-panel);
+}
+
+.inspector-analysis-summary,
+.analysis-developer-tools {
+  background: rgba(76, 29, 149, 0.12);
+}
+
+.inspector-human-conclusion {
+  border-color: var(--chrome-border);
+  background: var(--chrome-panel-2);
+}
+
+.inspector-conclusion-status-item {
+  border-color: var(--chrome-border);
+}
+
+.inspector-disclosure,
+.analysis-section,
+.profile-outside-section,
+.deployment-preview-junction-targets {
+  border-top-color: var(--chrome-border);
+}
+
+.primary-button,
+.secondary-button,
+.icon-button,
+input,
+select,
+.deployment-toggle-button,
+.deployment-preview-search input {
+  border-radius: var(--chrome-control-radius);
+}
+
+.primary-button {
+  background: var(--chrome-blue);
+  color: #17283e;
+}
+
+.secondary-button,
+.icon-button,
+input,
+select,
+.deployment-preview-search input {
+  border-color: var(--chrome-border);
+  background: var(--chrome-panel-2);
+}
+
+.notice,
+.diagnostic,
+.error-banner,
+.error-notice {
+  border-radius: 0;
+}
+
+.deployment-preview-surface {
+  min-height: 100%;
+  height: 100%;
+  padding: 18px clamp(16px, 4vw, 48px);
+  overflow-x: hidden;
+  background: var(--chrome-panel);
+}
+
+.deployment-preview-surface > * {
+  width: min(100%, 1080px);
+}
+
+.deployment-preview-summary-item,
+.deployment-preview-action-bar,
+.deployment-apply-confirmation,
+.deployment-preview-safety {
+  border-color: var(--chrome-border);
+  background: var(--chrome-panel-2);
+}
+
+.deployment-preview-action-bar,
+.deployment-apply-confirmation {
+  padding: 12px;
+}
+
+.deployment-preview-section {
+  background: var(--chrome-panel);
+}
+
+.deployment-preview-section-toggle:hover {
+  background: #3a3b3f;
+}
+
+.deployment-preview-detail-row,
+.deployment-preview-junction-targets li {
+  border-radius: 2px;
+  border-color: rgba(60, 64, 67, 0.8);
+  background: var(--chrome-panel-2);
+}
+
+.deployment-preview-risk {
+  color: var(--chrome-yellow) !important;
+}
+
+.deployment-preview-rollback {
+  color: var(--chrome-blue) !important;
+}
+
+.operation-progress-track {
+  border-radius: 0;
+  background: rgba(60, 64, 67, 0.78);
+}
+
+.operation-progress-fill {
+  border-radius: 0;
+  background: var(--chrome-blue);
+  box-shadow: 0 0 10px rgba(138, 180, 248, 0.52);
+}
+
+.local-skeleton {
+  border-radius: 2px;
+}
+
+@media (max-width: 1180px) {
+  .toolbar-controls-row {
+    gap: 5px;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .toolbar-actions {
+    gap: 2px;
+  }
+
+  .shortcut-hint {
+    display: none;
+  }
+
+  .mod-list-surface,
+  .shell {
+    padding-right: 10px;
+    padding-left: 10px;
   }
 }

@@ -62,6 +62,30 @@
     return candidate.displayName || candidate.directoryName || candidate.modKey;
   }
 
+  type ModLibraryState = 'Enabled' | 'Disabled' | 'Needs review' | 'Unresolved';
+
+  function normalizedState(value: string | null | undefined): string {
+    return value?.trim().toLowerCase().replace(/[^a-z]+/g, '-') ?? '';
+  }
+
+  function modLibraryState(candidate: ModCandidateUiState): ModLibraryState {
+    if (normalizedState(candidate.profileState) === 'unresolved') return 'Unresolved';
+
+    if (!candidate.version?.trim()) return 'Needs review';
+
+    const packageRelation = candidate.packageRelation;
+    const comparisonStatus = normalizedState(packageRelation?.comparison.status);
+    if (['unknown', 'unresolved', 'missing', 'not-assessed', 'not-comparable', 'needs-review'].includes(comparisonStatus)) {
+      return 'Needs review';
+    }
+
+    return normalizedState(candidate.enabledState) === 'enabled' ? 'Enabled' : 'Disabled';
+  }
+
+  function modLibraryStateClass(value: ModLibraryState): string {
+    return value.toLowerCase().replace(/[^a-z]+/g, '-');
+  }
+
   function roleRank(candidate: ModCandidateUiState): number {
     switch (candidate.role?.role) {
       case 'Foundation': return 0;
@@ -105,10 +129,6 @@
       status: 'Inferred',
       nexusSearchName: name
     };
-  }
-
-  function enabledLampLabel(candidate: ModCandidateUiState): string {
-    return candidate.enabledState === 'enabled' ? 'Enabled' : formatLabel(candidate.enabledState);
   }
 
   function selectMod(modKey: string) {
@@ -322,30 +342,57 @@
         </div>
       {:else}
         <div class="mod-list-scroll" aria-label="Active profile MOD list">
+          <div class="mod-library-active-profile" aria-label="Active profile">
+            <span>Active profile</span>
+            <strong>{state.knowledge.session.profileName || 'Unknown profile'}</strong>
+          </div>
           {#if profileCandidates.length > 0}
             <div class="mod-list-section-label">PROFILE MODLIST · {profileCandidates.length}</div>
-            <div class="mod-list-items">
-              {#each profileCandidates as candidate (candidate.modKey)}
-                {@const website = resolveModWebsite(candidate)}
-                <article class="mod-list-item" class:mod-list-item-selected={selectedModKey === candidate.modKey} class:mod-list-item-disabled={candidate.enabledState === 'disabled'} class:mod-list-item-unresolved={candidate.profileState === 'unresolved'} title={modTooltip(candidate)}>
-                  <div class="mod-list-item-top">
-                    <button type="button" class="mod-list-item-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
-                      <strong>{modDisplayName(candidate)}</strong>
-                      {#if candidate.version}<span class="mod-list-item-version">v{candidate.version}</span>{/if}
-                      <span class="mod-enabled-lamp" class:enabled={candidate.enabledState === 'enabled'} class:disabled={candidate.enabledState !== 'enabled'} role="img" aria-label={enabledLampLabel(candidate)}></span>
-                    </button>
-                    <div class="mod-list-item-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
-                      {#if website.url}
-                        <button type="button" class="secondary-button mod-list-item-website" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
-                      {:else}
-                        <span class="mod-list-item-website mod-list-item-website-unavailable" aria-label="No usable URL">No usable URL</span>
-                      {/if}
-                      <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
-                    </div>
-                  </div>
-                  <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)}</span>
-                </article>
-              {/each}
+            <div class="mod-library-table-wrap">
+              <table class="mod-library-table" aria-label="Compact active profile MOD table">
+                <colgroup>
+                  <col class="mod-library-column-order" />
+                  <col class="mod-library-column-name" />
+                  <col class="mod-library-column-state" />
+                  <col class="mod-library-column-version" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th class="mod-library-order" scope="col">#</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">State</th>
+                    <th scope="col">Version</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each profileCandidates as candidate, index (candidate.modKey)}
+                    {@const website = resolveModWebsite(candidate)}
+                    {@const libraryState = modLibraryState(candidate)}
+                    <tr class="mod-library-table-row" class:mod-list-item-selected={selectedModKey === candidate.modKey} class:mod-list-item-disabled={normalizedState(candidate.enabledState) === 'disabled'} class:mod-list-item-unresolved={normalizedState(candidate.profileState) === 'unresolved'} title={modTooltip(candidate)}>
+                      <td class="mod-library-order">{index + 1}</td>
+                      <td class="mod-library-name-cell">
+                        <div class="mod-library-name-wrap">
+                          <button type="button" class="mod-library-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
+                            <strong>{modDisplayName(candidate)}</strong>
+                          </button>
+                          <div class="mod-library-row-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
+                            {#if website.url}
+                              <button type="button" class="secondary-button mod-library-row-action" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
+                            {:else}
+                              <span class="mod-library-row-action-unavailable" aria-label="No usable URL">No usable URL</span>
+                            {/if}
+                            <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="mod-library-state-cell">
+                        <span class="mod-library-state {modLibraryStateClass(libraryState)}" aria-label={libraryState}><span class="mod-library-state-dot" aria-hidden="true"></span>{libraryState}</span>
+                      </td>
+                      <td class="mod-library-version">{candidate.version || 'Unknown'}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
             </div>
           {:else}
             <p class="empty-state">No MOD entry is available in this profile.</p>
@@ -354,28 +401,51 @@
           <details class="profile-outside-section">
             <summary>Profile外 · {unlistedProfileCandidates.length}</summary>
             {#if unlistedProfileCandidates.length > 0}
-              <div class="mod-list-items">
-                {#each unlistedProfileCandidates as candidate (candidate.modKey)}
-                  {@const website = resolveModWebsite(candidate)}
-                  <article class="mod-list-item mod-list-item-unresolved" class:mod-list-item-selected={selectedModKey === candidate.modKey} title={modTooltip(candidate)}>
-                    <div class="mod-list-item-top">
-                      <button type="button" class="mod-list-item-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
-                        <strong>{modDisplayName(candidate)}</strong>
-                        {#if candidate.version}<span class="mod-list-item-version">v{candidate.version}</span>{/if}
-                        <span class="mod-enabled-lamp disabled" role="img" aria-label={enabledLampLabel(candidate)}></span>
-                      </button>
-                      <div class="mod-list-item-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
-                        {#if website.url}
-                          <button type="button" class="secondary-button mod-list-item-website" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
-                        {:else}
-                          <span class="mod-list-item-website mod-list-item-website-unavailable" aria-label="No usable URL">No usable URL</span>
-                        {/if}
-                        <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
-                      </div>
-                    </div>
-                    <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)} · Profile outside</span>
-                  </article>
-                {/each}
+              <div class="mod-library-table-wrap">
+                <table class="mod-library-table" aria-label="Compact MOD table outside active profile">
+                  <colgroup>
+                    <col class="mod-library-column-order" />
+                    <col class="mod-library-column-name" />
+                    <col class="mod-library-column-state" />
+                    <col class="mod-library-column-version" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th class="mod-library-order" scope="col">#</th>
+                      <th scope="col">Name</th>
+                      <th scope="col">State</th>
+                      <th scope="col">Version</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each unlistedProfileCandidates as candidate, index (candidate.modKey)}
+                      {@const website = resolveModWebsite(candidate)}
+                      {@const libraryState = modLibraryState(candidate)}
+                      <tr class="mod-library-table-row" class:mod-list-item-selected={selectedModKey === candidate.modKey} class:mod-list-item-disabled={normalizedState(candidate.enabledState) === 'disabled'} class:mod-list-item-unresolved={normalizedState(candidate.profileState) === 'unresolved'} title={`${modTooltip(candidate)} · Profile outside`}>
+                        <td class="mod-library-order">{index + 1}</td>
+                        <td class="mod-library-name-cell">
+                          <div class="mod-library-name-wrap">
+                            <button type="button" class="mod-library-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
+                              <strong>{modDisplayName(candidate)}</strong>
+                            </button>
+                            <div class="mod-library-row-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
+                              {#if website.url}
+                                <button type="button" class="secondary-button mod-library-row-action" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
+                              {:else}
+                                <span class="mod-library-row-action-unavailable" aria-label="No usable URL">No usable URL</span>
+                              {/if}
+                              <button type="button" class="icon-button compact-icon-button mod-library-row-action mod-library-row-action-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="mod-library-state-cell">
+                          <span class="mod-library-state {modLibraryStateClass(libraryState)}" aria-label={libraryState}><span class="mod-library-state-dot" aria-hidden="true"></span>{libraryState}</span>
+                        </td>
+                        <td class="mod-library-version">{candidate.version || 'Unknown'}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
               </div>
             {:else}<p class="empty-state">No MOD exists outside this profile.</p>{/if}
           </details>
@@ -400,85 +470,296 @@
 </main>
 
 <style>
-  .mod-list-item-selected {
-    border-color: rgba(125, 211, 252, 0.72);
-    background: rgba(14, 116, 144, 0.18);
-    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.16);
-  }
-
-  .mod-list-item-select {
+  .mod-library-active-profile {
     display: flex;
-    flex: 1 1 auto;
-    align-items: center;
+    align-items: baseline;
+    justify-content: space-between;
     gap: 8px;
     min-width: 0;
-    padding: 1px 2px;
-    border: 0;
+    margin: 9px 0 7px;
+    padding: 8px 9px;
+    border: 1px solid rgba(125, 211, 252, 0.22);
     border-radius: 7px;
+    background: rgba(14, 116, 144, 0.14);
+  }
+
+  .mod-library-active-profile span {
+    flex: 0 0 auto;
+    color: #7dd3fc;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .mod-library-active-profile strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #f8fafc;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mod-library-table-wrap {
+    min-width: 0;
+    max-width: 100%;
+    margin-top: 5px;
+    overflow: hidden;
+  }
+
+  .mod-library-table {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .mod-library-column-order {
+    width: 10%;
+  }
+
+  .mod-library-column-name {
+    width: 39%;
+  }
+
+  .mod-library-column-state {
+    width: 31%;
+  }
+
+  .mod-library-column-version {
+    width: 20%;
+  }
+
+  .mod-library-table th,
+  .mod-library-table td {
+    min-width: 0;
+    padding: 6px 5px;
+    border-bottom: 1px solid rgba(60, 64, 67, 0.68);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .mod-library-table th {
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .mod-library-table td {
+    overflow: hidden;
+    color: #e2e8f0;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mod-library-order {
+    color: #64748b !important;
+    font-variant-numeric: tabular-nums;
+    text-align: right !important;
+  }
+
+  .mod-library-table-row {
+    transition: background-color 140ms ease, box-shadow 140ms ease;
+  }
+
+  .mod-library-table-row:hover,
+  .mod-library-table-row:focus-within {
+    background: rgba(56, 189, 248, 0.08);
+  }
+
+  .mod-library-table-row.mod-list-item-selected {
+    background: rgba(14, 116, 144, 0.25);
+    box-shadow: inset 2px 0 0 #38bdf8;
+  }
+
+  .mod-library-table-row.mod-list-item-disabled {
+    background: rgba(41, 42, 45, 0.72);
+    filter: grayscale(0.6);
+    opacity: 0.62;
+  }
+
+  .mod-library-table-row.mod-list-item-unresolved td {
+    border-bottom-style: dashed;
+  }
+
+  .mod-library-name-cell {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mod-library-name-wrap {
+    position: relative;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .mod-library-select {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 4px 3px;
+    border: 0;
+    border-radius: 5px;
     background: transparent;
     color: #e2e8f0;
     text-align: left;
   }
 
-  .mod-list-item-select:hover:not(:disabled),
-  .mod-list-item-select:focus-visible {
+  .mod-library-select:hover:not(:disabled),
+  .mod-library-select:focus-visible {
     background: rgba(56, 189, 248, 0.1);
   }
 
-  .mod-list-item-select strong {
+  .mod-library-select strong {
+    display: block;
     min-width: 0;
     overflow: hidden;
     color: #f8fafc;
-    font-size: 12px;
+    font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .mod-list-item-version {
-    flex: 0 0 auto;
-    color: #94a3b8;
-    font-size: 10px;
-  }
-
-  .mod-list-item-actions {
+  .mod-library-row-actions {
+    position: absolute;
+    top: 50%;
+    right: 2px;
+    z-index: 1;
     display: flex;
-    flex: 0 0 auto;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
+    max-width: calc(100% - 4px);
+    padding-left: 4px;
+    transform: translateY(-50%);
     visibility: hidden;
     opacity: 0;
+    background: var(--chrome-navigation);
     transition: opacity 140ms ease;
+    pointer-events: none;
   }
 
-  .mod-list-item:hover .mod-list-item-actions,
-  .mod-list-item:focus-within .mod-list-item-actions,
-  .mod-list-item-selected .mod-list-item-actions {
+  .mod-library-table-row:hover .mod-library-row-actions,
+  .mod-library-table-row:focus-within .mod-library-row-actions,
+  .mod-library-table-row.mod-list-item-selected .mod-library-row-actions {
     visibility: visible;
     opacity: 1;
+    pointer-events: auto;
   }
 
-  .mod-list-item-actions .mod-list-item-inspect {
-    opacity: 1;
-  }
-
-  .mod-list-item-website {
-    min-height: 26px;
-    padding: 4px 7px;
-    font-size: 10px;
+  .mod-library-row-action {
+    min-width: 0;
+    max-width: 74px;
+    min-height: 24px;
+    overflow: hidden;
+    padding: 3px 6px;
+    border-radius: 6px;
+    font-size: 9px;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .mod-list-item-website-unavailable {
+  .mod-library-row-action-inspect {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    padding: 0;
+    font-size: 13px;
+  }
+
+  .mod-library-row-action-unavailable {
     display: inline-flex;
     align-items: center;
-    min-height: 26px;
+    min-height: 24px;
+    overflow: hidden;
     color: #64748b;
-    font-size: 10px;
+    font-size: 9px;
+    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .mod-library-select:focus-visible,
+  .mod-library-row-action:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: -1px;
+  }
+
+  .mod-library-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mod-library-state-dot {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border: 1px solid #64748b;
+    border-radius: 50%;
+    background: #475569;
+  }
+
+  .mod-library-state.enabled .mod-library-state-dot {
+    border-color: #86efac;
+    background: #4ade80;
+  }
+
+  .mod-library-state.disabled .mod-library-state-dot {
+    border-color: #64748b;
+    background: #475569;
+  }
+
+  .mod-library-state.needs-review {
+    color: #fdd663;
+  }
+
+  .mod-library-state.needs-review .mod-library-state-dot {
+    border-color: #fdd663;
+    background: #eab308;
+  }
+
+  .mod-library-state.unresolved {
+    color: #f28b82;
+  }
+
+  .mod-library-state.unresolved .mod-library-state-dot {
+    border-color: #f28b82;
+    background: #ef4444;
+  }
+
+  .mod-library-version {
+    color: #cbd5e1 !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 360px) {
+    .mod-library-table th,
+    .mod-library-table td {
+      padding-right: 3px;
+      padding-left: 3px;
+    }
+
+    .mod-library-row-action {
+      max-width: 58px;
+      padding-right: 4px;
+      padding-left: 4px;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .mod-list-item-actions {
+    .mod-library-table-row,
+    .mod-library-row-actions {
       transition: none;
     }
   }

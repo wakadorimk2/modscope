@@ -107,3 +107,92 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .workspace-actions-menu {
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .more-button {
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 9px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: #9aa0a6;
+    font-size: 11px;
+    font-weight: 400;
+  }
+
+  .more-button:hover:not(:disabled),
+  .more-button.active {
+    border-color: transparent;
+    background: #3a3b3f;
+    color: #e8eaed;
+  }
+
+  .workspace-actions-menu-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 20;
+    display: grid;
+    width: 230px;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid #3c4043;
+    border-radius: 7px;
+    background: #202124;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+  }
+
+  .workspace-actions-menu-group {
+    display: grid;
+    gap: 2px;
+  }
+
+  .workspace-actions-menu-label {
+    padding: 5px 8px 3px;
+    color: #8ab4f8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .workspace-actions-menu-popover button {
+    display: flex;
+    width: 100%;
+    min-height: 28px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #bdc1c6;
+    font-size: 11px;
+    text-align: left;
+  }
+
+  .workspace-actions-menu-popover button:hover:not(:disabled),
+  .workspace-actions-menu-popover button.active {
+    background: #35445b;
+    color: #e8eaed;
+  }
+
+  .workspace-actions-menu-divider {
+    height: 1px;
+    margin: 4px 0;
+    background: #3c4043;
+  }
+
+  .workspace-actions-menu button:focus-visible {
+    outline: 2px solid #8ab4f8;
+    outline-offset: 1px;
+  }
+</style>

@@ -796,7 +796,7 @@ View countは、current snapshotにView条件を適用した件数です。free-
 
 Searchはdisplay name、directory name、MOD keyを対象にします。既存の名前正規化規則を使い、caseとUnicodeの差だけで候補を失いません。
 
-Default sortはViewの目的で決定します。Browseと`All`はName、`Enabled`と`Disabled`とDeploymentはMO2 priority / load order、`Review`と`Identity unresolved`と`Profile unresolved`とDiagnosisはactionable stateを使います。sort変更は明示操作です。Searchとfilter後も選択中のsort順を維持します。欠落値は最後に置き、同じ値はstable MOD keyで決定します。Libraryのflat result tableはName、State、Versionを初期列にし、role、resolution state、priority、provenanceはdetailまたはInspectorへprogressive disclosureします。詳細なUI patternは[UI原則](ui-principles.md)を参照します。
+Default sortはViewの目的で決定します。Browseと`All`はName、`Enabled`と`Disabled`とDeploymentはMO2 priority / load order、`Review`と`Identity unresolved`と`Profile unresolved`とDiagnosisはactionable stateを使います。sort変更は明示操作です。Searchとfilter後も選択中のsort順を維持します。欠落値は最後に置き、同じ値はstable MOD keyで決定します。Libraryのflat result tableは、compactな`#`、`Name`、`State`、`Version`を初期列にし、role、resolution state、priority、provenanceはdetailまたはInspectorへprogressive disclosureします。詳細なUI patternは[UI原則](ui-principles.md)を参照します。
 
 Saved Viewは、View条件とsortをアプリ内metadataへ保存します。保存metadataはinstance/profile fingerprintへ紐づけます。MO2、Local Mod Knowledge、`modlist.txt`、page本文、cookie、absolute pathは保存しません。snapshot再読、profile切替、source更新後に条件を再評価します。scopeが一致しない場合は`Unavailable`を表示し、`All`へfallbackしません。
 
@@ -1259,8 +1259,15 @@ Deployment preview tabは`?surface=deployment-preview`を使用します。
 Browser WebView2へLocal context用のWPF panelを重ねません。
 WPFはwindow、WebView2 host、Toolbar用のnative More Popup、native bridgeを担当します。
 
-下段は、左からMod Library (`mod-list`) `280px`、Browser `3*`、Context `2*`です。
-Toolbarは全列にまたがります。通常は76pxの短い2段構成で表示します。History pageを開いてもhost rowは拡張しません。
+最新の現行UI referenceは[ModScope UI Reference](ui-reference/document-model.json)です。
+このreferenceは1920 × 1080を基準にした、Browser-firstのresponsive三面構成とmixed evidence stateを示します。
+このreferenceをPhase 6の情報階層とvisual layoutの正本にします。pixel-perfectな実装仕様とは扱いません。
+
+Toolbarは全列にまたがる86pxの2段構成です。上段はtab row、下段はnavigation rowです。History pageを開いてもhost rowは拡張しません。
+下段は、左からMod Library (`mod-list`)、Browser、Contextのresponsive三列です。
+FHDの基準比率は、Mod Libraryを`minmax(235px, 18%)`、Browserを`minmax(0, 1fr)`、Contextを`minmax(290px, 23%)`とします。Browserを最大の主面にします。
+狭いviewportでは基準比率を`20% / minmax(0, 1fr) / 28%`へ調整します。Browserのflexibleな中央列は維持します。
+Mod LibraryとBrowser、BrowserとContextの境界にはpane separatorを表示します。separatorは各paneの境界を示し、contentへ重ねません。
 Moreの展開内容はToolbar rowの高さを変更しません。
 Desktop executableでは、MoreのWPF Popupを`ToolbarHost`の下側へ配置し、Browser、Mod Library、Contextへ重ねて表示します。
 WPF Popupの`StaysOpen`は`False`です。
@@ -1277,6 +1284,10 @@ Mod Library columnはToolbarのMod Library buttonまたは`layout.setModListVisi
 active profileを先に表示します。初回起動は他profileをpreloadしません。Profile切替後は直前のprofileを1件だけbackground preloadします。
 profile selectorはpending、loading、ready、failedを表示します。
 将来はContextをdrawerまたはoverlayへ折り畳める構造へ進めます。
+
+このUI更新は表示とlayoutだけを変更します。Bridge contract v2、C# DTO、既存のMO2 read/write境界は変更しません。
+MO2 read planeはsource of truthをread-onlyで読み取ります。controlled write planeはread planeから独立したまま維持します。
+Deployment preview、差分、対象確認、plan ID、explicit approval、backup、temporary replacement、再読検証、rollbackの既存sequenceを変更しません。
 
 ### 24.3 Bridge contract
 
@@ -1424,7 +1435,7 @@ role assessmentはrow detailまたはInspectorへ段階表示します。
 role assessmentをSystem Viewのmembershipへ変換しません。
 
 Contextの表示順は`RECOGNIZE`、Local awareness、Analysis summary、Inspect導線です。
-通常Contextは対応可能なdiagnostic要約と件数だけを表示します。
+通常Contextは、`Installed`、`Enabled`、`Version`、`Profile`の4項目summaryと、必要なread actionを表示します。
 raw code、raw value、source detail、Page details、Developer toolsはDebugへ移します。
 SettingsはMO2 sourceの状態、変更、再読込、復旧操作だけを表示します。
 MO2 source未選択時はOnboardingを表示します。
@@ -1461,9 +1472,12 @@ MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません�
 Phase6.6は、既存のBrowse、Recognize、Analysis、Inspectorの結果を維持し、通常画面の情報量だけを減らします。
 Browser chrome、MO2 read-only境界、Query projectionは変更しません。
 
-通常Contextは`RECOGNIZE`と最小Local summaryだけを表示します。
-Local summaryは、installed / not installedとenabled / disabledだけを表示します。
-profile名、version、priority、evidence、uncertainty、raw diagnostic、XML、provenanceは通常Contextへ表示しません。
+通常Contextは`RECOGNIZE`と、`Installed`、`Enabled`、`Version`、`Profile`の4項目summaryを表示します。
+各項目はvalueとevidence stateを文字で表示します。`Installed`、`Enabled`、`Profile`の確認済み値と、確認済みversion sourceは`Observed`を表示します。
+確認できる値がない場合、またはevidenceが競合して値を確定できない場合は`Unknown`を表示します。推測値を表示しません。
+Installedが確認済みでもversion sourceを確認できない場合は、`Version: Unknown`と`Needs review`のreview cueを表示します。
+`Needs review`はevidence不足を示すreview cueです。Inspectorまたは別のread actionへ進むために使います。`latest`または`outdated`の判定を意味せず、その判定へ変換しません。
+priority、raw diagnostic、XML、provenanceなどの詳細は通常Contextへ詰め込まず、Inspector、Settings、Analysis、Debugの責務へ段階的に開示します。
 Analysisは小さなstatus lampで`Running`、`Not assessed`、`Assessed`、`Issue`を文字とtooltipで示します。
 lampはInspector modeを開きます。
 確認済みMODがある場合はMOD Inspectorを開き、確認済みMODがない場合はactive profileのDiagnosisを開きます。
@@ -1479,7 +1493,8 @@ Mod Roleはrole chip、assessment chip、短い`Reason:`要約だけを初期表
 profile、MO2 source、analysis inputの変更時は古いInspector表示を閉じます。
 Runtime comparisonの実行導線はDebugへ残します。
 
-通常MOD rowはMOD名、version、enable状態のlampだけを表示します。
+通常のMod Libraryは、`#`、`Name`、`State`、`Version`のcompact tableを表示します。
+`State`とevidence stateは文字で表示し、色やlampだけに依存しません。`Version`を確認できない場合は`Unknown`を表示します。
 role、assessment、profile state、priority、verified Website状態はhover、keyboard focus、Inspectorで表示します。
 disabled MODは名前、背景、lampを灰色系で表示します。
 MOD名はellipsisで省略します。
@@ -1492,6 +1507,9 @@ Context、Settings、Debug、Analysisのmode切替はMore menuから維持しま
 raw diagnosticはDebugだけに表示します。
 InspectorはContext WebView内で完結し、中央BrowserとBrowser chromeを覆いません。
 通常Contextの背景と境界は低コントラストにし、中央Web pageを主役として維持します。
+Inspector、Settings、Analysis、Deployment previewは、ModScope所有surfaceの共通visual languageを使います。Chrome dark palette、pane heading、pane separator、evidence stateの文字表示、action hierarchy、progressive disclosureを共有します。
+visual languageの統一は表示上の変更だけです。各surfaceの既存の機能境界と責務を移しません。
+Deployment previewは既存のinternal Browser tabとcontrolled write sequenceを維持します。
 MO2 write、AI、MCP、独自Browser engineは追加しません。
 
 ### 25.4 Phase6.7 起動表示、Chrome型Toolbar、MOD URL導線
@@ -1512,10 +1530,9 @@ Background profile warmはactive Profileの表示をSkeletonへ置き換えま�
 処理失敗時はSkeletonを解除し、既存diagnosticとunknown stateを表示します。
 この表示規則はread-onlyの派生表示だけに適用し、MO2 source、Local snapshot、Bridge wire contractを変更しません。
 
-通常Toolbarは76pxのChrome型2段構成です。
+通常Toolbarは、24.2で定義した86pxのChrome型2段構成を使用します。
 上段へtab strip、active tab、tab close、new tabを置きます。
 下段へback、forward、reload、home、URL入力、Go、History、pane icon、shortcut hintを置きます。
-Toolbarは通常76pxで固定します。
 History pageを開いてもToolbar高さは変更しません。
 `layout.setToolbarExpanded`は互換性のため残しますが、通常History操作からは呼び出しません。
 Browser engineとWebView2構成は変更しません。
@@ -1533,7 +1550,7 @@ ToolbarのMore PopupはEscape、外側クリック、再表示、loading開始�
 Mod Libraryは選択したViewの結果だけを表示します。
 View countとSearch後のresult countを分けて表示します。
 `MO2 order`切替と設定項目は持ちません。
-通常のMod Libraryはprofile selector、compact row、enabled状態だけを表示します。
+通常のMod Libraryはprofile selectorとcompact tableを表示します。列と表示規則はPhase6.6に従います。
 profile編集とDeployment previewはMod Library modeまたはMore menuから開きます。
 
 MOD Websiteは`Verified`、`Inferred`、`No usable URL`へ分類します。

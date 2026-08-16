@@ -21,7 +21,7 @@
             <Setter Property="Cursor" Value="Hand" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#3A4A5A" />
+                    <Setter Property="Background" Value="#3A3B3F" />
                     <Setter Property="Foreground" Value="#F8FAFC" />
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
@@ -32,28 +32,50 @@
     </Window.Resources>
     <Grid Background="#202124">
         <Grid.RowDefinitions>
-            <RowDefinition x:Name="ToolbarRow" Height="76" />
+            <RowDefinition x:Name="ToolbarRow" Height="86" MinHeight="86" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="ModListColumn" Width="280" />
-            <ColumnDefinition Width="3*" />
-            <ColumnDefinition x:Name="ContextColumn" Width="2*" />
+            <ColumnDefinition x:Name="ModListColumn" Width="18*" />
+            <ColumnDefinition Width="59*" />
+            <ColumnDefinition x:Name="ContextColumn" Width="23*" />
         </Grid.ColumnDefinitions>
 
-        <Border x:Name="ToolbarHost" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="8,8,8,0" CornerRadius="12" Background="#292A2D">
+        <Border x:Name="ToolbarHost"
+                Grid.Row="0"
+                Grid.Column="0"
+                Grid.ColumnSpan="3"
+                Margin="0"
+                Background="#292A2D"
+                BorderBrush="#3C4043"
+                BorderThickness="0,0,0,1">
             <wv2:WebView2 x:Name="ToolbarShell" />
         </Border>
 
-        <Border x:Name="ModListShell" Grid.Row="1" Grid.Column="0" Margin="8,8,0,8" CornerRadius="12" Background="#292A2D">
+        <Border x:Name="ModListShell"
+                Grid.Row="1"
+                Grid.Column="0"
+                Margin="0"
+                Background="#303134"
+                BorderBrush="#3C4043"
+                BorderThickness="0,0,1,0">
             <wv2:WebView2 x:Name="ModListWebView" />
         </Border>
 
-        <Border Grid.Row="1" Grid.Column="1" Margin="8" CornerRadius="12" Background="#292A2D">
+        <Border Grid.Row="1"
+                Grid.Column="1"
+                Margin="0"
+                Background="#202124"
+                BorderBrush="#3C4043"
+                BorderThickness="0,0,1,0">
             <Grid x:Name="BrowserHost" />
         </Border>
 
-        <Border x:Name="ContextShell" Grid.Row="1" Grid.Column="2" Margin="0,8,8,8" CornerRadius="12" Background="#292A2D">
+        <Border x:Name="ContextShell"
+                Grid.Row="1"
+                Grid.Column="2"
+                Margin="0"
+                Background="#303134">
             <wv2:WebView2 x:Name="ContextWebView" />
         </Border>
 
@@ -63,33 +85,33 @@
                 Grid.Column="0"
                 Grid.ColumnSpan="3"
                 Panel.ZIndex="100"
-                Background="#A8E5E7EB"
+                Background="#CC202124"
                 IsHitTestVisible="True"
                 Visibility="Visible"
                 AutomationProperties.Name="Loading local profile">
             <Border Width="390"
-                    Padding="28"
+                    Padding="24"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="#EEF1F3F4"
-                    BorderBrush="#B8BEC5"
+                    Background="#303134"
+                    BorderBrush="#3C4043"
                     BorderThickness="1"
-                    CornerRadius="10">
+                    CornerRadius="4">
                 <StackPanel>
                     <TextBlock Text="LOADING PROFILE"
-                               Foreground="#202124"
+                               Foreground="#E8EAED"
                                FontSize="18"
                                FontWeight="Bold"
                                HorizontalAlignment="Center" />
                     <TextBlock x:Name="LoadingOverlayTitle"
                                Margin="0,12,0,0"
                                Text="Loading local MO2 knowledge..."
-                               Foreground="#202124"
+                               Foreground="#E8EAED"
                                FontSize="14"
                                HorizontalAlignment="Center" />
                     <TextBlock x:Name="LoadingOverlayPhase"
                                Margin="0,6,0,0"
-                               Foreground="#4B5563"
+                               Foreground="#9AA0A6"
                                FontSize="12"
                                HorizontalAlignment="Center" />
                     <ProgressBar x:Name="LoadingOverlayProgress"
@@ -97,7 +119,9 @@
                                  Height="6"
                                  Minimum="0"
                                  Maximum="100"
-                                 IsIndeterminate="True" />
+                                 IsIndeterminate="True"
+                                 Foreground="#8AB4F8"
+                                 Background="#202124" />
                 </StackPanel>
             </Border>
         </Border>
@@ -114,9 +138,9 @@
                     Width="260"
                     Padding="8"
                     Background="#292A2D"
-                    BorderBrush="#56616D"
+                    BorderBrush="#3C4043"
                     BorderThickness="1"
-                    CornerRadius="10"
+                    CornerRadius="4"
                     Focusable="True"
                     PreviewKeyDown="MorePopup_PreviewKeyDown">
                 <StackPanel>
@@ -139,7 +163,7 @@
                         </DockPanel>
                     </Button>
 
-                    <Separator Margin="4,6" Background="#56616D" />
+                    <Separator Margin="4,6" Background="#3C4043" />
                     <TextBlock Margin="8,4,8,6"
                                Foreground="#7DD3FC"
                                FontSize="10"
@@ -182,7 +206,7 @@
                             Click="MoreModListModeButton_Click"
                             Content="Edit profile" />
 
-                    <Separator Margin="4,6" Background="#56616D" />
+                    <Separator Margin="4,6" Background="#3C4043" />
                     <Button x:Name="MoreModListVisibilityButton"
                             Style="{StaticResource MorePopupButtonStyle}"
                             Click="MoreModListVisibilityButton_Click"

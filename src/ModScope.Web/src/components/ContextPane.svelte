@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { BridgeErrorPayload, DiagnosticUiState, ModCandidateUiState, UiState } from '../contracts';
+  import type { BridgeErrorPayload, DiagnosticUiState, LocalContextUiState, ModCandidateUiState, UiState } from '../contracts';
 
   import type { ContextMode } from './ui-types';
 
@@ -38,12 +38,26 @@
   export let onUseAnalysisFixture: () => void;
   export let onOpenInspectorForMod: (modKey: string) => void;
 
+  type ContextCell = {
+    label: 'Installed' | 'Enabled' | 'Version' | 'Profile';
+    value: string;
+    evidence: 'Observed' | 'Unknown';
+    tone: 'positive' | 'unknown' | 'neutral';
+  };
+
   $: analysisBusy = state.analysis.operation.isBusy;
   $: analysisGroups = state.analysis.conflict?.groups ?? [];
   $: candidateAnalysisGroups = state.analysis.conflict && state.localContext?.localModKey
     ? state.analysis.conflict.groups.filter((group) => group.operations.some((operation) => operation.modKey === state.localContext?.localModKey))
     : [];
   $: hasConclusion = state.localContext?.status === 'installed' || state.localContext?.status === 'notInstalled';
+  $: localContextCells = state.localContext ? buildContextCells(state.localContext) : [];
+  $: localContextReviewItems = state.localContext ? buildReviewCueItems(state.localContext) : [];
+  $: localContextCandidate = state.localContext?.localModKey
+    ? state.knowledge.candidates.find((candidate) => candidate.modKey === state.localContext?.localModKey) ?? null
+    : null;
+  $: localContextPageUrl = localContextCandidate ? resolveModPageUrl(localContextCandidate) : null;
+  $: canOpenLocalInspector = state.localContext?.status === 'installed' && Boolean(state.localContext?.localModKey);
 
   type DiagnosticGroup = { diagnostic: DiagnosticUiState; count: number };
 
@@ -65,6 +79,81 @@
   function formatLabel(value: string | null | undefined): string {
     if (!value) return 'Unknown';
     return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/:/g, ' · ').replace(/^./, (character) => character.toUpperCase());
+  }
+
+  function normalizedValue(value: string | null | undefined): string {
+    return (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+  }
+
+  function resolvedText(value: string | null | undefined): string {
+    const trimmed = value?.trim() ?? '';
+    return ['unknown', 'unresolved', 'missing', 'notassessed'].includes(normalizedValue(trimmed)) ? '' : trimmed;
+  }
+
+  function buildContextCells(context: LocalContextUiState): ContextCell[] {
+    const installed = normalizedValue(context.status);
+    const enabled = normalizedValue(context.enabledState);
+    const knownVersion = resolvedText(context.knownVersion);
+    const profileName = resolvedText(context.profileName);
+    const installedResolved = installed === 'installed' || installed === 'notinstalled';
+    const enabledResolved = enabled === 'enabled' || enabled === 'disabled';
+
+    return [
+      {
+        label: 'Installed',
+        value: installed === 'installed' ? 'Yes' : installed === 'notinstalled' ? 'No' : 'Unknown',
+        evidence: installedResolved ? 'Observed' : 'Unknown',
+        tone: installed === 'installed' ? 'positive' : installedResolved ? 'neutral' : 'unknown'
+      },
+      {
+        label: 'Enabled',
+        value: enabled === 'enabled' ? 'Yes' : enabled === 'disabled' ? 'No' : 'Unknown',
+        evidence: enabledResolved ? 'Observed' : 'Unknown',
+        tone: enabled === 'enabled' ? 'positive' : enabledResolved ? 'neutral' : 'unknown'
+      },
+      {
+        label: 'Version',
+        value: knownVersion || 'Unknown',
+        evidence: knownVersion ? 'Observed' : 'Unknown',
+        tone: knownVersion ? 'neutral' : 'unknown'
+      },
+      {
+        label: 'Profile',
+        value: profileName || 'Unknown',
+        evidence: profileName ? 'Observed' : 'Unknown',
+        tone: profileName ? 'neutral' : 'unknown'
+      }
+    ];
+  }
+
+  function buildReviewCueItems(context: LocalContextUiState): string[] {
+    return normalizedValue(context.status) === 'installed' && !resolvedText(context.knownVersion)
+      ? ['Installed version has no confirmed source observation.']
+      : [];
+  }
+
+  function isWebsiteUrl(value: string | null | undefined): value is string {
+    const trimmed = value?.trim();
+    if (!trimmed) return false;
+    try {
+      const url = new URL(trimmed);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  function resolveModPageUrl(candidate: ModCandidateUiState): string | null {
+    if (isWebsiteUrl(candidate.website)) return candidate.website.trim();
+    const name = [candidate.displayName, candidate.directoryName, candidate.modKey]
+      .map((value) => value?.trim() ?? '')
+      .find((value) => value.length > 0) ?? '';
+    return name ? `https://www.nexusmods.com/games/7daystodie/mods?keyword=${encodeURIComponent(name)}` : null;
+  }
+
+  function openLocalModPage() {
+    if (!localContextCandidate || !localContextPageUrl) return;
+    onOpenModPage(localContextCandidate);
   }
 
   function contextConclusionLabel(status: string | null | undefined): string {
@@ -171,8 +260,29 @@
         </div>
       </div>
     {:else if hasConclusion && state.localContext}
-      <div class="local-summary-line" aria-label="Minimal local MOD summary"><span class="status-chip {statusClass(state.localContext.status)}">{formatLabel(state.localContext.status)}</span><span class="status-chip {statusClass(state.localContext.enabledState)}">{formatLabel(state.localContext.enabledState)}</span></div>
-      {#if state.localContext.status === 'installed' && state.localContext.localModKey}<button class="secondary-button action-button" disabled={operationBlocksInteraction} onclick={onOpenInspector}>Inspect MOD</button>{/if}
+      <div class="context-reference-grid" aria-label="Local MOD context">
+        {#each localContextCells as cell}
+          <div class="context-reference-cell">
+            <span class="context-reference-label">{cell.label}</span>
+            <strong class:context-reference-value-positive={cell.tone === 'positive'} class:context-reference-value-unknown={cell.tone === 'unknown'}>{cell.value}</strong>
+            <span class="context-reference-evidence context-reference-evidence-{cell.evidence.toLowerCase()}" aria-label={`Evidence: ${cell.evidence}`}><i aria-hidden="true"></i>{cell.evidence}</span>
+          </div>
+        {/each}
+      </div>
+      {#if localContextReviewItems.length > 0}
+        <aside class="context-reference-review" aria-label="Needs review">
+          <strong>Needs review</strong>
+          <ul>
+            {#each localContextReviewItems as item}<li>{item}</li>{/each}
+          </ul>
+        </aside>
+      {/if}
+      {#if canOpenLocalInspector || (localContextCandidate && localContextPageUrl)}
+        <div class="context-reference-actions">
+          {#if canOpenLocalInspector}<button class="primary-button context-reference-action" type="button" disabled={operationBlocksInteraction} onclick={onOpenInspector}>Open Inspector</button>{/if}
+          {#if localContextCandidate && localContextPageUrl}<button class="secondary-button context-reference-action" type="button" disabled={operationBlocksInteraction} onclick={openLocalModPage}>Open page</button>{/if}
+        </div>
+      {/if}
     {:else if state.observation}
       <p class="subtle">Identity confirmation is required. Choose a local MOD or mark this page as not installed.</p>
       {#if state.identity.matches.length > 0}
@@ -257,3 +367,117 @@
     {#if modSearchQuery.trim().length === 0}<p class="empty-state mod-search-empty">Enter a search term to show matching MODs.</p>{:else if modSearchResults.length === 0}<p class="empty-state mod-search-empty">No matching MODs were found.</p>{:else}<div class="mod-search-results" aria-live="polite"><p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>{#each modSearchResults as candidate (candidate.modKey)}<article class="mod-search-card"><button type="button" class="mod-card-main" aria-label={`Inspect ${candidate.displayName || candidate.modKey}`} onclick={() => onOpenModPage(candidate)}><strong>{candidate.displayName || candidate.directoryName || candidate.modKey}</strong><span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span></button><div class="mod-card-meta"><span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span><span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span><span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span></div>{#if modSearchMode === 'recognition'}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onChooseModForRecognition(candidate)}>Use for recognition</button>{/if}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onOpenInspectorForMod(candidate.modKey)}>Inspect evidence</button></article>{/each}</div>{/if}
   </aside>
 {/if}
+
+<style>
+  .context-reference-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .context-reference-cell {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.44);
+  }
+
+  .context-reference-label {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .context-reference-cell strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #e2e8f0;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .context-reference-value-positive {
+    color: #86efac !important;
+  }
+
+  .context-reference-value-unknown {
+    color: #fde68a !important;
+  }
+
+  .context-reference-evidence {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    color: #94a3b8;
+    font-size: 9px;
+  }
+
+  .context-reference-evidence i {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+    background: #64748b;
+  }
+
+  .context-reference-evidence-observed i {
+    background: #4ade80;
+  }
+
+  .context-reference-evidence-unknown {
+    color: #fcd34d;
+  }
+
+  .context-reference-evidence-unknown i {
+    background: #facc15;
+  }
+
+  .context-reference-review {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 10px 11px;
+    border-left: 2px solid #facc15;
+    background: rgba(120, 53, 15, 0.2);
+  }
+
+  .context-reference-review strong {
+    color: #fde68a;
+    font-size: 11px;
+  }
+
+  .context-reference-review ul {
+    display: grid;
+    gap: 3px;
+    margin: 0;
+    padding-left: 17px;
+    color: #d6c79e;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .context-reference-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 14px;
+  }
+
+  .context-reference-action {
+    min-width: 0;
+  }
+
+  @media (max-width: 420px) {
+    .context-reference-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
