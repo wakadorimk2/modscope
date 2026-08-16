@@ -1290,7 +1290,7 @@ active profileを先に表示します。初回起動は他profileをpreloadし�
 profile selectorはpending、loading、ready、failedを表示します。
 将来はContextをdrawerまたはoverlayへ折り畳める構造へ進めます。
 
-このUI更新は表示とlayoutだけを変更します。Bridge contract v2、C# DTO、既存のMO2 read/write境界は変更しません。
+このUI更新は表示とlayoutだけを変更します。Bridge contract version 2は維持し、既存の`LayoutUiState`をpayloadとするhostからfrontendへの`layout` messageを追加します。C# DTOと既存のMO2 read/write境界は変更しません。
 MO2 read planeはsource of truthをread-onlyで読み取ります。controlled write planeはread planeから独立したまま維持します。
 Deployment preview、差分、対象確認、plan ID、explicit approval、backup、temporary replacement、再読検証、rollbackの既存sequenceを変更しません。
 
@@ -1338,10 +1338,12 @@ frontendからhostへ送るcommandは次です。
 - layout.setContextMode
 - layout.setModListMode
 
-hostからfrontendへ送るmessageは、state、error、readyです。
+hostからfrontendへ送るmessageは、state、layout、error、readyです。
 Toolbar、Mod Library、Context、Deployment previewの各App WebViewへ同じmessageをbroadcastします。
-More menuから変更したContext modeとMod Library modeも、同じstate snapshotで全WebViewへbroadcastします。
-stateはUI stateの完全なsnapshotです。
+`state`はUI stateの完全なsnapshotです。
+`layout`は表示状態、Context mode、Mod Library mode、More Popup状態だけを送る軽量なpresentation updateです。
+layout変更では、frontendは完全な`state`を置き換えません。
+More menuから変更したContext modeとMod Library modeも、同じ`layout` messageで全WebViewへbroadcastします。
 `LayoutUiState.moreOpen`はWPF Popupの一時的な開閉stateです。
 `moreOpen`は永続化しません。
 `layout.setMoreOpen`のpayloadは`{ open: boolean }`です。

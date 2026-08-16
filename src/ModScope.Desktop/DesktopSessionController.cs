@@ -873,6 +873,11 @@ public sealed class DesktopSessionController
         _statusMessage = message;
     }
 
+    public LayoutUiState BuildLayoutState()
+    {
+        return new LayoutUiState(_contextVisible, _modListVisible, _contextMode, _modListMode);
+    }
+
     public UiState BuildState(BrowserUiState browser)
     {
         return DesktopStateMapper.Map(
@@ -902,7 +907,7 @@ public sealed class DesktopSessionController
                 GetBaseDataStatus(),
                 _analysisOperation,
                 _analysisDiagnostics),
-            new LayoutUiState(_contextVisible, _modListVisible, _contextMode, _modListMode),
+            BuildLayoutState(),
             _statusMessage,
             _operation,
             _profileLoadStates,

@@ -6,6 +6,7 @@
     type BridgeErrorPayload,
     type DeploymentEntryUiState,
     type HostMessage,
+    type LayoutUiState,
     type ModCandidateUiState,
     type UiState
   } from './contracts';
@@ -26,6 +27,7 @@
         : 'context';
 
   let state: UiState = initialState;
+  let layout: LayoutUiState = initialState.layout;
   let address = initialState.browser.url;
   let contextMode: ContextMode = 'context';
   let modListMode: ModListMode = 'browse';
@@ -137,6 +139,7 @@
         || previousState.identity.selectedLocalModKey !== message.payload.identity.selectedLocalModKey
         || previousState.localContext?.localModKey !== message.payload.localContext?.localModKey;
       state = message.payload;
+      layout = message.payload.layout;
       browserHostReady = Boolean(
         state.browser.activeTabId
         && state.browser.tabs.some((tab) => tab.isActive)
@@ -146,8 +149,8 @@
         pendingInspectorModKey = null;
       }
       const inspectorTransitionPending = pendingInspectorModKey !== null;
-      contextMode = inspectorTransitionPending ? 'context' : normalizeContextMode(state.layout.contextMode);
-      modListMode = normalizeModListMode(state.layout.modListMode);
+      contextMode = inspectorTransitionPending ? 'context' : normalizeContextMode(layout.contextMode);
+      modListMode = normalizeModListMode(layout.modListMode);
       if (modListMode === 'browse') {
         deploymentDraftEntries = state.deployment.entries;
       }
@@ -181,6 +184,13 @@
         inspectorFilesOpen = false;
         webObservedVersion = '';
       }
+      return;
+    }
+
+    if (message.kind === 'layout') {
+      layout = message.payload;
+      contextMode = normalizeContextMode(layout.contextMode);
+      modListMode = normalizeModListMode(layout.modListMode);
       return;
     }
 
@@ -289,11 +299,11 @@
   }
 
   function toggleContext() {
-    send('layout.setContextVisible', { visible: !state.layout.contextVisible });
+    send('layout.setContextVisible', { visible: !layout.contextVisible });
   }
 
   function toggleModList() {
-    send('layout.setModListVisible', { visible: !state.layout.modListVisible });
+    send('layout.setModListVisible', { visible: !layout.modListVisible });
   }
 
   function openNewTab() { send('browser.newTab'); }
@@ -447,6 +457,7 @@
   <WorkspaceToolbar
     bind:address
     {state}
+    {layout}
     disabled={browserToolbarDisabled}
     {showHtmlMoreMenu}
     error={lastError}
@@ -468,6 +479,7 @@
 {:else if surface === 'mod-list'}
   <ModLibraryPane
     {state}
+    {modListMode}
     {operationRailVisible}
     {operationBlocksInteraction}
     {inspectorOpen}

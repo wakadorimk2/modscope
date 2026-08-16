@@ -721,6 +721,13 @@ export function createBridge(onMessage: (message: HostMessage) => void): Bridge 
   const webview = getWebViewPort();
   const mockStateRef = { current: cloneState(initialState) };
   let mockRequestId = 0;
+  const layoutOnlyCommands = new Set([
+    'layout.setContextVisible',
+    'layout.setModListVisible',
+    'layout.setMoreOpen',
+    'layout.setContextMode',
+    'layout.setModListMode'
+  ]);
 
   const handleMessage = (event: MessageEvent) => {
     try {
@@ -779,7 +786,11 @@ export function createBridge(onMessage: (message: HostMessage) => void): Bridge 
       }
 
       mockStateRef.current = mockStateForCommand(mockStateRef.current, command, payload);
-      onMessage({ kind: 'state', requestId, payload: mockStateRef.current });
+      if (layoutOnlyCommands.has(command)) {
+        onMessage({ kind: 'layout', requestId, payload: mockStateRef.current.layout });
+      } else {
+        onMessage({ kind: 'state', requestId, payload: mockStateRef.current });
+      }
 
       if (command === 'knowledge.useFixture') {
         scheduleMockProfilePreload(mockStateRef, onMessage);
