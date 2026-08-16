@@ -73,6 +73,34 @@
     </div>
 
     <div class="toolbar-actions" aria-label="Workspace actions">
+      <button
+        class="history-button"
+        type="button"
+        title={`Open history (${state.browser.history.length} entries)`}
+        aria-label={`Open history (${state.browser.history.length} entries)`}
+        disabled={disabled}
+        onclick={onOpenHistory}
+      >◷</button>
+      <button
+        class="pane-toggle-button"
+        class:active={state.layout.modListVisible}
+        type="button"
+        title={state.layout.modListVisible ? 'Hide Mod Library pane' : 'Show Mod Library pane'}
+        aria-label={state.layout.modListVisible ? 'Hide Mod Library pane' : 'Show Mod Library pane'}
+        aria-pressed={state.layout.modListVisible}
+        disabled={disabled}
+        onclick={onToggleModList}
+      ><span aria-hidden="true">◧</span></button>
+      <button
+        class="pane-toggle-button"
+        class:active={state.layout.contextVisible}
+        type="button"
+        title={state.layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
+        aria-label={state.layout.contextVisible ? 'Hide Context pane' : 'Show Context pane'}
+        aria-pressed={state.layout.contextVisible}
+        disabled={disabled}
+        onclick={onToggleContext}
+      ><span aria-hidden="true">◨</span></button>
       <WorkspaceActionsMenu
         layout={state.layout}
         historyCount={state.browser.history.length}

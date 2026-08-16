@@ -18,7 +18,8 @@
   let fallbackOpen = false;
   let menuElement: HTMLDivElement;
 
-  $: menuOpen = showHtmlFallback ? fallbackOpen : layout.moreOpen;
+  $: if (disabled) fallbackOpen = false;
+  $: menuOpen = disabled ? false : (showHtmlFallback ? fallbackOpen : layout.moreOpen);
   $: if (showHtmlFallback && !layout.moreOpen && fallbackOpen) fallbackOpen = false;
 
   onMount(() => {
@@ -43,16 +44,19 @@
   });
 
   function setMenuOpen(nextOpen: boolean) {
+    if (disabled) return;
     fallbackOpen = nextOpen;
     onSetMoreOpen(nextOpen);
   }
 
   function chooseContextMode(mode: ContextMode) {
+    if (disabled) return;
     onSetContextMode(mode);
     setMenuOpen(false);
   }
 
   function chooseModListMode(mode: ModListMode) {
+    if (disabled) return;
     onSetModListMode(mode);
     setMenuOpen(false);
   }
@@ -74,30 +78,30 @@
     <div class="workspace-actions-menu-popover" role="menu" aria-label="More workspace actions">
       <div class="workspace-actions-menu-group">
         <span class="workspace-actions-menu-label">Browser</span>
-        <button type="button" role="menuitem" onclick={() => { onOpenHistory(); setMenuOpen(false); }}>
+        <button type="button" role="menuitem" disabled={disabled} onclick={() => { onOpenHistory(); setMenuOpen(false); }}>
           History <span>{historyCount}</span>
         </button>
       </div>
 
       <div class="workspace-actions-menu-group">
         <span class="workspace-actions-menu-label">Context mode</span>
-        <button class:active={layout.contextMode === 'context'} type="button" role="menuitem" onclick={() => chooseContextMode('context')}>Context</button>
-        <button class:active={layout.contextMode === 'settings'} type="button" role="menuitem" onclick={() => chooseContextMode('settings')}>Settings</button>
-        <button class:active={layout.contextMode === 'debug'} type="button" role="menuitem" onclick={() => chooseContextMode('debug')}>Debug</button>
-        <button class:active={layout.contextMode === 'analysis'} type="button" role="menuitem" onclick={() => chooseContextMode('analysis')}>Analysis</button>
+        <button class:active={layout.contextMode === 'context'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseContextMode('context')}>Context</button>
+        <button class:active={layout.contextMode === 'settings'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseContextMode('settings')}>Settings</button>
+        <button class:active={layout.contextMode === 'debug'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseContextMode('debug')}>Debug</button>
+        <button class:active={layout.contextMode === 'analysis'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseContextMode('analysis')}>Analysis</button>
       </div>
 
       <div class="workspace-actions-menu-group">
         <span class="workspace-actions-menu-label">Mod Library</span>
-        <button class:active={layout.modListMode === 'browse'} type="button" role="menuitem" onclick={() => chooseModListMode('browse')}>Browse</button>
-        <button class:active={layout.modListMode === 'deployment-edit'} type="button" role="menuitem" onclick={() => chooseModListMode('deployment-edit')}>Edit profile</button>
+        <button class:active={layout.modListMode === 'browse'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseModListMode('browse')}>Browse</button>
+        <button class:active={layout.modListMode === 'deployment-edit'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseModListMode('deployment-edit')}>Edit profile</button>
       </div>
 
       <div class="workspace-actions-menu-divider" aria-hidden="true"></div>
-      <button type="button" role="menuitem" onclick={() => { onToggleModList(); setMenuOpen(false); }}>
+      <button type="button" role="menuitem" disabled={disabled} onclick={() => { onToggleModList(); setMenuOpen(false); }}>
         {layout.modListVisible ? 'Hide' : 'Show'} Mod Library
       </button>
-      <button type="button" role="menuitem" onclick={() => { onToggleContext(); setMenuOpen(false); }}>
+      <button type="button" role="menuitem" disabled={disabled} onclick={() => { onToggleContext(); setMenuOpen(false); }}>
         {layout.contextVisible ? 'Hide' : 'Show'} Context
       </button>
     </div>
