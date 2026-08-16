@@ -7,6 +7,8 @@
         MinHeight="760"
         Width="1450"
         Height="900"
+        Closing="MainWindow_Closing"
+        Closed="MainWindow_Closed"
         PreviewKeyDown="MainWindow_PreviewKeyDown"
         SizeChanged="MainWindow_SizeChanged">
     <Window.Resources>
