@@ -367,6 +367,10 @@
   function setWebVersionObservation() {
     if (state.inspector && webObservedVersion.trim()) send('knowledge.setWebVersionObservation', { rawValue: webObservedVersion.trim() });
   }
+
+  function observeNexusFileVersion() {
+    if (state.inspector) send('knowledge.observeNexusFileVersion');
+  }
 </script>
 
 <svelte:head><title>ModScope</title></svelte:head>
@@ -470,6 +474,7 @@
         bind:webObservedVersion
         onClose={closeInspector}
         onSetWebVersionObservation={setWebVersionObservation}
+        onObserveNexusFileVersion={observeNexusFileVersion}
         onStartStaticAnalysis={startStaticAnalysis}
       />
     {/if}

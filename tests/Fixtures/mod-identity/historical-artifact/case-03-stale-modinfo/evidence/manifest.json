@@ -1,0 +1,85 @@
+{
+  "scenario": "historical-artifact-stale-modinfo",
+  "fixture_status": "anonymous_synthetic",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "package-stale-01",
+      "name": "synthetic-stale-modinfo-package",
+      "relativePath": "mods/synthetic-stale-modinfo-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-stale-01",
+      "name": "Synthetic Stale Modlet",
+      "version": "1.0.0",
+      "relativePath": "mods/synthetic-stale-modinfo-package/StaleModlet/ModInfo.xml"
+    },
+    {
+      "kind": "nexus-mod",
+      "id": "nexus-mod-7301",
+      "modId": "synthetic-mod-7301"
+    },
+    {
+      "kind": "nexus-file",
+      "id": "nexus-file-8301",
+      "fileId": "synthetic-file-8301",
+      "version": "1.2.0"
+    },
+    {
+      "kind": "wabbajack-record",
+      "id": "wj-record-stale-01",
+      "recordVersion": "1.2.0",
+      "listVersion": "1.4.0",
+      "modId": "synthetic-mod-7301",
+      "fileId": "synthetic-file-8301",
+      "targetGame": "SevenDaysToDie"
+    }
+  ],
+  "relations": [
+    {
+      "from": "package-stale-01",
+      "type": "contains",
+      "to": "modlet-stale-01"
+    },
+    {
+      "from": "modlet-stale-01",
+      "type": "identity-exact",
+      "to": "nexus-file-8301"
+    },
+    {
+      "from": "nexus-file-8301",
+      "type": "recorded-by",
+      "to": "wj-record-stale-01"
+    }
+  ],
+  "observations": [
+    {
+      "type": "version-observation",
+      "source": "ModInfo.xml",
+      "value": "1.0.0",
+      "role": "modlet_declared"
+    },
+    {
+      "type": "version-observation",
+      "source": "meta.ini",
+      "value": "1.2.0",
+      "role": "package_metadata"
+    },
+    {
+      "type": "version-observation",
+      "source": "download_metadata",
+      "value": "1.2.0",
+      "role": "download_metadata"
+    }
+  ],
+  "expected": {
+    "temporalState": "current_installation",
+    "identityState": "Exact",
+    "versionComparisonState": "Mismatch",
+    "deprecatedCandidate": "not_assessed",
+    "diagnostics": [
+      "modinfo_stale_candidate"
+    ]
+  }
+}

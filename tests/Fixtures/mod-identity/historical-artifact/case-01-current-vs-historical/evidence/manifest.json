@@ -1,0 +1,90 @@
+{
+  "scenario": "historical-artifact-current-vs-historical",
+  "fixture_status": "anonymous_synthetic",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "package-current-01",
+      "name": "synthetic-current-package",
+      "relativePath": "mods/synthetic-current-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-current-01",
+      "name": "Synthetic Current Modlet",
+      "version": "2.4.0.0",
+      "relativePath": "mods/synthetic-current-package/CurrentModlet/ModInfo.xml"
+    },
+    {
+      "kind": "source-artifact",
+      "id": "source-artifact-historical-01",
+      "archiveName": "SyntheticCurrent-7101-8102-2.1.0.zip",
+      "archiveSize": 4101,
+      "archiveHash": "synthetic-sha256-historical-01",
+      "source": "synthetic-source"
+    },
+    {
+      "kind": "wabbajack-record",
+      "id": "wj-record-historical-01",
+      "listIdentity": "Synthetic List",
+      "listVersion": "1.4.0",
+      "recordVersion": "2.1.0",
+      "modId": "synthetic-mod-7101",
+      "fileId": "synthetic-file-8102",
+      "targetGame": "SevenDaysToDie"
+    }
+  ],
+  "relations": [
+    {
+      "from": "package-current-01",
+      "type": "contains",
+      "to": "modlet-current-01"
+    },
+    {
+      "from": "package-current-01",
+      "type": "identity-exact",
+      "to": "source-artifact-historical-01"
+    },
+    {
+      "from": "source-artifact-historical-01",
+      "type": "recorded-by",
+      "to": "wj-record-historical-01"
+    }
+  ],
+  "observations": [
+    {
+      "sourceKind": "MO2",
+      "evidenceRole": "primary",
+      "timeAxis": "current_installation",
+      "observedAt": "2026-08-15T10:00:00Z",
+      "values": {
+        "modId": "synthetic-mod-7101",
+        "fileId": "synthetic-file-8102",
+        "version": "2.4.0.0"
+      }
+    },
+    {
+      "sourceKind": "Wabbajack",
+      "evidenceRole": "primary",
+      "timeAxis": "historical_observation",
+      "observedAt": "2026-08-15T10:00:00Z",
+      "values": {
+        "modId": "synthetic-mod-7101",
+        "fileId": "synthetic-file-8102",
+        "recordVersion": "2.1.0",
+        "listVersion": "1.4.0"
+      }
+    }
+  ],
+  "expected": {
+    "temporalState": {
+      "mo2": "current_installation",
+      "wabbajack": "historical_observation",
+      "relation": "unresolved"
+    },
+    "identityState": "Exact",
+    "versionComparisonState": "Mismatch",
+    "deprecatedCandidate": "not_assessed",
+    "diagnostics": []
+  }
+}

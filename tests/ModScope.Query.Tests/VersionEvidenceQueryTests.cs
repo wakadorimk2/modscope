@@ -32,7 +32,7 @@ public sealed class VersionEvidenceQueryTests
         Assert.False(relation.SharedAcrossModlets);
         Assert.Equal(QueryEnabledState.Enabled, candidate.EnabledState);
         Assert.Equal(QueryIdentityResolutionState.Exact, relation.IdentityState);
-        Assert.Equal(QueryVersionComparisonStatus.Equal, relation.Comparison.Status);
+        Assert.Equal(QueryVersionComparisonStatus.NotComparable, relation.Comparison.Status);
         Assert.NotEmpty(relation.Comparison.Reason);
         Assert.Equal("mods/synthetic-package", relation.PackageSource.RelativePath);
         Assert.Single(relation.SourceArtifacts);
@@ -42,7 +42,7 @@ public sealed class VersionEvidenceQueryTests
         var inspector = query.GetInspector(candidate.ModKey)!;
         Assert.NotNull(inspector);
         Assert.NotNull(inspector.PackageRelation);
-        Assert.Equal(QueryVersionComparisonStatus.Equal, inspector.PackageRelation!.Comparison.Status);
+        Assert.Equal(QueryVersionComparisonStatus.NotComparable, inspector.PackageRelation!.Comparison.Status);
 
         var serialized = JsonSerializer.Serialize(new { candidate, inspector, session });
         Assert.DoesNotContain(fixture.Root, serialized, StringComparison.OrdinalIgnoreCase);

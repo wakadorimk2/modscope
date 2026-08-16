@@ -27,6 +27,15 @@ public sealed class VersionEvidenceContractTests
               "payload": { "rawValue": "v1.2.3" }
             }
             """);
+        var nexusObservation = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 2,
+              "requestId": "nexus-version-1",
+              "command": "knowledge.observeNexusFileVersion",
+              "payload": {}
+            }
+            """);
         var load = BridgeProtocol.ParseCommand(
             """
             {
@@ -39,9 +48,12 @@ public sealed class VersionEvidenceContractTests
 
         Assert.Equal(2, manifest.ContractVersion);
         Assert.Equal(2, observation.ContractVersion);
+        Assert.Equal(2, nexusObservation.ContractVersion);
         Assert.Equal(2, load.ContractVersion);
         Assert.Equal("knowledge.selectEvidenceManifest", manifest.Command);
+        Assert.Equal("knowledge.observeNexusFileVersion", nexusObservation.Command);
         Assert.Equal("v1.2.3", BridgeProtocol.ReadPayload<SetWebVersionObservationPayload>(observation.Payload).RawValue);
+        _ = BridgeProtocol.ReadPayload<ObserveNexusFileVersionPayload>(nexusObservation.Payload);
         Assert.Equal("mo2-candidate", BridgeProtocol.ReadPayload<LoadSourcePayload>(load.Payload).CandidateId);
 
         var serialized = JsonSerializer.Serialize(
@@ -57,6 +69,7 @@ public sealed class VersionEvidenceContractTests
         Assert.DoesNotContain("manifestPath", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("C:\\\\", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("secret-local-content", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("apiKey", JsonSerializer.Serialize(BridgeProtocol.ReadPayload<ObserveNexusFileVersionPayload>(nexusObservation.Payload)), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

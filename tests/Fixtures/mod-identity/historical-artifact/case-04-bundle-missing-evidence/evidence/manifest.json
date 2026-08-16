@@ -1,0 +1,113 @@
+{
+  "scenario": "historical-artifact-bundle-missing-evidence",
+  "fixture_status": "anonymous_synthetic",
+  "entities": [
+    {
+      "kind": "package",
+      "id": "package-bundle-01",
+      "name": "synthetic-bundle-package",
+      "relativePath": "mods/synthetic-bundle-package"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-bundle-a",
+      "name": "Synthetic Bundle Modlet A",
+      "version": "1.0.0",
+      "relativePath": "mods/synthetic-bundle-package/modlet-a/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-bundle-b",
+      "name": "Synthetic Bundle Modlet B",
+      "version": "2.0.0",
+      "relativePath": "mods/synthetic-bundle-package/modlet-b/ModInfo.xml"
+    },
+    {
+      "kind": "modlet",
+      "id": "modlet-bundle-c",
+      "name": "Synthetic Bundle Modlet C",
+      "version": "unknown",
+      "relativePath": "mods/synthetic-bundle-package/modlet-c/ModInfo.xml"
+    },
+    {
+      "kind": "package",
+      "id": "package-missing-01",
+      "name": "synthetic-missing-evidence-package",
+      "relativePath": "mods/synthetic-missing-evidence-package"
+    },
+    {
+      "kind": "wabbajack-record",
+      "id": "wj-record-bundle-01",
+      "recordVersion": null,
+      "listVersion": "1.4.0",
+      "modId": null,
+      "fileId": null,
+      "targetGame": "SevenDaysToDie"
+    }
+  ],
+  "relations": [
+    {
+      "from": "package-bundle-01",
+      "type": "contains",
+      "to": "modlet-bundle-a"
+    },
+    {
+      "from": "package-bundle-01",
+      "type": "contains",
+      "to": "modlet-bundle-b"
+    },
+    {
+      "from": "package-bundle-01",
+      "type": "contains",
+      "to": "modlet-bundle-c"
+    },
+    {
+      "from": "package-bundle-01",
+      "type": "package-level-candidate-source",
+      "to": "wj-record-bundle-01"
+    }
+  ],
+  "observations": [
+    {
+      "type": "package-has-multiple-modlets",
+      "target": "package-bundle-01",
+      "value": 3
+    },
+    {
+      "type": "missing-modinfo",
+      "target": "package-missing-01",
+      "value": true
+    },
+    {
+      "type": "missing-package-meta",
+      "target": "package-bundle-01",
+      "value": true
+    },
+    {
+      "type": "missing-download-metadata",
+      "target": "package-missing-01",
+      "value": true
+    },
+    {
+      "type": "not-observable",
+      "target": "wj-record-bundle-01",
+      "value": "modID and FileID"
+    }
+  ],
+  "expected": {
+    "temporalState": "unresolved",
+    "identityState": "Unresolved",
+    "versionComparisonState": "NotAssessed",
+    "deprecatedCandidate": "not_assessed",
+    "diagnostics": [
+      "package_level_binding_only",
+      "missing_modinfo",
+      "missing_package_metadata",
+      "missing_download_metadata"
+    ],
+    "notes": [
+      "Do not assign one source identity to all Modlets.",
+      "not_observable is not evidence of absence."
+    ]
+  }
+}

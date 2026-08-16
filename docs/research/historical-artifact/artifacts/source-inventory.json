@@ -1,0 +1,130 @@
+{
+  "schema_version": "modscope.historical_artifact.source_inventory.v1",
+  "run_id": "run-2026-08-15T16-47-42Z-historical-artifact-pilot",
+  "observed_at_utc": "2026-08-15T16:47:42Z",
+  "target_game": "SevenDaysToDie",
+  "read_only": true,
+  "pilot_status": "blocked_owner_wabbajack_input_missing",
+  "human_review_limit_per_case_family": 20,
+  "sources": [
+    {
+      "source_id": "source-mo2-primary-001",
+      "source_kind": "mo2_instance",
+      "evidence_role": "primary",
+      "status": "observed",
+      "path_locator": "opaque/mo2-instance-001",
+      "profile_locator": "profiles/Default",
+      "target_profile": "Default",
+      "observed_at_utc": "2026-08-15T16:59:55Z",
+      "read_only": true,
+      "observation_scope": [
+        "selected profile",
+        "full read-only inventory counts",
+        "previously committed sanitized MO2 inventory",
+        "package metadata shape"
+      ],
+      "artifacts": [
+        {
+          "kind": "profile",
+          "locator": "profiles/Default",
+          "status": "selected"
+        },
+        {
+          "kind": "profile_modlist",
+          "locator": "profiles/Default/modlist.txt",
+          "status": "available_in_owner_source_not_copied"
+        },
+        {
+          "kind": "package_directory",
+          "locator": "mods/<opaque-package>",
+          "status": "available_in_prior_sanitized_inventory"
+        },
+        {
+          "kind": "modinfo",
+          "locator": "mods/<opaque-package>/<opaque-modlet>/ModInfo.xml",
+          "status": "available_in_prior_sanitized_inventory"
+        },
+        {
+          "kind": "mo2_metadata",
+          "locator": "mods/<opaque-package>/meta.ini",
+          "status": "available_in_prior_sanitized_inventory"
+        },
+        {
+          "kind": "download_metadata",
+          "locator": "downloads/<opaque-archive>.zip.meta",
+          "status": "available_in_prior_sanitized_inventory"
+        }
+      ],
+      "counts": {
+        "profile_entries": 98,
+        "enabled_entries": 54,
+        "disabled_entries": 44,
+        "package_directory_count": 98,
+        "modinfo_count": 105,
+        "package_meta_count": 87,
+        "download_meta_count": 204
+      },
+      "diagnostics": [
+        "raw_mo2_files_not_copied"
+      ]
+    },
+    {
+      "source_id": "source-wj-primary-001",
+      "source_kind": "wabbajack_file_or_list",
+      "evidence_role": "primary",
+      "status": "not_provided",
+      "path_locator": null,
+      "list_identity": null,
+      "list_version": null,
+      "list_revision": null,
+      "target_game": null,
+      "observed_at_utc": null,
+      "read_only": true,
+      "raw_retained": false,
+      "diagnostics": [
+        "owner_wabbajack_path_not_supplied",
+        "no_implicit_path_search"
+      ]
+    },
+    {
+      "source_id": "source-wj-secondary-001",
+      "source_kind": "existing_committed_sanitized_snapshot",
+      "evidence_role": "secondary",
+      "status": "available",
+      "path_locator": "docs/research/version/snapshot-2026-08-14/artifacts/smorgasbord.wj-records.json",
+      "list_identity": "Smorgasbord",
+      "list_version": "3.1.1.39",
+      "list_revision": 39,
+      "collection_id": "445130",
+      "target_game": "SevenDaysToDie",
+      "observed_at_utc": "2026-08-14T10:01:09Z",
+      "primary": false,
+      "raw_retained": false,
+      "public_manifest_refetch": false,
+      "allowed_use": "candidate_shape_and_existing_observation_reference",
+      "diagnostics": [
+        "not_owner_local_wabbajack_input",
+        "cannot_upgrade_primary_evidence"
+      ]
+    }
+  ],
+  "join_precedence": [
+    "mod_id_and_file_id",
+    "archive_hash",
+    "archive_size_and_archive_name",
+    "explicit_package_binding",
+    "name_or_filename_candidate_only"
+  ],
+  "rejected_inputs": [
+    {
+      "input": "public_manifest_live_fetch",
+      "status": "not_run",
+      "reason": "out_of_scope_for_this_lane"
+    },
+    {
+      "input": "raw_archive_copy",
+      "status": "not_run",
+      "reason": "privacy_and_repository_boundary"
+    }
+  ]
+}

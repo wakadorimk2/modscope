@@ -1,0 +1,2 @@
+# Synthetic historical artifact fixture
++synthetic-current-package

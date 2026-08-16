@@ -2,6 +2,7 @@
   import type {
     InspectorUiState,
     ModCandidateUiState,
+    PackageRelationUiState,
     RuntimeEvidenceComparisonItemUiState,
     SemanticConflictGroupUiState,
     UiState
@@ -17,6 +18,7 @@
   export let webObservedVersion = '';
   export let onClose: () => void;
   export let onSetWebVersionObservation: () => void;
+  export let onObserveNexusFileVersion: () => void;
   export let onStartStaticAnalysis: () => void;
 
   function formatLabel(value: string | null | undefined): string {
@@ -42,6 +44,33 @@
   function statusClass(status: string | undefined): string {
     return 'status-' + (status ?? 'unknown').toLowerCase().replace(/[^a-z]+/g, '-');
   }
+
+  function identityLabel(value: string | null | undefined): string {
+    const normalized = (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
+    if (normalized === 'exact') return 'AutoResolved';
+    if (normalized === 'missing' || normalized === 'ambiguous' || normalized === 'conflicting' || normalized === 'unresolved') return 'Unresolved';
+    return formatLabel(value);
+  }
+
+  function nexusArtifact(relation: PackageRelationUiState): PackageRelationUiState['sourceArtifacts'][number] | null {
+    return relation.sourceArtifacts.find((artifact) => artifact.kind.toLowerCase() === 'nexus-file') ?? null;
+  }
+
+  function observationBySourceKind(relation: PackageRelationUiState, sourceKind: string): string {
+    return relation.versionObservations.find((observation) => observation.sourceKind.toLowerCase() === sourceKind.toLowerCase())?.rawValue || 'Unknown';
+  }
+
+  function identityEvidencePath(relation: PackageRelationUiState): string {
+    return relation.versionObservations.find((observation) => observation.sourceKind.toLowerCase() === 'mo2metaini')?.source.relativePath
+      || nexusArtifact(relation)?.source.relativePath
+      || relation.packageSource.relativePath;
+  }
+
+  function hasNexusApiObservation(relation: PackageRelationUiState | null | undefined): boolean {
+    return relation?.versionObservations.some((observation) => observation.sourceKind.toLowerCase() === 'nexusapi') ?? false;
+  }
+
+  $: inspectorNexusArtifact = inspector?.packageRelation ? nexusArtifact(inspector.packageRelation) : null;
 
   function analysisLabel(value: string | null | undefined): string {
     const normalized = (value ?? '').toLowerCase().replace(/[^a-z]+/g, '');
@@ -94,7 +123,7 @@
       </div>
       <div class="inspector-conclusion-status-grid">
         <div class="inspector-conclusion-status-item"><span>Installed</span><strong>{inspector.conclusion?.installedVersion || inspector.modInfo?.version || 'Unknown'}</strong></div>
-        <div class="inspector-conclusion-status-item"><span>Latest observed</span><strong>{inspector.conclusion?.latestObservedVersion || 'Unknown'}</strong></div>
+        <div class="inspector-conclusion-status-item"><span>{hasNexusApiObservation(inspector.packageRelation) ? 'Nexus File observed' : 'Latest observed'}</span><strong>{inspector.conclusion?.latestObservedVersion || 'Unknown'}</strong></div>
         <div class="inspector-conclusion-status-item"><span>Version status</span><strong class="status-chip {statusClass(inspector.conclusion?.versionStatus)}">{statusLabel(inspector.conclusion?.versionStatus)}</strong></div>
         <div class="inspector-conclusion-status-item"><span>Game compatibility</span><strong class="status-chip {statusClass(inspector.conclusion?.compatibilityStatus)}">{formatLabel(inspector.conclusion?.compatibilityStatus)}</strong></div>
       </div>
@@ -154,13 +183,29 @@
         <details class="drawer-section inspector-disclosure">
             <summary class="inspector-disclosure-summary"><span class="eyebrow">VERSION EVIDENCE</span><span class="subtle">Identity, package, and release observations</span></summary>
           <div class="inspector-conclusion-grid">
-            <div><span>Identity</span><strong class="status-chip {statusClass(inspector.packageRelation.identityState)}">{formatLabel(inspector.packageRelation.identityState)}</strong></div>
+            <div><span>Identity</span><strong class="status-chip {statusClass(inspector.packageRelation.identityState)}">{identityLabel(inspector.packageRelation.identityState)}</strong></div>
             <div><span>Version</span><strong class="status-chip {statusClass(inspector.packageRelation.comparison.status)}">{formatLabel(inspector.packageRelation.comparison.status)}</strong></div>
             <div><span>Package</span><strong>{inspector.packageRelation.packageDirectoryName}</strong></div>
             <div><span>Modlets</span><strong>{inspector.packageRelation.modletCount}</strong></div>
           </div>
+          <div class="inspector-conclusion-grid">
+            <div><span>Nexus MOD ID</span><strong>{inspectorNexusArtifact?.modId || inspector.packageRelation.packageModId || 'Unknown'}</strong></div>
+            <div><span>Nexus File ID</span><strong>{inspectorNexusArtifact?.fileId || inspector.packageRelation.packageFileId || 'Unknown'}</strong></div>
+            <div><span>MO2 meta.ini</span><strong>{observationBySourceKind(inspector.packageRelation, 'Mo2MetaIni')}</strong></div>
+            <div><span>ModInfo.xml</span><strong>{observationBySourceKind(inspector.packageRelation, 'ModInfoXml')}</strong></div>
+          </div>
           <p class="analysis-meta">{inspector.packageRelation.comparison.reason}</p>
           <p class="analysis-meta">{inspector.packageRelation.identityReason}</p>
+          <p class="provenance-line">Identity evidence · {identityEvidencePath(inspector.packageRelation)}</p>
+          {#if inspectorNexusArtifact}
+            <p class="provenance-line">Artifact · {inspectorNexusArtifact.artifactId} · {inspectorNexusArtifact.sourceUrl || 'Locator unknown'}</p>
+            <button
+              class="secondary-button action-button"
+              type="button"
+              disabled={operationBlocksInteraction || inspector.packageRelation.identityState.toLowerCase() !== 'exact'}
+              onclick={onObserveNexusFileVersion}
+            >Observe Nexus File version</button>
+          {/if}
           <details class="inspector-disclosure inspector-advanced-evidence">
             <summary>Manual Web version fallback</summary>
             <div class="web-version-observation">
@@ -177,11 +222,19 @@
                   {#if observation.targetUrl} · {observation.targetUrl}{/if}
                   {#if observation.releaseScopeKind} · scope {observation.releaseScopeKind}{/if}
                   {#if observation.releaseScopeVersion} · {observation.releaseScopeVersion}{/if}
+                  · observed {observation.observedAtUtc}
                   {#if observation.evidence}<br />{observation.evidence}{/if}
                   {#if observation.releaseScopeMatchedLine}<br />scope line · {observation.releaseScopeMatchedLine}{/if}
                 </p>
+                {#each observation.diagnostics as diagnostic}<p class={diagnosticClass(diagnostic.severity)}><strong>{diagnostic.code}</strong> {diagnostic.message}</p>{/each}
             {/each}
           </details>
+          {#if inspector.packageRelation.diagnostics.length > 0}
+            <details class="inspector-disclosure">
+              <summary>Package diagnostics · {inspector.packageRelation.diagnostics.length}</summary>
+              {#each inspector.packageRelation.diagnostics as diagnostic}<p class={diagnosticClass(diagnostic.severity)}><strong>{diagnostic.code}</strong> {diagnostic.message}</p>{/each}
+            </details>
+          {/if}
         </details>
       {/if}
 
