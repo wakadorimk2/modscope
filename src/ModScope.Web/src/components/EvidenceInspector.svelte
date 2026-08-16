@@ -147,6 +147,24 @@
   </div>
 
   {#if inspector}
+    {#if operationBlocksInteraction}
+      <div class="local-skeleton-panel inspector-skeleton-panel" aria-busy="true">
+        <p class="subtle local-skeleton-status" role="status">{state.analysis.operation.isBusy ? 'Analysis is running…' : 'Loading local evidence…'}</p>
+        <div class="local-skeleton-stack" aria-hidden="true">
+          <span class="local-skeleton local-skeleton-inspector-hero"></span>
+          <div class="local-skeleton-grid">
+            <span class="local-skeleton local-skeleton-grid-cell"></span>
+            <span class="local-skeleton local-skeleton-grid-cell"></span>
+            <span class="local-skeleton local-skeleton-grid-cell"></span>
+            <span class="local-skeleton local-skeleton-grid-cell"></span>
+          </div>
+          <span class="local-skeleton local-skeleton-line"></span>
+          <span class="local-skeleton local-skeleton-line local-skeleton-line-short"></span>
+          <span class="local-skeleton local-skeleton-card"></span>
+          <span class="local-skeleton local-skeleton-card local-skeleton-card-short"></span>
+        </div>
+      </div>
+    {:else}
     <section class="drawer-section inspector-human-conclusion" aria-labelledby="inspector-conclusion-title">
       <div class="inspector-conclusion-heading">
         <div>
@@ -354,6 +372,7 @@
         <p class="subtle">{inspector.source.kind} · {inspector.source.relativePath}</p>
       </details>
     {/key}
+    {/if}
   {:else}
     <p class="empty-state">Inspector evidence is loading.</p>
   {/if}

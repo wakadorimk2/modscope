@@ -15,3 +15,13 @@
 2026-08-16 06:11:00.221: [INFO] BookmarksLoadDropped droppedNodes=0
 2026-08-16 06:11:00.221: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
 2026-08-16 06:11:28.276: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-16 06:26:48.418: [INFO] CurrentProfilePath: C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default
+2026-08-16 06:26:48.418: [INFO] Profiles total count: 1
+2026-08-16 06:26:48.418: [INFO] Profile: name=プロファイル 1 path=C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default lastActive=2026-08-16T06:11:28.112Z
+2026-08-16 06:26:48.418: [INFO] LastUsedProfileDir: C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default
+2026-08-16 06:26:48.418: [INFO] MostRecentlyActiveProfile: name=プロファイル 1 path=C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default lastActive=2026-08-16T06:11:28.112Z
+2026-08-16 06:26:48.418: [INFO] OnDoneLoading sync enabled: 0
+2026-08-16 06:26:48.418: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-16 06:26:48.418: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-16 06:26:48.418: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-16 06:27:34.612: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1

@@ -1,2 +1,3 @@
-2026/08/16-15:08:08.915 ac9c Creating DB C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default\Extension Scripts since it was missing.
-2026/08/16-15:08:08.920 ac9c Reusing MANIFEST C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default\Extension Scripts/MANIFEST-000001
+2026/08/16-15:08:15.283 9038 Reusing MANIFEST C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default\Extension Scripts/MANIFEST-000001
+2026/08/16-15:08:15.284 9038 Recovering log #3
+2026/08/16-15:08:15.284 9038 Reusing old log C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default\Extension Scripts/000003.log 

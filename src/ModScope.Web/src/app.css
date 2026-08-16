@@ -2704,3 +2704,133 @@ dd {
 .web-version-observation label {
   flex: 1;
 }
+
+.local-skeleton-panel {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+}
+
+.mod-list-pending {
+  flex: 1 1 auto;
+  overflow: hidden;
+  padding-top: 8px;
+}
+
+.recognition-skeleton-panel,
+.analysis-skeleton-panel,
+.inspector-skeleton-panel {
+  padding: 10px 0;
+}
+
+.local-skeleton-status {
+  margin: 0;
+}
+
+.local-skeleton-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.local-skeleton {
+  display: block;
+  border: 1px solid rgba(100, 116, 139, 0.32);
+  border-radius: 8px;
+  background: linear-gradient(100deg, rgba(71, 85, 105, 0.24), rgba(148, 163, 184, 0.42), rgba(71, 85, 105, 0.24));
+  background-size: 240% 100%;
+  animation: local-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+.local-skeleton-control {
+  height: 34px;
+  width: 100%;
+}
+
+.local-skeleton-summary {
+  height: 18px;
+  width: 74%;
+}
+
+.local-skeleton-label {
+  height: 12px;
+  width: 48%;
+  margin-top: 5px;
+}
+
+.local-skeleton-row {
+  height: 42px;
+  width: 100%;
+}
+
+.local-skeleton-row-short,
+.local-skeleton-line-short {
+  width: 68%;
+}
+
+.local-skeleton-row-medium {
+  width: 84%;
+}
+
+.local-skeleton-card {
+  min-height: 78px;
+  width: 100%;
+}
+
+.local-skeleton-card-short {
+  width: 82%;
+}
+
+.local-skeleton-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.local-skeleton-action {
+  height: 34px;
+  width: 42%;
+}
+
+.local-skeleton-action-secondary {
+  width: 34%;
+}
+
+.local-skeleton-analysis-card {
+  min-height: 98px;
+  width: 100%;
+}
+
+.local-skeleton-inspector-hero {
+  min-height: 126px;
+  width: 100%;
+}
+
+.local-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.local-skeleton-grid-cell {
+  min-height: 46px;
+}
+
+.local-skeleton-line {
+  height: 14px;
+  width: 92%;
+}
+
+@keyframes local-skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .local-skeleton {
+    animation: none;
+  }
+}

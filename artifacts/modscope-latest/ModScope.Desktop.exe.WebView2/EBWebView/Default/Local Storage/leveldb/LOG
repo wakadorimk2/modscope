@@ -1,2 +1,3 @@
-2026/08/16-15:11:00.283 c070 Creating DB C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default\Local Storage\leveldb since it was missing.
-2026/08/16-15:11:00.304 c070 Reusing MANIFEST C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default\Local Storage\leveldb/MANIFEST-000001
+2026/08/16-15:26:48.502 4bec Reusing MANIFEST C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default\Local Storage\leveldb/MANIFEST-000001
+2026/08/16-15:26:48.509 4bec Recovering log #3
+2026/08/16-15:26:48.511 4bec Reusing old log C:\Users\wakad\projects\modscope\artifacts\modscope-latest\ModScope.Desktop.exe.WebView2\EBWebView\Default\Local Storage\leveldb/000003.log 

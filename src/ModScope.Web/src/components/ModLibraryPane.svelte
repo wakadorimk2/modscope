@@ -252,120 +252,145 @@
   {/if}
 
   {#if state.knowledge.session}
-    <div class="deployment-toolbar" aria-label="Profile deployment controls">
-      {#if deploymentEditMode}
-        <span class="deployment-mode-label">Edit profile</span>
-        <button class="secondary-button" type="button" disabled={operationBlocksInteraction} onclick={onCancelDeploymentEdit}>Cancel</button>
-        <button class="secondary-button" type="button" disabled={operationBlocksInteraction} onclick={onPreviewDeployment}>Preview deployment</button>
-      {:else}
-        <button class="secondary-button" type="button" disabled={operationBlocksInteraction} onclick={onStartDeploymentEdit}>Edit profile</button>
-      {/if}
-      {#if state.deployment.canLaunch}<button class="secondary-button" type="button" disabled={operationBlocksInteraction} onclick={onLaunchGame}>Launch 7DTD</button>{/if}
-    </div>
-
-    <label class="mod-list-profile-picker">
-      <span>Profile</span>
-      <select aria-label="Active profile" value={state.knowledge.session.profileName} disabled={operationBlocksInteraction} onchange={onSwitchProfile}>
-        {#each state.knowledge.profiles as profile (profile.name)}
-          <option value={profile.name}>{profile.name} · {formatLabel(profile.loadState)}</option>
-        {/each}
-      </select>
-    </label>
-
-    <p class="mod-list-compact-summary" aria-label="Profile MOD status">
-      {profileCandidates.length} in profile · {enabledCount} enabled · {disabledCount} disabled · {unresolvedCount} unresolved
-    </p>
-
-    {#if deploymentEditMode}
-      <div class="mod-list-scroll" aria-label="Edit active profile MOD list">
-        <div class="mod-list-section-label">EDIT PROFILE ORDER · {deploymentDraftEntries.length}</div>
-        <p class="subtle deployment-help">Drag to reorder. Use + or − to change the enabled state.</p>
-        <div class="mod-list-items deployment-edit-list">
-          {#each deploymentDraftEntries as entry (entry.entryId)}
-            {#if entry.isSeparator}
-              <div class="deployment-separator" aria-label="Profile separator">{entry.modKey}</div>
-            {:else}
-              {#if deploymentDropGap === deploymentEditableIndex(entry.entryId)}<div class="deployment-drop-line" role="status" aria-label={`Drop before ${entry.modKey}`}></div>{/if}
-              <article class="mod-list-item deployment-edit-item" class:mod-list-item-disabled={!entry.enabled} draggable={entry.isEditable} ondragstart={(event) => startDeploymentDrag(event, entry)} ondragover={(event) => allowDeploymentDrop(event, entry)} ondrop={(event) => dropDeploymentEntry(event, entry)} ondragend={() => { draggedDeploymentEntryId = null; deploymentDropGap = null; }}>
-                <div class="deployment-row-controls">
-                  <span class="deployment-drag-handle" title="Drag to reorder" aria-hidden="true">☷</span>
-                  <button class="deployment-toggle-button" type="button" title={entry.enabled ? 'Disable MOD' : 'Enable MOD'} aria-label={entry.enabled ? `Disable ${entry.modKey}` : `Enable ${entry.modKey}`} disabled={!entry.isEditable || operationBlocksInteraction} onclick={() => toggleDeploymentEntry(entry.entryId)}>{entry.enabled ? '−' : '+'}</button>
-                </div>
-                <div class="deployment-edit-main"><strong>{entry.modKey}</strong>{#if entry.priority !== null && entry.priority !== undefined}<span>priority {entry.priority}</span>{/if}</div>
-              </article>
-            {/if}
-          {/each}
+    {#if operationBlocksInteraction}
+      <div class="local-skeleton-panel mod-list-pending" aria-busy="true">
+        {#if state.analysis.operation.isBusy}
+          <p class="subtle local-skeleton-status" role="status">Analysis is running…</p>
+        {:else if state.knowledge.operation.isBusy}
+          <p class="subtle local-skeleton-status" role="status">Loading local profile…</p>
+        {/if}
+        <div class="local-skeleton-stack" aria-hidden="true">
+          <span class="local-skeleton local-skeleton-control"></span>
+          <span class="local-skeleton local-skeleton-summary"></span>
+          <span class="local-skeleton local-skeleton-label"></span>
+          <span class="local-skeleton local-skeleton-row"></span>
+          <span class="local-skeleton local-skeleton-row local-skeleton-row-short"></span>
+          <span class="local-skeleton local-skeleton-row"></span>
+          <span class="local-skeleton local-skeleton-row local-skeleton-row-medium"></span>
+          <span class="local-skeleton local-skeleton-row"></span>
+          <span class="local-skeleton local-skeleton-row local-skeleton-row-short"></span>
+          <span class="local-skeleton local-skeleton-row"></span>
+          <span class="local-skeleton local-skeleton-row-medium"></span>
         </div>
-        {#if deploymentDraftEntries.length === 0}<p class="empty-state">No editable MOD entry is available in this profile.</p>{/if}
       </div>
     {:else}
-      <div class="mod-list-scroll" aria-label="Active profile MOD list">
-        {#if profileCandidates.length > 0}
-          <div class="mod-list-section-label">PROFILE MODLIST · {profileCandidates.length}</div>
-          <div class="mod-list-items">
-            {#each profileCandidates as candidate (candidate.modKey)}
-              {@const website = resolveModWebsite(candidate)}
-              <article class="mod-list-item" class:mod-list-item-selected={selectedModKey === candidate.modKey} class:mod-list-item-disabled={candidate.enabledState === 'disabled'} class:mod-list-item-unresolved={candidate.profileState === 'unresolved'} title={modTooltip(candidate)}>
-                <div class="mod-list-item-top">
-                  <button type="button" class="mod-list-item-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} disabled={operationBlocksInteraction} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
-                    <strong>{modDisplayName(candidate)}</strong>
-                    {#if candidate.version}<span class="mod-list-item-version">v{candidate.version}</span>{/if}
-                    <span class="mod-enabled-lamp" class:enabled={candidate.enabledState === 'enabled'} class:disabled={candidate.enabledState !== 'enabled'} role="img" aria-label={enabledLampLabel(candidate)}></span>
-                  </button>
-                  <div class="mod-list-item-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
-                    {#if website.url}
-                      <button type="button" class="secondary-button mod-list-item-website" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} disabled={operationBlocksInteraction} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
-                    {:else}
-                      <span class="mod-list-item-website mod-list-item-website-unavailable" aria-label="No usable URL">No usable URL</span>
-                    {/if}
-                    <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} disabled={operationBlocksInteraction} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+      <div class="deployment-toolbar" aria-label="Profile deployment controls">
+        {#if deploymentEditMode}
+          <span class="deployment-mode-label">Edit profile</span>
+          <button class="secondary-button" type="button" onclick={onCancelDeploymentEdit}>Cancel</button>
+          <button class="secondary-button" type="button" onclick={onPreviewDeployment}>Preview deployment</button>
+        {:else}
+          <button class="secondary-button" type="button" onclick={onStartDeploymentEdit}>Edit profile</button>
+        {/if}
+        {#if state.deployment.canLaunch}<button class="secondary-button" type="button" onclick={onLaunchGame}>Launch 7DTD</button>{/if}
+      </div>
+
+      <label class="mod-list-profile-picker">
+        <span>Profile</span>
+        <select aria-label="Active profile" value={state.knowledge.session.profileName} onchange={onSwitchProfile}>
+          {#each state.knowledge.profiles as profile (profile.name)}
+            <option value={profile.name}>{profile.name} · {formatLabel(profile.loadState)}</option>
+          {/each}
+        </select>
+      </label>
+
+      <p class="mod-list-compact-summary" aria-label="Profile MOD status">
+        {profileCandidates.length} in profile · {enabledCount} enabled · {disabledCount} disabled · {unresolvedCount} unresolved
+      </p>
+
+      {#if deploymentEditMode}
+        <div class="mod-list-scroll" aria-label="Edit active profile MOD list">
+          <div class="mod-list-section-label">EDIT PROFILE ORDER · {deploymentDraftEntries.length}</div>
+          <p class="subtle deployment-help">Drag to reorder. Use + or − to change the enabled state.</p>
+          <div class="mod-list-items deployment-edit-list">
+            {#each deploymentDraftEntries as entry (entry.entryId)}
+              {#if entry.isSeparator}
+                <div class="deployment-separator" aria-label="Profile separator">{entry.modKey}</div>
+              {:else}
+                {#if deploymentDropGap === deploymentEditableIndex(entry.entryId)}<div class="deployment-drop-line" role="status" aria-label={`Drop before ${entry.modKey}`}></div>{/if}
+                <article class="mod-list-item deployment-edit-item" class:mod-list-item-disabled={!entry.enabled} draggable={entry.isEditable} ondragstart={(event) => startDeploymentDrag(event, entry)} ondragover={(event) => allowDeploymentDrop(event, entry)} ondrop={(event) => dropDeploymentEntry(event, entry)} ondragend={() => { draggedDeploymentEntryId = null; deploymentDropGap = null; }}>
+                  <div class="deployment-row-controls">
+                    <span class="deployment-drag-handle" title="Drag to reorder" aria-hidden="true">☷</span>
+                    <button class="deployment-toggle-button" type="button" title={entry.enabled ? 'Disable MOD' : 'Enable MOD'} aria-label={entry.enabled ? `Disable ${entry.modKey}` : `Enable ${entry.modKey}`} disabled={!entry.isEditable} onclick={() => toggleDeploymentEntry(entry.entryId)}>{entry.enabled ? '−' : '+'}</button>
                   </div>
-                </div>
-                <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)}</span>
-              </article>
+                  <div class="deployment-edit-main"><strong>{entry.modKey}</strong>{#if entry.priority !== null && entry.priority !== undefined}<span>priority {entry.priority}</span>{/if}</div>
+                </article>
+              {/if}
             {/each}
           </div>
-        {:else}
-          <p class="empty-state">No MOD entry is available in this profile.</p>
-        {/if}
-
-        <details class="profile-outside-section">
-          <summary>Profile外 · {unlistedProfileCandidates.length}</summary>
-          {#if unlistedProfileCandidates.length > 0}
+          {#if deploymentDraftEntries.length === 0}<p class="empty-state">No editable MOD entry is available in this profile.</p>{/if}
+        </div>
+      {:else}
+        <div class="mod-list-scroll" aria-label="Active profile MOD list">
+          {#if profileCandidates.length > 0}
+            <div class="mod-list-section-label">PROFILE MODLIST · {profileCandidates.length}</div>
             <div class="mod-list-items">
-              {#each unlistedProfileCandidates as candidate (candidate.modKey)}
+              {#each profileCandidates as candidate (candidate.modKey)}
                 {@const website = resolveModWebsite(candidate)}
-                <article class="mod-list-item mod-list-item-unresolved" class:mod-list-item-selected={selectedModKey === candidate.modKey} title={modTooltip(candidate)}>
+                <article class="mod-list-item" class:mod-list-item-selected={selectedModKey === candidate.modKey} class:mod-list-item-disabled={candidate.enabledState === 'disabled'} class:mod-list-item-unresolved={candidate.profileState === 'unresolved'} title={modTooltip(candidate)}>
                   <div class="mod-list-item-top">
-                    <button type="button" class="mod-list-item-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} disabled={operationBlocksInteraction} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
+                    <button type="button" class="mod-list-item-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
                       <strong>{modDisplayName(candidate)}</strong>
                       {#if candidate.version}<span class="mod-list-item-version">v{candidate.version}</span>{/if}
-                      <span class="mod-enabled-lamp disabled" role="img" aria-label={enabledLampLabel(candidate)}></span>
+                      <span class="mod-enabled-lamp" class:enabled={candidate.enabledState === 'enabled'} class:disabled={candidate.enabledState !== 'enabled'} role="img" aria-label={enabledLampLabel(candidate)}></span>
                     </button>
                     <div class="mod-list-item-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
                       {#if website.url}
-                        <button type="button" class="secondary-button mod-list-item-website" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} disabled={operationBlocksInteraction} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
+                        <button type="button" class="secondary-button mod-list-item-website" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
                       {:else}
                         <span class="mod-list-item-website mod-list-item-website-unavailable" aria-label="No usable URL">No usable URL</span>
                       {/if}
-                      <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} disabled={operationBlocksInteraction} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                      <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
                     </div>
                   </div>
-                  <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)} · Profile outside</span>
+                  <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)}</span>
                 </article>
               {/each}
             </div>
-          {:else}<p class="empty-state">No MOD exists outside this profile.</p>{/if}
-        </details>
-      </div>
+          {:else}
+            <p class="empty-state">No MOD entry is available in this profile.</p>
+          {/if}
+
+          <details class="profile-outside-section">
+            <summary>Profile外 · {unlistedProfileCandidates.length}</summary>
+            {#if unlistedProfileCandidates.length > 0}
+              <div class="mod-list-items">
+                {#each unlistedProfileCandidates as candidate (candidate.modKey)}
+                  {@const website = resolveModWebsite(candidate)}
+                  <article class="mod-list-item mod-list-item-unresolved" class:mod-list-item-selected={selectedModKey === candidate.modKey} title={modTooltip(candidate)}>
+                    <div class="mod-list-item-top">
+                      <button type="button" class="mod-list-item-select" aria-pressed={selectedModKey === candidate.modKey} aria-label={`Select ${modDisplayName(candidate)}`} onclick={() => selectMod(candidate.modKey)} onkeydown={(event) => handleModSelectionKeydown(event, candidate.modKey)}>
+                        <strong>{modDisplayName(candidate)}</strong>
+                        {#if candidate.version}<span class="mod-list-item-version">v{candidate.version}</span>{/if}
+                        <span class="mod-enabled-lamp disabled" role="img" aria-label={enabledLampLabel(candidate)}></span>
+                      </button>
+                      <div class="mod-list-item-actions" aria-label={`Actions for ${modDisplayName(candidate)}`}>
+                        {#if website.url}
+                          <button type="button" class="secondary-button mod-list-item-website" title={`${website.status}: ${modDisplayName(candidate)}`} aria-label={`${website.status === 'Verified' ? 'Open website' : 'Open inferred Nexus search'} for ${modDisplayName(candidate)}`} onclick={() => onOpenModPage(candidate)}>{website.status === 'Verified' ? 'Website' : 'Nexus search'}</button>
+                        {:else}
+                          <span class="mod-list-item-website mod-list-item-website-unavailable" aria-label="No usable URL">No usable URL</span>
+                        {/if}
+                        <button type="button" class="icon-button compact-icon-button mod-list-item-inspect" title="Inspect evidence" aria-label={`Inspect ${modDisplayName(candidate)} evidence`} onclick={() => onOpenInspectorForMod(candidate.modKey)}>⌕</button>
+                      </div>
+                    </div>
+                    <span class="mod-list-item-tooltip" role="tooltip">{modTooltip(candidate)} · Profile outside</span>
+                  </article>
+                {/each}
+              </div>
+            {:else}<p class="empty-state">No MOD exists outside this profile.</p>{/if}
+          </details>
+        </div>
+      {/if}
     {/if}
   {:else}
-    <div class="mod-list-empty-state" role={state.knowledge.operation.isBusy ? 'status' : undefined}>
+    <div class="mod-list-empty-state" role={state.knowledge.operation.isBusy ? 'status' : undefined} aria-busy={state.knowledge.operation.isBusy ? 'true' : 'false'}>
       <span class="eyebrow">LOCAL MODS</span>
       {#if state.knowledge.operation.isBusy}
         <p class="subtle">Preparing local MO2 knowledge. Browser remains available.</p>
-        <div class="mod-list-skeleton" aria-hidden="true">
-          <span></span><span></span><span></span>
+        <div class="local-skeleton-stack" aria-hidden="true">
+          <span class="local-skeleton local-skeleton-row"></span>
+          <span class="local-skeleton local-skeleton-row-short"></span>
+          <span class="local-skeleton local-skeleton-row-medium"></span>
         </div>
       {:else}
         <p class="subtle">Load an MO2 source to show the active profile.</p>
@@ -452,41 +477,9 @@
     white-space: nowrap;
   }
 
-  .mod-list-skeleton {
-    display: grid;
-    gap: 8px;
-    margin-top: 12px;
-  }
-
-  .mod-list-skeleton span {
-    display: block;
-    height: 28px;
-    border-radius: 7px;
-    background: linear-gradient(90deg, rgba(71, 85, 105, 0.28), rgba(100, 116, 139, 0.46), rgba(71, 85, 105, 0.28));
-    background-size: 240% 100%;
-    animation: mod-list-skeleton-pulse 1.4s ease-in-out infinite;
-  }
-
-  .mod-list-skeleton span:nth-child(2) {
-    width: 86%;
-  }
-
-  .mod-list-skeleton span:nth-child(3) {
-    width: 68%;
-  }
-
-  @keyframes mod-list-skeleton-pulse {
-    from { background-position: 100% 0; }
-    to { background-position: -100% 0; }
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .mod-list-item-actions {
       transition: none;
-    }
-
-    .mod-list-skeleton span {
-      animation: none;
     }
   }
 </style>

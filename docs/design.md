@@ -1503,6 +1503,15 @@ overlayは対象profile、operation phase、取得できるcompleted / totalを�
 失敗時はoverlayを閉じ、既存stateとdiagnosticを保持します。
 operation stateは既存`OperationStateChanged`を使い、UiStateとbridge contractへ項目を追加しません。
 
+ForegroundのMO2 source load、Profile load、Profile switch、Analysis中は、Local data bodyへSkeletonを表示します。
+処理中の古いMOD row、recognition candidate、analysis result、Inspector evidenceをdisabledな実データとして表示しません。
+Skeletonは非操作要素とし、`aria-busy`を処理中のdata bodyへ設定します。
+Paneの見出し、active Profileの識別、operation status、progress、Browser toolbar、tab、navigationは維持します。
+Background profile warmはactive Profileの表示をSkeletonへ置き換えません。
+処理完了時は同じUiStateから実データを描画します。
+処理失敗時はSkeletonを解除し、既存diagnosticとunknown stateを表示します。
+この表示規則はread-onlyの派生表示だけに適用し、MO2 source、Local snapshot、Bridge wire contractを変更しません。
+
 通常Toolbarは76pxのChrome型2段構成です。
 上段へtab strip、active tab、tab close、new tabを置きます。
 下段へback、forward、reload、home、URL入力、Go、History、pane icon、shortcut hintを置きます。
