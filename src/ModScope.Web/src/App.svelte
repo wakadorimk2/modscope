@@ -32,6 +32,7 @@
   let contextPanelMode: 'context' | 'inspector' = 'context';
   let inspectorView: 'mod' | 'diagnosis' = 'mod';
   let inspectorModKey: string | null = null;
+  let pendingInspectorModKey: string | null = null;
   let dismissedInspectorModKey: string | null = null;
   let handledAutoInspectToken: string | null = null;
   let inspectorFilesOpen = false;
@@ -89,7 +90,12 @@
       const addressIsBeingEdited = document.activeElement instanceof HTMLInputElement
         && document.activeElement.classList.contains('toolbar-address');
       state = message.payload;
-      contextMode = normalizeContextMode(state.layout.contextMode);
+      const requestedInspectorKey = pendingInspectorModKey;
+      if (requestedInspectorKey && state.inspector?.modKey === requestedInspectorKey) {
+        pendingInspectorModKey = null;
+      }
+      const inspectorTransitionPending = pendingInspectorModKey !== null;
+      contextMode = inspectorTransitionPending ? 'context' : normalizeContextMode(state.layout.contextMode);
       modListMode = normalizeModListMode(state.layout.modListMode);
       if (modListMode === 'browse') {
         deploymentDraftEntries = state.deployment.entries;
@@ -106,7 +112,7 @@
         deploymentApplyPending = false;
       }
 
-      if (surface === 'context' && state.inspector?.modKey) {
+      if (!inspectorTransitionPending && surface === 'context' && state.inspector?.modKey) {
         if (state.identity.autoInspectToken && state.identity.autoInspectToken !== handledAutoInspectToken) {
           handledAutoInspectToken = state.identity.autoInspectToken;
           dismissedInspectorModKey = null;
@@ -123,13 +129,19 @@
         }
       }
 
-      if (contextPanelMode === 'inspector' && inspectorView === 'mod' && inspectorModKey && state.inspector?.modKey !== inspectorModKey) {
+      if (!inspectorTransitionPending && contextPanelMode === 'inspector' && inspectorView === 'mod' && inspectorModKey && state.inspector?.modKey !== inspectorModKey) {
         closeInspector();
       }
       return;
     }
 
     if (message.kind === 'error') {
+      if (pendingInspectorModKey !== null) {
+        pendingInspectorModKey = null;
+        contextPanelMode = 'context';
+        inspectorView = 'mod';
+        inspectorModKey = null;
+      }
       lastError = message.payload;
       deploymentApplyPending = false;
     }
@@ -138,6 +150,7 @@
   function send(command: string, payload: unknown = {}) {
     lastError = null;
     if (['browser.home', 'browser.newTab', 'browser.history', 'browser.selectHistory', 'browser.selectTab', 'browser.navigate', 'identity.confirm', 'knowledge.loadSource', 'knowledge.selectRoot', 'knowledge.selectSource', 'knowledge.switchProfile', 'knowledge.useFixture', 'knowledge.selectEvidenceManifest', 'deployment.preview', 'deployment.apply', 'game.launch'].includes(command)) {
+      pendingInspectorModKey = null;
       contextPanelMode = 'context';
       inspectorModKey = null;
     }
@@ -159,7 +172,10 @@
 
   function setContextMode(mode: ContextMode) {
     contextMode = mode;
-    if (mode !== 'context') contextPanelMode = 'context';
+    if (mode !== 'context') {
+      pendingInspectorModKey = null;
+      contextPanelMode = 'context';
+    }
     send('layout.setContextMode', { mode });
   }
 
@@ -271,17 +287,19 @@
   function openInspectorForMod(modKey: string) {
     const inspectorChanged = inspectorModKey !== modKey;
     if (inspectorChanged) webObservedVersion = '';
+    pendingInspectorModKey = modKey;
     contextMode = 'context';
     contextPanelMode = 'inspector';
     inspectorView = 'mod';
     inspectorModKey = modKey;
     dismissedInspectorModKey = null;
     if (inspectorChanged) inspectorFilesOpen = false;
-    send('layout.setContextMode', { mode: 'context' });
     send('inspector.open', { modKey });
+    send('layout.setContextMode', { mode: 'context' });
   }
 
   function openProfileDiagnosis() {
+    pendingInspectorModKey = null;
     contextMode = 'analysis';
     contextPanelMode = 'inspector';
     inspectorView = 'diagnosis';
@@ -300,6 +318,7 @@
   }
 
   function closeInspector() {
+    pendingInspectorModKey = null;
     dismissedInspectorModKey = state.inspector?.modKey ?? inspectorModKey;
     contextPanelMode = 'context';
     inspectorView = 'mod';

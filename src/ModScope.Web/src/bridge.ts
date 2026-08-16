@@ -559,6 +559,30 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
       };
       next.statusMessage = 'Mock profile switched.';
     }
+  } else if (command === 'inspector.open' && typeof payload === 'object' && payload !== null) {
+    const modKey = (payload as { modKey?: unknown }).modKey;
+    const candidate = typeof modKey === 'string'
+      ? next.knowledge.candidates.find((item) => item.modKey === modKey)
+      : undefined;
+    if (candidate) {
+      next.inspector = {
+        modKey: candidate.modKey,
+        directoryName: candidate.directoryName,
+        profileState: candidate.profileState,
+        enabledState: candidate.enabledState,
+        priority: candidate.priority,
+        modInfo: null,
+        files: [],
+        xmlFiles: [],
+        diagnostics: candidate.diagnostics,
+        source: candidate.source,
+        packageRelation: candidate.packageRelation ?? null,
+        conclusion: null,
+        compatibilityObservations: [],
+        compatibilityDiagnostics: []
+      };
+      next.statusMessage = `Mock Inspector opened for ${candidate.directoryName}.`;
+    }
   } else if (command === 'deployment.preview' && typeof payload === 'object' && payload !== null) {
     const preview = payload as {
       profileName?: unknown;
