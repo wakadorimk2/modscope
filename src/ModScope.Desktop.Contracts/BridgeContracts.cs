@@ -56,6 +56,7 @@ public static class BridgeProtocol
         "layout.setContextVisible",
         "layout.setModListVisible",
         "layout.setMoreOpen",
+        "layout.setModSearchOpen",
         "layout.setToolbarExpanded",
         "layout.setContextMode",
         "layout.setModListMode"
@@ -212,6 +213,17 @@ public static class BridgeProtocol
         return ReadPayload<SetMoreOpenPayload>(payload);
     }
 
+    public static SetModSearchOpenPayload ReadModSearchOpenPayload(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("open", out var open)
+            || open.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            throw new BridgeProtocolException("The MOD search drawer state must be a boolean.");
+        }
+
+        return ReadPayload<SetModSearchOpenPayload>(payload);
+    }
+
     public static bool IsContextMode(string? value)
     {
         return value is "context" or "settings" or "debug" or "analysis";
@@ -284,6 +296,8 @@ public sealed record SetContextVisiblePayload(bool Visible);
 public sealed record SetModListVisiblePayload(bool Visible);
 
 public sealed record SetMoreOpenPayload(bool Open);
+
+public sealed record SetModSearchOpenPayload(bool Open);
 
 public sealed record SetToolbarExpandedPayload(bool Expanded);
 
@@ -803,7 +817,8 @@ public sealed record LayoutUiState(
     bool ModListVisible,
     string ContextMode = "context",
     string ModListMode = "browse",
-    bool MoreOpen = false);
+    bool MoreOpen = false,
+    bool ModSearchOpen = false);
 
 public sealed record UiState(
     BrowserUiState Browser,
