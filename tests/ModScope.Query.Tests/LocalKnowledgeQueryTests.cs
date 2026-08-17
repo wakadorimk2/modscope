@@ -230,6 +230,33 @@ public sealed class LocalKnowledgeQueryTests
     }
 
     [Fact]
+    public void TreatsSameUrlObservationsAsTheSamePage()
+    {
+        var first = CreatePage(
+            "https://example.test/alpha?tab=files",
+            content: "first body",
+            title: "First observation");
+        var second = CreatePage(
+            "https://example.test/alpha?tab=files",
+            content: "updated body",
+            title: "Second observation");
+
+        Assert.True(first.IsSamePageAs(second));
+    }
+
+    [Theory]
+    [InlineData("https://example.test/beta?tab=files")]
+    [InlineData("https://example.test/alpha?tab=description")]
+    [InlineData("https://other.test/alpha?tab=files")]
+    public void TreatsChangedPageUrlsAsDifferentPages(string url)
+    {
+        var first = CreatePage("https://example.test/alpha?tab=files");
+        var second = CreatePage(url);
+
+        Assert.False(first.IsSamePageAs(second));
+    }
+
+    [Fact]
     public void ResolvesInstalledNotInstalledUnresolvedAndUnknownStates()
     {
         var query = CreateQuery();

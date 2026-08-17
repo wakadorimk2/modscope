@@ -299,6 +299,12 @@ public sealed record PageObservation(
 {
     public const int MaxContentPreviewLength = 8_000;
 
+    public bool IsSamePageAs(PageObservation other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return Url.Equals(other.Url);
+    }
+
     public string? BoundedContentPreview => ContentPreview is null
         ? null
         : ContentPreview.Length <= MaxContentPreviewLength

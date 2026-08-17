@@ -554,6 +554,7 @@ export type LayoutUiState = {
   contextMode: 'context' | 'settings' | 'debug' | 'analysis' | string;
   modListMode: 'browse' | 'deployment-edit' | string;
   moreOpen: boolean;
+  modSearchOpen: boolean;
   actions?: WorkspaceActionsUiState | null;
 };
 
@@ -660,6 +661,7 @@ export const initialState: UiState = {
     contextMode: 'context',
     modListMode: 'browse',
     moreOpen: false,
+    modSearchOpen: false,
     actions: null
   },
   statusMessage: 'Load a source and observe the current page.',
