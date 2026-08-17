@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { afterUpdate } from 'svelte';
   import type {
     BridgeErrorPayload,
     DiagnosticUiState,
@@ -56,6 +57,16 @@
   export let onObserveNexusFileVersion: () => void;
   export let inspectorFilesOpen = false;
   export let webObservedVersion = '';
+
+  let modSearchInput: HTMLInputElement | undefined;
+  let previousModSearchOpen = false;
+
+  afterUpdate(() => {
+    if (modSearchOpen && !previousModSearchOpen) {
+      modSearchInput?.focus();
+    }
+    previousModSearchOpen = modSearchOpen;
+  });
 
   type ContextCell = {
     label: 'Installed' | 'Enabled' | 'Version' | 'Profile';
@@ -388,8 +399,8 @@
 
 {#if modSearchOpen}
   <button type="button" class="drawer-backdrop" aria-label="Close MOD search" onclick={onCloseModSearch}></button>
-  <aside class="mod-search-drawer" aria-labelledby="mod-search-title"><div class="drawer-heading"><div><span class="eyebrow">MOD CATALOG</span><h2 id="mod-search-title">{modSearchMode === 'recognition' ? 'Choose a local MOD' : 'Search all MODs'}</h2></div><button class="icon-button" type="button" title="Close MOD search" aria-label="Close MOD search" onclick={onCloseModSearch}>×</button></div><p class="subtle mod-search-description">Search by display name, directory name, or MOD key. Website links use exact package identity, source Website, or inferred Nexus destinations.</p><label class="mod-search-field"><span>Search MODs</span><input bind:value={modSearchQuery} aria-label="Search MODs" placeholder="e.g. Alpha Mod" /></label>
-    {#if modSearchQuery.trim().length === 0}<p class="empty-state mod-search-empty">Enter a search term to show matching MODs.</p>{:else if modSearchResults.length === 0}<p class="empty-state mod-search-empty">No matching MODs were found.</p>{:else}<div class="mod-search-results" aria-live="polite"><p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>{#each modSearchResults as candidate (candidate.modKey)}<article class="mod-search-card"><button type="button" class="mod-card-main" aria-label={`Inspect ${candidate.displayName || candidate.modKey}`} onclick={() => onOpenModPage(candidate)}><strong>{candidate.displayName || candidate.directoryName || candidate.modKey}</strong><span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span></button><div class="mod-card-meta"><span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span><span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span><span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span></div>{#if modSearchMode === 'recognition'}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onChooseModForRecognition(candidate)}>Use for recognition</button>{/if}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onOpenInspectorForMod(candidate.modKey)}>Inspect evidence</button></article>{/each}</div>{/if}
+  <aside class="mod-search-drawer" aria-labelledby="mod-search-title"><div class="drawer-heading"><div><span class="eyebrow">MOD CATALOG</span><h2 id="mod-search-title">{modSearchMode === 'recognition' ? 'Choose a local MOD' : 'Search all MODs'}</h2></div><button class="icon-button" type="button" title="Close MOD search" aria-label="Close MOD search" onclick={onCloseModSearch}>×</button></div><p class="subtle mod-search-description">Search by display name, directory name, or MOD key. Website links use exact package identity, source Website, or inferred Nexus destinations.</p><label class="mod-search-field"><span>Search MODs</span><input bind:value={modSearchQuery} bind:this={modSearchInput} aria-label="Search MODs" placeholder="e.g. Alpha Mod" /></label>
+    {#if modSearchQuery.trim().length === 0}<p class="empty-state mod-search-empty">Enter a search term to show matching MODs.</p>{:else if modSearchResults.length === 0}<p class="empty-state mod-search-empty">No matching MODs were found.</p>{:else}<div class="mod-search-results" aria-live="polite"><p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>{#each modSearchResults as candidate (candidate.modKey)}<article class="mod-search-card"><button type="button" class="mod-card-main" disabled={!resolveModWebsite(candidate).url} aria-label={resolveModWebsite(candidate).url ? `Open ${candidate.displayName || candidate.modKey}` : `No usable Website for ${candidate.displayName || candidate.modKey}`} onclick={() => onOpenModPage(candidate)}><strong>{candidate.displayName || candidate.directoryName || candidate.modKey}</strong><span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span></button><div class="mod-card-meta"><span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span><span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span><span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span><span class="subtle">{resolveModWebsite(candidate).status}</span></div>{#if modSearchMode === 'recognition'}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onChooseModForRecognition(candidate)}>Use for recognition</button>{/if}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onOpenInspectorForMod(candidate.modKey)}>Inspect evidence</button></article>{/each}</div>{/if}
   </aside>
 {/if}
 

@@ -35,7 +35,7 @@
   let inspectorModKey: string | null = null;
   let pendingInspectorModKey: string | null = null;
   let inspectorFilesOpen = false;
-  let modSearchOpen = false;
+  let modSearchOpen = initialState.layout.modSearchOpen;
   let modSearchMode: 'browse' | 'recognition' = 'browse';
   let modSearchQuery = '';
   let pageDetailsOpen = false;
@@ -140,6 +140,11 @@
         || previousState.localContext?.localModKey !== message.payload.localContext?.localModKey;
       state = message.payload;
       layout = message.payload.layout;
+      modSearchOpen = layout.modSearchOpen;
+      if (!modSearchOpen) {
+        modSearchQuery = '';
+        modSearchMode = 'browse';
+      }
       browserHostReady = Boolean(
         state.browser.activeTabId
         && state.browser.tabs.some((tab) => tab.isActive)
@@ -189,6 +194,11 @@
 
     if (message.kind === 'layout') {
       layout = message.payload;
+      modSearchOpen = layout.modSearchOpen;
+      if (!modSearchOpen) {
+        modSearchQuery = '';
+        modSearchMode = 'browse';
+      }
       contextMode = normalizeContextMode(layout.contextMode);
       modListMode = normalizeModListMode(layout.modListMode);
       return;
@@ -208,6 +218,12 @@
 
   function send(command: string, payload: unknown = {}) {
     lastError = null;
+    if (command.startsWith('browser.') && modSearchOpen) {
+      modSearchOpen = false;
+      modSearchQuery = '';
+      modSearchMode = 'browse';
+      bridge?.send('layout.setModSearchOpen', { open: false });
+    }
     if (['browser.home', 'browser.newTab', 'browser.history', 'browser.selectHistory', 'browser.selectTab', 'browser.navigate', 'identity.confirm', 'knowledge.loadSource', 'knowledge.selectRoot', 'knowledge.selectSource', 'knowledge.switchProfile', 'knowledge.useFixture', 'knowledge.selectEvidenceManifest', 'deployment.preview', 'deployment.apply', 'game.launch'].includes(command)) {
       pendingInspectorModKey = null;
       inspectorOpen = false;
@@ -404,12 +420,20 @@
     modSearchMode = mode;
     modSearchQuery = '';
     modSearchOpen = true;
+    if (!layout.contextVisible) {
+      send('layout.setContextVisible', { visible: true });
+    }
+    if (mode === 'browse' && layout.modSearchOpen) {
+      send('layout.setModSearchOpen', { open: false });
+    }
+    send('layout.setModSearchOpen', { open: true });
   }
 
   function closeModSearch() {
     modSearchOpen = false;
     modSearchQuery = '';
     modSearchMode = 'browse';
+    send('layout.setModSearchOpen', { open: false });
   }
 
   function openModPage(candidate: ModCandidateUiState) {
@@ -466,6 +490,7 @@
     onForward={() => send('browser.forward')}
     onReload={() => send('browser.reload')}
     onHome={openHome}
+    onOpenModSearch={() => openModSearch('browse')}
     onOpenHistory={openHistory}
     onNewTab={openNewTab}
     onSelectTab={selectTab}

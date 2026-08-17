@@ -833,6 +833,7 @@ public partial class MainWindow : Window
 
     private void NavigateHome(BrowserTabHostState tab)
     {
+        _controller.SetModSearchOpen(false);
         tab.InternalPage = "home";
         tab.PendingNexusSearchNames = Array.Empty<string>();
         tab.Url = "about:blank";
@@ -843,6 +844,7 @@ public partial class MainWindow : Window
 
     private void NavigateHistory(BrowserTabHostState tab)
     {
+        _controller.SetModSearchOpen(false);
         tab.InternalPage = "history";
         tab.PendingNexusSearchNames = Array.Empty<string>();
         tab.Url = "about:history";
@@ -2155,6 +2157,13 @@ public partial class MainWindow : Window
                 SetMoreOpenState(payload.Open, command.RequestId, sourceWebView);
                 break;
             }
+            case "layout.setModSearchOpen":
+            {
+                var payload = BridgeProtocol.ReadModSearchOpenPayload(command.Payload);
+                _controller.SetModSearchOpen(payload.Open);
+                SendLayoutState(command.RequestId, sourceWebView);
+                break;
+            }
             case "layout.setToolbarExpanded":
             {
                 if (!command.Payload.TryGetProperty("expanded", out var expanded)
@@ -2238,6 +2247,7 @@ public partial class MainWindow : Window
         }
 
         var browser = tab.WebView;
+        _controller.SetModSearchOpen(false);
         tab.Url = tab.InternalPage switch
         {
             "history" => "about:history",
@@ -2334,6 +2344,8 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        _controller.SetModSearchOpen(false);
 
         var source = tab.WebView.Source?.ToString() ?? "about:blank";
         var documentTitle = tab.WebView.CoreWebView2?.DocumentTitle;

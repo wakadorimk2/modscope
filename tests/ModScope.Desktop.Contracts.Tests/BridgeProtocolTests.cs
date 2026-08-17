@@ -130,7 +130,7 @@ public sealed class BridgeProtocolTests
     {
         var json = BridgeProtocol.SerializeMessage(
             "layout",
-            new LayoutUiState(false, true, "analysis", "deployment-edit", true),
+            new LayoutUiState(false, true, "analysis", "deployment-edit", true, true),
             "layout-1");
         using var document = JsonDocument.Parse(json);
         var payload = document.RootElement.GetProperty("payload");
@@ -142,6 +142,7 @@ public sealed class BridgeProtocolTests
         Assert.Equal("analysis", payload.GetProperty("contextMode").GetString());
         Assert.Equal("deployment-edit", payload.GetProperty("modListMode").GetString());
         Assert.True(payload.GetProperty("moreOpen").GetBoolean());
+        Assert.True(payload.GetProperty("modSearchOpen").GetBoolean());
         Assert.False(payload.TryGetProperty("browser", out _));
         Assert.False(payload.TryGetProperty("knowledge", out _));
     }
@@ -233,6 +234,17 @@ public sealed class BridgeProtocolTests
             """);
         var morePayload = BridgeProtocol.ReadMoreOpenPayload(moreEnvelope.Payload);
 
+        var modSearchEnvelope = BridgeProtocol.ParseCommand(
+            """
+            {
+              "contractVersion": 2,
+              "requestId": "mod-search-layout-1",
+              "command": "layout.setModSearchOpen",
+              "payload": { "open": true }
+            }
+            """);
+        var modSearchPayload = BridgeProtocol.ReadModSearchOpenPayload(modSearchEnvelope.Payload);
+
         var contextModeEnvelope = BridgeProtocol.ParseCommand(
             """
             {
@@ -260,6 +272,7 @@ public sealed class BridgeProtocolTests
         Assert.False(modListPayload.Visible);
         Assert.True(toolbarPayload.Expanded);
         Assert.True(morePayload.Open);
+        Assert.True(modSearchPayload.Open);
         Assert.Equal("analysis", contextModePayload.Mode);
         Assert.Equal("deployment-edit", modListModePayload.Mode);
     }
@@ -329,6 +342,37 @@ public sealed class BridgeProtocolTests
 
         Assert.Throws<BridgeProtocolException>(
             () => BridgeProtocol.ReadMoreOpenPayload(envelope.Payload));
+    }
+
+    [Fact]
+    public void SerializesModSearchOpenPayloadInCamelCase()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new SetModSearchOpenPayload(true),
+            BridgeProtocol.JsonOptions);
+
+        Assert.Equal("{\"open\":true}", json);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"open\":null}")]
+    [InlineData("{\"open\":\"true\"}")]
+    [InlineData("{\"open\":1}")]
+    public void RejectsInvalidModSearchOpenPayload(string payload)
+    {
+        var envelope = BridgeProtocol.ParseCommand(
+            $$"""
+            {
+              "contractVersion": 2,
+              "requestId": "mod-search-layout-invalid",
+              "command": "layout.setModSearchOpen",
+              "payload": {{payload}}
+            }
+            """);
+
+        Assert.Throws<BridgeProtocolException>(
+            () => BridgeProtocol.ReadModSearchOpenPayload(envelope.Payload));
     }
 
     [Fact]
@@ -431,7 +475,7 @@ public sealed class BridgeProtocolTests
             BridgeProtocol.JsonOptions);
 
         Assert.Equal("{\"name\":\"default\",\"loadState\":\"pending\"}", profile);
-        Assert.Equal("{\"contextVisible\":true,\"modListVisible\":false,\"contextMode\":\"context\",\"modListMode\":\"browse\",\"moreOpen\":false}", layout);
+        Assert.Equal("{\"contextVisible\":true,\"modListVisible\":false,\"contextMode\":\"context\",\"modListMode\":\"browse\",\"moreOpen\":false,\"modSearchOpen\":false}", layout);
         Assert.Contains("\"isBackground\":true", operation);
     }
 

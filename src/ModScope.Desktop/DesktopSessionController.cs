@@ -41,6 +41,7 @@ public sealed class DesktopSessionController
     private string _statusMessage = "Load a source and observe the current page.";
     private bool _contextVisible = true;
     private bool _modListVisible = true;
+    private bool _modSearchOpen;
     private string _contextMode = "context";
     private string _modListMode = "browse";
     private KnowledgeOperationUiState _operation = KnowledgeOperationUiState.Idle;
@@ -684,6 +685,11 @@ public sealed class DesktopSessionController
         _modListVisible = visible;
     }
 
+    public void SetModSearchOpen(bool open)
+    {
+        _modSearchOpen = open;
+    }
+
     public void SetContextMode(string mode)
     {
         _contextMode = mode;
@@ -707,6 +713,7 @@ public sealed class DesktopSessionController
         _selectedLocalModKey = null;
         _localContext = null;
         _inspector = null;
+        _modSearchOpen = false;
         RefreshPageRecognition();
     }
 
@@ -875,7 +882,12 @@ public sealed class DesktopSessionController
 
     public LayoutUiState BuildLayoutState()
     {
-        return new LayoutUiState(_contextVisible, _modListVisible, _contextMode, _modListMode);
+        return new LayoutUiState(
+            _contextVisible,
+            _modListVisible,
+            _contextMode,
+            _modListMode,
+            ModSearchOpen: _modSearchOpen);
     }
 
     public UiState BuildState(BrowserUiState browser)

@@ -341,6 +341,9 @@ function createMockBrowserTab(next: UiState): void {
 
 function mockStateForCommand(state: UiState, command: string, payload: unknown): UiState {
   let next = cloneState(state);
+  if (command.startsWith('browser.')) {
+    next.layout = { ...next.layout, modSearchOpen: false };
+  }
   if (command === 'browser.newTab') {
     createMockBrowserTab(next);
     next.statusMessage = 'New tab opened.';
@@ -647,6 +650,11 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
     if (typeof open === 'boolean') {
       next.layout = { ...next.layout, moreOpen: open };
     }
+  } else if (command === 'layout.setModSearchOpen' && typeof payload === 'object' && payload !== null) {
+    const open = (payload as { open?: unknown }).open;
+    if (typeof open === 'boolean') {
+      next.layout = { ...next.layout, modSearchOpen: open };
+    }
   } else if (command === 'layout.setToolbarExpanded' && typeof payload === 'object' && payload !== null) {
     const expanded = (payload as { expanded?: unknown }).expanded;
     if (typeof expanded === 'boolean') {
@@ -725,6 +733,7 @@ export function createBridge(onMessage: (message: HostMessage) => void): Bridge 
     'layout.setContextVisible',
     'layout.setModListVisible',
     'layout.setMoreOpen',
+    'layout.setModSearchOpen',
     'layout.setContextMode',
     'layout.setModListMode'
   ]);
