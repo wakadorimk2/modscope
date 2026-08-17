@@ -1458,8 +1458,9 @@ tabのURL、title、navigation、scroll、form stateは実行中のWebView2が�
 保存がない場合はローカルBrowse Homeを開きます。
 Historyはbounded metadataとしてURL、title、訪問時刻だけを保存します。
 page本文、raw observation、absolute path、cookie、認証情報は保存しません。
-通常Browseは`Search MODs`から開始します。URL直接入力は現在のトップバーに残します。
-URL直接入力はfallbackまたはadvanced operationとして扱い、http、https、file、aboutのabsolute URLだけを受け付けます。
+通常Browseはトップバーのomniboxから開始します。omniboxはURLとWeb検索語を受け付けます。
+http、https、file、aboutのabsolute URLはそのままnavigationします。schemeなしのdomain/pathはhttps URLとしてnavigationします。それ以外の入力はGoogle検索URLへ変換します。
+unsupported schemeは既存のBrowser validationで拒否します。
 `BrowserUiState.internalPage`は、active tabが`home`、`history`、`deployment-preview`のいずれかの内部ページであることを示します。
 active tabが内部ページへ移動した場合、Hostは前のpage observation、認識結果、Local contextを破棄します。
 Context paneは内部ページ自身の説明を表示し、前のWeb pageの認識結果を再表示しません。
@@ -1570,7 +1571,7 @@ Background profile warmはactive Profileの表示をSkeletonへ置き換えま�
 
 通常Toolbarは、24.2で定義した86pxのChrome型2段構成を使用します。
 上段へtab strip、active tab、tab close、new tabを置きます。
-下段へback、forward、reload、home、Search MODs、URL入力、Go、History、pane icon、shortcut hintを置きます。
+下段へback、forward、reload、home、URLまたはWeb検索入力、Go、History、pane icon、shortcut hintを置きます。
 History pageを開いてもToolbar高さは変更しません。
 `layout.setToolbarExpanded`は互換性のため残しますが、通常History操作からは呼び出しません。
 Browser engineとWebView2構成は変更しません。
@@ -1578,12 +1579,12 @@ Browser engineとWebView2構成は変更しません。
 ToolbarはChrome darkのtabstripとnavigation rowへ分離します。
 active tabは明るいsurfaceと丸い上端で表示し、inactive tabは透明背景と控えめなhoverで表示します。
 new tab buttonはtab listの末尾へ置き、tabと一緒に横スクロールします。
-navigation rowのURL入力はomniboxとして表示し、Goはcompactな`↵` iconで表示します。
+navigation rowの入力はURLまたはWeb検索語を受け付けるomniboxとして表示し、Goはcompactな`↵` iconで表示します。
 History、Mod Library、Context、shortcut hintは右側のaction groupへまとめます。
-`Search MODs`は通常Browseのprimary entryです。既存の検索drawerを開き、display name、directory name、MOD keyから候補を検索します。
-Contextが非表示の場合は、検索drawerを表示するためにContextを再表示します。
+Local MOD検索drawerはContextまたは認識失敗画面から開き、display name、directory name、MOD keyから候補を検索します。
+Contextが非表示の場合は、Local MOD検索drawerを表示するためにContextを再表示します。
 検索語と検索modeは一時的なWeb UI stateです。永続化しません。
-URL直接入力は現在のトップバーに残します。URL入力はfallbackまたはadvanced operationとして扱います。
+omniboxのURL入力は削除しません。URLらしい入力はnavigationし、それ以外の入力はGoogle検索へ送ります。
 History、Settings、Debug、Analysis、profile編集はMore menuへ集約します。
 DesktopのMore triggerは`layout.setMoreOpen`だけを送ります。
 WPF Popupの項目選択は、WebView commandと同じhost処理を実行します。
@@ -1750,7 +1751,7 @@ MOD directoryに存在するがprofileに存在しないModletは、System View�
 enabled、disabled、Review、Identity unresolved、Profile unresolvedを別Viewで扱います。
 profile selectorはMod Libraryへ移し、profile名とPending、Loading、Ready、Failedを表示します。
 active profileを先に表示します。初回起動は他profileをpreloadしません。Profile切替後は直前のprofileを1件だけbackground preloadします。
-検索drawerはMod LibraryのViewと別の検索surfaceとして維持します。通常BrowseではToolbarの`Search MODs`が主入口です。認識失敗時はContextから同じdrawerを開きます。
+検索drawerはMod LibraryのViewと別のLocal MOD検索surfaceとして維持します。通常BrowseのWeb検索はToolbarのomniboxから開始します。認識失敗時はContextからLocal MOD検索drawerを開きます。
 検索対象はdisplay name、directory name、MOD keyです。
 Exactなpackage identityから得たNexus `modId`を最優先します。
 次に、`ModInfo.xml`から得た有効なabsolute http / https Websiteを`Source`として扱います。
@@ -1768,10 +1769,10 @@ eye-trackingは実施しません。視線の予測は`likely`または`heuristi
 confirmation pointは、RECOGNIZEの結論、4項目summary、evidence labelです。
 action pointは、明示的な`Inspect`、`Open page`、identity confirmation、または必要なsource操作です。
 
-Browse-first taskでは、ユーザーはLocal MOD候補から根拠のあるWebsiteを開きます。
-このtaskのscanpathは、`Search MODs → query → candidate evidence → Open page`です。
-`Search MODs`を`Guess`のprimary anchorにします。候補カードを`Scan`のanchorにします。Websiteの`Exact`、`Source`、`Inferred`、`No usable URL`を`Confirm`のanchorにします。`Open page`を`Act`のaction pointにします。
-URL入力は表示を維持します。ただし、Browse-first taskではSearch MODsと競合しないsecondary actionとして扱います。
+Browse-first taskでは、ユーザーはomniboxからURLまたはWeb検索語を入力できます。
+Web discoveryのscanpathは、`omnibox query → Google result → page observation → RECOGNIZE`です。
+Local MOD確認のscanpathは、`ContextのSearch local MODs → query → candidate evidence → Open page`です。
+Google検索結果からMOD identityを自動確定しません。Local MOD候補のWebsite表示では、`Exact`、`Source`、`Inferred`、`No usable URL`を維持します。
 
 Free-view saliencyとtask-driven scanpathを分けます。
 Free-viewでは中央Browser、RECOGNIZE heading、選択中Library rowが主要なanchorになり得ます。
@@ -1811,7 +1812,7 @@ Conclusion-first、closed disclosure、raw XML、XPath、diagnosticの詳細分�
 ### 25.8 Attention flowの実装境界
 
 この適用で変更する対象は、frontendの表示階層、spacing、focus、action affordance、visual emphasisです。
-Issue #49では、cross-surfaceな表示状態として`modSearchOpen`をlayout stateへ追加し、`layout.setModSearchOpen`で同期します。検索語、検索mode、Query projection、MO2 read/write boundaryは変更しません。
+Issue #49では、omniboxのURL / Web検索判定をfrontendで行い、既存の`browser.navigate`へ解決済みURLを渡します。Local MOD検索のcross-surface表示状態として`modSearchOpen`をlayout stateへ保持し、`layout.setModSearchOpen`で同期します。検索語、検索mode、Query projection、MO2 read/write boundaryは変更しません。
 Browser URL、page body、Cookie、認証情報の同期または永続化は追加しません。
 新しいObserve、Identity confirm、Browser engine、write commandは追加しません。
 

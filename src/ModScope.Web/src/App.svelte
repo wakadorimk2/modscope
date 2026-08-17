@@ -258,7 +258,19 @@
   }
 
   function navigate() {
-    if (address.trim()) send('browser.navigate', { url: address.trim() });
+    const input = address.trim();
+    if (!input) return;
+
+    if (/^[a-z][a-z\d+.-]*:/i.test(input)) {
+      send('browser.navigate', { url: input });
+      return;
+    }
+
+    const domainLike = /^(?:localhost|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}|(?:\d{1,3}\.){3}\d{1,3})(?::\d+)?(?:[/?#].*)?$/i.test(input);
+    const url = domainLike
+      ? `https://${input}`
+      : `https://www.google.com/search?q=${encodeURIComponent(input)}`;
+    send('browser.navigate', { url });
   }
 
   function switchProfile(event: Event) {
@@ -516,7 +528,6 @@
     onForward={() => send('browser.forward')}
     onReload={() => send('browser.reload')}
     onHome={openHome}
-    onOpenModSearch={() => openModSearch('browse')}
     onOpenHistory={openHistory}
     onNewTab={openNewTab}
     onSelectTab={selectTab}

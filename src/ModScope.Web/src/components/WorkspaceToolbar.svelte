@@ -14,7 +14,6 @@
   export let onForward: () => void;
   export let onReload: () => void;
   export let onHome: () => void;
-  export let onOpenModSearch: () => void;
   export let onOpenHistory: () => void;
   export let onNewTab: () => void;
   export let onSelectTab: (tabId: string) => void;
@@ -63,11 +62,11 @@
       <button class="icon-button toolbar-home-button" title="Home" aria-label="Open Browse Home" disabled={disabled} onclick={onHome}>⌂</button>
     </div>
 
-    <div class="toolbar-omnibox" aria-label="Browser address controls">
+    <div class="toolbar-omnibox" aria-label="URL or web search controls">
       <input
         class="toolbar-address"
-        aria-label="Browser URL"
-        placeholder="https://example.com"
+        aria-label="URL or web search"
+        placeholder="Enter a URL or search the web"
         bind:value={address}
         disabled={disabled}
         onkeydown={(event) => event.key === 'Enter' && onNavigate()}
@@ -76,14 +75,6 @@
     </div>
 
     <div class="toolbar-actions" aria-label="Workspace actions">
-      <button
-        class="primary-button toolbar-search-button"
-        type="button"
-        title="Search the local MOD catalog"
-        aria-label="Search MODs"
-        disabled={disabled}
-        onclick={onOpenModSearch}
-      >Search MODs</button>
       <button
         class="history-button toolbar-text-action"
         type="button"
@@ -279,27 +270,6 @@
   .mock-toolbar-controls-row .toolbar-actions {
     gap: 2px;
     overflow: visible;
-  }
-
-  .mock-toolbar-controls-row .toolbar-search-button {
-    display: inline-flex;
-    width: auto;
-    height: 30px;
-    min-height: 30px;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 10px;
-    border: 1px solid rgba(138, 180, 248, 0.5);
-    border-radius: 6px;
-    background: #8ab4f8;
-    color: #202124;
-    font-size: 11px;
-    font-weight: 700;
-  }
-
-  .mock-toolbar-controls-row .toolbar-search-button:hover:not(:disabled) {
-    background: #aecbfa;
   }
 
   .mock-toolbar-controls-row .toolbar-text-action {
