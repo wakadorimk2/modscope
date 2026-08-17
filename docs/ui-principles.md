@@ -104,9 +104,11 @@ AI専用の主画面や常設paneを、通常画面の主役にしません。
 
 Toolbarは、tab、navigation、address、history、pane actionを提供する通常のbrowser chromeです。
 Browserの基本操作を、hidden menuへ押し込みません。
-`Search MODs`は通常Browseのprimary anchorです。Toolbarから既存のMOD検索drawerを開きます。
+通常Browseのprimary anchorは、URLとWeb検索語を受け付けるトップバーのomniboxです。
+URLらしい入力はnavigationします。それ以外の入力はGoogle検索へ送ります。
+Local MOD検索drawerは、Contextまたは認識失敗画面から開きます。
 検索drawerでは、query、candidate、Websiteのevidence stateを順に確認してから`Open page`を実行します。
-URL入力は現在のトップバーに残します。Browse-first taskではfallbackまたはadvanced operationとして扱います。
+URL入力は削除しません。URLは通常navigationへ使い、unsupported schemeは既存のBrowser validationで拒否します。
 
 ### 3.2 Dark desktop baseline
 
