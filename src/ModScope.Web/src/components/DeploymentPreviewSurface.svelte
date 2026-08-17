@@ -50,6 +50,14 @@
     return 'The host has not produced an approvable deployment plan.';
   }
 
+  function deploymentBlockReason(): string {
+    const status = state.deployment.status.toLowerCase();
+    if (status === 'recovery-required') return 'Review the recovery diagnostics before another deployment change.';
+    if (blockingDiagnosticCount > 0) return `Resolve ${blockingDiagnosticCount} blocking diagnostic${blockingDiagnosticCount === 1 ? '' : 's'} before explicit approval.`;
+    if (!state.deployment.planId) return 'No active preview plan is available. Preview the current profile again.';
+    return 'The host has not marked this preview as approvable.';
+  }
+
   function deploymentRollbackLabel(): string {
     const status = state.deployment.status.toLowerCase();
     if (status === 'recovery-required') return 'Recovery is required before another apply.';
@@ -67,8 +75,8 @@
   </header>
 
   <section class="deployment-preview-summary" aria-label="Deployment summary">
-    <div class="deployment-preview-summary-item"><span>MOD changes</span><strong>{state.deployment.modChanges.length}</strong><small>{enabledChangeCount} enabled-state · {orderChangeCount} order</small></div>
-    <div class="deployment-preview-summary-item"><span>Junction changes</span><strong>{state.deployment.junctionChanges.length}</strong><small>{junctionCreateCount} create/adopt · {junctionRemoveCount} remove</small></div>
+    <div class="deployment-preview-summary-item"><span>MODLIST changes</span><strong>{state.deployment.modChanges.length}</strong><small>{enabledChangeCount} enabled-state · {orderChangeCount} order</small></div>
+    <div class="deployment-preview-summary-item"><span>Junction operations</span><strong>{state.deployment.junctionChanges.length}</strong><small>{junctionCreateCount} create/adopt · {junctionRemoveCount} remove</small></div>
     <div class="deployment-preview-summary-item"><span>Diagnostics</span><strong>{state.deployment.diagnostics.length}</strong><small>{blockingDiagnosticCount} blocking</small></div>
   </section>
 
@@ -80,7 +88,7 @@
     <dl class="deployment-preview-safety-grid">
       <div>
         <dt>Target</dt>
-        <dd><strong>{state.deployment.profileName || 'Unknown profile'}</strong><small>{state.deployment.junctionChanges.length} junction change(s) are listed below.</small></dd>
+        <dd><strong>{state.deployment.profileName || 'Unknown profile'}</strong><small>{state.deployment.junctionChanges.length} managed junction operation(s) are listed below.</small></dd>
       </div>
       <div>
         <dt>Risk</dt>
@@ -117,7 +125,7 @@
         <div class="deployment-apply-confirmation" role="alertdialog" aria-labelledby="deployment-apply-title" aria-describedby="deployment-apply-description">
           <span class="eyebrow">EXPLICIT APPROVAL</span><h2 id="deployment-apply-title">Apply this deployment?</h2>
           <p id="deployment-apply-description">ModScope will back up <code>modlist.txt</code>, apply the profile and junction changes, then verify both results.</p>
-          <div class="deployment-preview-confirm-summary"><span>{state.deployment.modChanges.length} MOD changes</span><span>{state.deployment.junctionChanges.length} junction changes</span></div>
+          <div class="deployment-preview-confirm-summary"><span>{state.deployment.modChanges.length} MODLIST changes</span><span>{state.deployment.junctionChanges.length} junction operations</span></div>
           <div class="action-row"><button class="secondary-button" type="button" onclick={onCancelApply}>Cancel</button><button class="primary-button" type="button" onclick={onApply}>Apply profile and junctions</button></div>
         </div>
       {:else}
@@ -128,7 +136,7 @@
     {:else if state.deployment.status === 'recovery-required'}
       <div class="deployment-preview-action-bar deployment-preview-blocked"><p><strong>Recovery is required.</strong> Review the diagnostics below before making another deployment change.</p></div>
     {:else}
-      <div class="deployment-preview-action-bar deployment-preview-blocked"><p><strong>Apply is blocked.</strong> Resolve the diagnostics below, then preview the current profile again.</p></div>
+      <div class="deployment-preview-action-bar deployment-preview-blocked"><p><strong>Apply is blocked.</strong> {deploymentBlockReason()}</p></div>
     {/if}
   </section>
 

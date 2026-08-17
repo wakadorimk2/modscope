@@ -214,6 +214,20 @@ profile、modlist、deploymentへ影響するwrite actionは、次の順で進�
 
 MO2または7DTDのsource of truthを、UIから直接変更しません。
 
+### Disabled actionと件数の定義
+
+disabled actionは、実行可能なactionに見える文言を残しません。
+disabled actionは、現在の状態または必要な前提を短い理由で示します。
+理由はtooltipまたはmenu内の補助文で確認できます。
+
+同じ画面で異なる母集合を数える場合は、labelへ母集合を含めます。
+Profile editorは`profile rows`を数えます。
+通常のMod Libraryは`Local MOD records`を数えます。
+separator rowはprofile rowsへ含め、Local MOD recordsへ含めません。
+Deployment previewは`MODLIST changes`、`Junction operations`、`Diagnostics`を別のsummary itemで示します。
+`Review and apply`は、Hostが`canApply`と`planId`を両方返した場合だけ表示します。
+Applyがblockedの場合は、理由を表示し、実行可能なApply actionを表示しません。
+
 ### Trust / safetyのhard ban
 
 次の3項目だけをhard banにします。

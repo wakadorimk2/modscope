@@ -128,9 +128,19 @@ public sealed class BridgeProtocolTests
     [Fact]
     public void SerializesLayoutMessageWithoutFullStatePayload()
     {
+        var actions = new WorkspaceActionsUiState(
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(false, "Load a local profile first."),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(false, "No profile entries are available."),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(true));
         var json = BridgeProtocol.SerializeMessage(
             "layout",
-            new LayoutUiState(false, true, "analysis", "deployment-edit", true),
+            new LayoutUiState(false, true, "analysis", "deployment-edit", true, actions),
             "layout-1");
         using var document = JsonDocument.Parse(json);
         var payload = document.RootElement.GetProperty("payload");
@@ -142,6 +152,12 @@ public sealed class BridgeProtocolTests
         Assert.Equal("analysis", payload.GetProperty("contextMode").GetString());
         Assert.Equal("deployment-edit", payload.GetProperty("modListMode").GetString());
         Assert.True(payload.GetProperty("moreOpen").GetBoolean());
+        var serializedActions = payload.GetProperty("actions");
+        Assert.False(serializedActions.GetProperty("analysisMode").GetProperty("isEnabled").GetBoolean());
+        Assert.Equal(
+            "Load a local profile first.",
+            serializedActions.GetProperty("analysisMode").GetProperty("disabledReason").GetString());
+        Assert.False(serializedActions.GetProperty("editProfile").GetProperty("isEnabled").GetBoolean());
         Assert.False(payload.TryGetProperty("browser", out _));
         Assert.False(payload.TryGetProperty("knowledge", out _));
     }
@@ -663,12 +679,14 @@ public sealed class BridgeProtocolTests
                     "Example MOD",
                     "https://example.test/mod",
                     DateTimeOffset.Parse("2026-08-14T00:00:00Z"))
-            });
+            },
+            "history");
 
         var json = System.Text.Json.JsonSerializer.Serialize(browser, BridgeProtocol.JsonOptions);
 
         Assert.Contains("\"tabs\"", json);
         Assert.Contains("\"activeTabId\":\"tab-1\"", json);
+        Assert.Contains("\"internalPage\":\"history\"", json);
         Assert.Contains("\"history\"", json);
         Assert.DoesNotContain("C:\\\\Users\\\\wakad", json);
         Assert.DoesNotContain("raw runtime log", json);

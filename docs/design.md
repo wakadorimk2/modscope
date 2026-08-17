@@ -1347,6 +1347,9 @@ More menuから変更したContext modeとMod Library modeも、同じ`layout` m
 `LayoutUiState.moreOpen`はWPF Popupの一時的な開閉stateです。
 `moreOpen`は永続化しません。
 `layout.setMoreOpen`のpayloadは`{ open: boolean }`です。
+`LayoutUiState.actions`は、Hostが計算したMore menu各項目の利用可否とdisabled理由です。
+利用できない項目は実行可能なactionとして表示しません。
+disabled項目には、現在の状態または必要な前提を短い理由で表示します。
 
 Hostは次を検証します。
 
@@ -1456,6 +1459,17 @@ tabのURL、title、navigation、scroll、form stateは実行中のWebView2が�
 Historyはbounded metadataとしてURL、title、訪問時刻だけを保存します。
 page本文、raw observation、absolute path、cookie、認証情報は保存しません。
 URL直接入力は通常Toolbarに置きます。http、https、file、aboutのabsolute URLだけを受け付けます。
+`BrowserUiState.internalPage`は、active tabが`home`、`history`、`deployment-preview`のいずれかの内部ページであることを示します。
+active tabが内部ページへ移動した場合、Hostは前のpage observation、認識結果、Local contextを破棄します。
+Context paneは内部ページ自身の説明を表示し、前のWeb pageの認識結果を再表示しません。
+内部ページがactiveでないtabへ移動した場合、activeな外部Web pageのobservationは破棄しません。
+
+Historyの保存対象は、認証処理を除く外部`http` / `https` URLだけです。
+保存前にquery stringとfragmentを削除します。
+`users.nexusmods.com`、`auth`、`authorize`、`callback`、`login`、`oauth`、`signin`をpath segmentへ持つURLは保存しません。
+`access_token`、`auth`、`authorization`、`client_secret`、`code`、`id_token`、`nonce`、`redirect_uri`、`return_to`、`session`、`session_id`、`state`、`token`をquery keyへ持つURLは保存しません。
+login redirect自体はHistoryへ表示しません。
+redirect後に認証情報を含まない通常の外部URLへ到達した場合は、その最終URLだけをqueryとfragmentなしで表示できます。
 
 Bridge contract versionは`2`を維持します。
 Browser tab、History、active tab、MOD roleのstateは既存stateへ追加します。
@@ -1470,6 +1484,15 @@ Deployment previewは既存Svelte bundleを読み込み、要約、検索、折�
 Deployment preview tabはbrowser persistenceへ保存しません。
 Deployment preview tabは初期state取得の`frontend.ready`と、activeな内部tabからの既存`deployment.apply`だけを受け付けます。
 外部Web pageからDeployment commandは受け付けません。
+Profile editorの件数は、`profile rows`と`Local MOD records`を分けます。
+`profile rows`は`modlist.txt`の解析済み行です。
+`Local MOD records`はLocal Knowledgeのcandidateのうち、profileへlistedまたはunresolvedとして投影されたrecordです。
+separator rowはprofile rowへ含めますが、Local MOD recordへ含めません。
+Deployment previewの`MODLIST changes`はenabled状態またはorderが変わるMOD行の件数です。
+`Junction operations`はcreate、adopt、removeのmanaged junction操作の件数です。
+`Diagnostics`はpreviewが保持するdiagnosticの件数です。
+`Review and apply`は`canApply`と`planId`の両方がある場合だけ表示します。
+それ以外は、diagnostic、plan不足、またはHost未承認の理由を表示し、実行可能なApply actionを表示しません。
 page本文、raw observation、absolute path、cookie、認証情報はHistoryへ保存しません。
 `layout.setToolbarExpanded`は互換性のため残しますが、History操作は使用しません。
 MO2 write、AI、MCP、独自Browser engine、browser syncは追加しません。
@@ -1600,6 +1623,14 @@ History buttonはpopupを開かず、新しいBrowser tabを開きます。
 新しいtabのtitleは`History`で、内部URLは`about:history`です。
 History pageはDesktop hostが生成し、URL、title、訪問時刻だけを表示します。
 History metadataはbounded local dataとして保存し、page本文、raw observation、absolute path、cookie、認証情報は保存しません。
+認証redirectと内部ページはHistory entryへ追加しません。
+認証後の通常URLは、queryとfragmentを除いた形でだけ追加します。
+
+More menuは、Hostから受け取った`actions`を使います。
+Analysisはprofile load後だけ有効です。
+Edit profileはprofile operation、analysis、profile entryの前提を満たす場合だけ有効です。
+disabled itemはdisabled reasonをtooltipまたはmenu内の補助文で示します。
+disabled itemに実行可能なclick actionを残しません。
 
 ### 25.6 Nexus検索によるMODページ解決
 

@@ -4,6 +4,8 @@ import {
   type BrowserHistoryEntryUiState,
   type HostMessage,
   type ModCandidateUiState,
+  type WorkspaceActionAvailabilityUiState,
+  type WorkspaceActionsUiState,
   type UiState
 } from './contracts';
 
@@ -155,6 +157,30 @@ function mockDeploymentEntriesForProfile(profileName: string) {
     }));
 }
 
+function mockActionAvailability(isEnabled: boolean, disabledReason: string | null = null): WorkspaceActionAvailabilityUiState {
+  return { isEnabled, disabledReason };
+}
+
+function mockWorkspaceActions(hasSession: boolean, profileRowCount: number): WorkspaceActionsUiState {
+  const analysisReason = hasSession ? null : 'Load a local profile first.';
+  const editProfileReason = !hasSession
+    ? 'Load a local profile first.'
+    : profileRowCount === 0
+      ? 'No profile entries are available.'
+      : null;
+  return {
+    history: mockActionAvailability(true),
+    contextMode: mockActionAvailability(true),
+    settingsMode: mockActionAvailability(true),
+    debugMode: mockActionAvailability(true),
+    analysisMode: mockActionAvailability(hasSession, analysisReason),
+    browseModList: mockActionAvailability(true),
+    editProfile: mockActionAvailability(editProfileReason === null, editProfileReason),
+    toggleModList: mockActionAvailability(true),
+    toggleContext: mockActionAvailability(true)
+  };
+}
+
 function mockAnalysisForFixture(): UiState['analysis'] {
   const source = (kind: string, relativePath: string, lineNumber?: number) => ({
     kind,
@@ -275,13 +301,54 @@ function mockAnalysisForFixture(): UiState['analysis'] {
   };
 }
 
-function isMockHistoryUrl(url: string): boolean {
+const mockSensitiveQueryKeys = new Set([
+  'access_token',
+  'auth',
+  'authorization',
+  'client_secret',
+  'code',
+  'id_token',
+  'nonce',
+  'redirect_uri',
+  'return_to',
+  'session',
+  'session_id',
+  'state',
+  'token'
+]);
+const mockAuthenticationPathSegments = new Set(['auth', 'authorize', 'callback', 'login', 'oauth', 'signin']);
+
+function normalizeMockHistoryUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    if (parsed.hostname.toLowerCase() === 'users.nexusmods.com') return null;
+    if (parsed.pathname.split('/').filter(Boolean).some((segment) => mockAuthenticationPathSegments.has(segment.toLowerCase()))) return null;
+    let hasSensitiveQueryKey = false;
+    parsed.searchParams.forEach((_value, key) => {
+      if (mockSensitiveQueryKeys.has(key.toLowerCase())) hasSensitiveQueryKey = true;
+    });
+    if (hasSensitiveQueryKey) return null;
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
   } catch {
-    return false;
+    return null;
   }
+}
+
+function mockInternalPageFor(url: string, title: string): string | null {
+  if (url === 'about:history') return 'history';
+  if (url === 'about:deployment-preview') return 'deployment-preview';
+  if (url === 'about:blank' && title === 'ModScope Home') return 'home';
+  return null;
+}
+
+function clearMockObservation(next: UiState): void {
+  next.observation = null;
+  next.identity = cloneState(initialState).identity;
+  next.localContext = null;
+  next.inspector = null;
 }
 
 function updateMockBrowserTab(next: UiState, url: string, title: string): void {
@@ -290,14 +357,17 @@ function updateMockBrowserTab(next: UiState, url: string, title: string): void {
     return;
   }
 
+  const wasInternalPage = Boolean(next.browser.internalPage);
+  const internalPage = mockInternalPageFor(url, title);
   const tabs = next.browser.tabs.map((tab) => tab.tabId === activeTabId
     ? { ...tab, url, title, isActive: true }
     : { ...tab, isActive: false });
-  const historyEntry: BrowserHistoryEntryUiState | null = isMockHistoryUrl(url)
+  const normalizedHistoryUrl = normalizeMockHistoryUrl(url);
+  const historyEntry: BrowserHistoryEntryUiState | null = normalizedHistoryUrl
     ? {
         entryId: `mock-history-${Date.now()}`,
         title: title || url,
-        url,
+        url: normalizedHistoryUrl,
         visitedAtUtc: new Date().toISOString()
       }
     : null;
@@ -305,12 +375,14 @@ function updateMockBrowserTab(next: UiState, url: string, title: string): void {
     ...next.browser,
     url,
     title,
+    internalPage,
     tabs,
     activeTabId,
     history: historyEntry
-      ? [historyEntry, ...next.browser.history.filter((entry) => entry.url !== url)].slice(0, 100)
+      ? [historyEntry, ...next.browser.history.filter((entry) => entry.url !== normalizedHistoryUrl)].slice(0, 100)
       : next.browser.history
   };
+  if (wasInternalPage || internalPage) clearMockObservation(next);
 }
 
 function createMockBrowserTab(next: UiState): void {
@@ -321,6 +393,7 @@ function createMockBrowserTab(next: UiState): void {
     tabId = `mock-tab-${sequence}`;
   }
 
+  const wasInternalPage = Boolean(next.browser.internalPage);
   next.browser = {
     ...next.browser,
     tabs: next.browser.tabs.map((tab) => ({ ...tab, isActive: false })).concat({
@@ -334,9 +407,11 @@ function createMockBrowserTab(next: UiState): void {
     activeTabId: tabId,
     url: 'about:blank',
     title: 'New tab',
+    internalPage: null,
     canGoBack: false,
     canGoForward: false
   };
+  if (wasInternalPage) clearMockObservation(next);
 }
 
 function mockStateForCommand(state: UiState, command: string, payload: unknown): UiState {
@@ -354,9 +429,11 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
         activeTabId: tabId,
         url: selected.url,
         title: selected.title,
+        internalPage: mockInternalPageFor(selected.url, selected.title),
         canGoBack: selected.canGoBack,
         canGoForward: selected.canGoForward
       };
+      if (next.browser.internalPage) clearMockObservation(next);
     }
   } else if (command === 'browser.closeTab' && typeof payload === 'object' && payload !== null) {
     const tabId = (payload as { tabId?: unknown }).tabId;
@@ -369,9 +446,11 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
         activeTabId: selected.tabId,
         url: selected.url,
         title: selected.title,
+        internalPage: mockInternalPageFor(selected.url, selected.title),
         canGoBack: selected.canGoBack,
         canGoForward: selected.canGoForward
       };
+      if (next.browser.internalPage) clearMockObservation(next);
     }
   } else if (command === 'browser.history') {
     createMockBrowserTab(next);
@@ -439,6 +518,10 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
       modChanges: [],
       junctionChanges: [],
       diagnostics: []
+    };
+    next.layout = {
+      ...next.layout,
+      actions: mockWorkspaceActions(true, next.deployment.entries.length)
     };
     next.analysis = initialState.analysis;
     next.statusMessage = 'Mock Local Knowledge loaded.';
@@ -557,6 +640,10 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
         junctionChanges: [],
         diagnostics: []
       };
+      next.layout = {
+        ...next.layout,
+        actions: mockWorkspaceActions(true, next.deployment.entries.length)
+      };
       next.statusMessage = 'Mock profile switched.';
     }
   } else if (command === 'inspector.open' && typeof payload === 'object' && payload !== null) {
@@ -614,6 +701,8 @@ function mockStateForCommand(state: UiState, command: string, payload: unknown):
           .map((entry) => ({ action: 'keep', targetName: entry.modKey })),
         diagnostics: []
       };
+      createMockBrowserTab(next);
+      updateMockBrowserTab(next, 'about:deployment-preview', 'Deployment preview');
       next.statusMessage = 'Mock deployment preview is ready.';
     }
   } else if (command === 'deployment.apply' && typeof payload === 'object' && payload !== null) {
@@ -719,7 +808,12 @@ function scheduleMockProfilePreload(
 
 export function createBridge(onMessage: (message: HostMessage) => void): Bridge {
   const webview = getWebViewPort();
-  const mockStateRef = { current: cloneState(initialState) };
+  const mockInitialState = cloneState(initialState);
+  mockInitialState.layout = {
+    ...mockInitialState.layout,
+    actions: mockWorkspaceActions(false, 0)
+  };
+  const mockStateRef = { current: mockInitialState };
   let mockRequestId = 0;
   const layoutOnlyCommands = new Set([
     'layout.setContextVisible',

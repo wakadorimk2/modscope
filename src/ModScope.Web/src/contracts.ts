@@ -22,6 +22,7 @@ export type BrowserUiState = {
   tabs: BrowserTabUiState[];
   activeTabId: string;
   history: BrowserHistoryEntryUiState[];
+  internalPage?: string | null;
 };
 
 export type SourceReferenceUiState = {
@@ -530,12 +531,30 @@ export type DeploymentUiState = {
   diagnostics: DiagnosticUiState[];
 };
 
+export type WorkspaceActionAvailabilityUiState = {
+  isEnabled: boolean;
+  disabledReason?: string | null;
+};
+
+export type WorkspaceActionsUiState = {
+  history: WorkspaceActionAvailabilityUiState;
+  contextMode: WorkspaceActionAvailabilityUiState;
+  settingsMode: WorkspaceActionAvailabilityUiState;
+  debugMode: WorkspaceActionAvailabilityUiState;
+  analysisMode: WorkspaceActionAvailabilityUiState;
+  browseModList: WorkspaceActionAvailabilityUiState;
+  editProfile: WorkspaceActionAvailabilityUiState;
+  toggleModList: WorkspaceActionAvailabilityUiState;
+  toggleContext: WorkspaceActionAvailabilityUiState;
+};
+
 export type LayoutUiState = {
   contextVisible: boolean;
   modListVisible: boolean;
   contextMode: 'context' | 'settings' | 'debug' | 'analysis' | string;
   modListMode: 'browse' | 'deployment-edit' | string;
   moreOpen: boolean;
+  actions?: WorkspaceActionsUiState | null;
 };
 
 export type UiState = {
@@ -579,7 +598,8 @@ export const initialState: UiState = {
       isActive: true
     }],
     activeTabId: 'initial',
-    history: []
+    history: [],
+    internalPage: null
   },
   observation: null,
   knowledge: {
@@ -639,7 +659,8 @@ export const initialState: UiState = {
     modListVisible: true,
     contextMode: 'context',
     modListMode: 'browse',
-    moreOpen: false
+    moreOpen: false,
+    actions: null
   },
   statusMessage: 'Load a source and observe the current page.',
   diagnostics: []

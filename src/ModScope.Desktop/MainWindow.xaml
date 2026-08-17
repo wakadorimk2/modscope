@@ -16,6 +16,7 @@
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Padding" Value="10,7" />
             <Setter Property="Margin" Value="0,1" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="#CBD5E1" />

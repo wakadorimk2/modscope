@@ -217,11 +217,44 @@
   function sizeLabel(size: number): string {
     return size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KB`;
   }
+
+  function internalPageTitle(page: string | null | undefined): string {
+    switch (page) {
+      case 'history': return 'History';
+      case 'deployment-preview': return 'Deployment preview';
+      case 'home': return 'Browse Home';
+      default: return 'Internal page';
+    }
+  }
+
+  function internalPageDescription(page: string | null | undefined): string {
+    switch (page) {
+      case 'history': return 'History is an internal page. Page recognition is not active here.';
+      case 'deployment-preview': return 'Deployment preview is an internal page. Page recognition is paused here.';
+      case 'home': return 'Browse Home is an internal page. Open an external MOD page to recognize it.';
+      default: return 'Page recognition is not active on this internal page.';
+    }
+  }
 </script>
 
 {#if error}<p class="error-notice"><strong>{error.code}</strong> {error.message}</p>{/if}
 
-{#if mode === 'settings' || !state.knowledge.session}
+{#if mode === 'context' && state.browser.internalPage}
+  <section class="panel context-summary-panel internal-page-context" aria-labelledby="internal-page-title">
+    <div class="recognize-header">
+      <div>
+        <span class="eyebrow">INTERNAL PAGE</span>
+        <h2 id="internal-page-title">{internalPageTitle(state.browser.internalPage)}</h2>
+      </div>
+    </div>
+    <p class="subtle">{internalPageDescription(state.browser.internalPage)}</p>
+    {#if state.knowledge.session}
+      <p class="notice">The previous Web page context is cleared. Return to an external Web page to start recognition again.</p>
+    {:else}
+      <p class="notice">No local profile is loaded. History and other internal pages do not use page recognition.</p>
+    {/if}
+  </section>
+{:else if mode === 'settings' || !state.knowledge.session}
   <section class="panel source-discovery-panel">
     <div class="summary-header"><div><span class="eyebrow">{state.knowledge.session ? 'SETTINGS' : 'ONBOARDING'}</span><h2>{state.knowledge.session ? 'MO2 source' : 'Choose a local source'}</h2><p class="summary-meta">ModScope checks known MO2 locations and keeps this read-only.</p></div><span class="muted-badge">No absolute paths sent to Web</span></div>
     {#if state.knowledge.session}<p class="source-status-line">Active source · {state.knowledge.session.instanceName || 'Unknown instance'} · {state.knowledge.session.profileName || 'Profile unknown'}</p><div class="action-row"><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onDiscoverSources}>Reload source discovery</button><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onSelectRoot}>Change MO2 source</button></div>{/if}
@@ -242,9 +275,7 @@
     {/if}
     <div class="action-row"><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onDiscoverSources}>Scan again</button><button class="secondary-button" disabled={operationBlocksInteraction} onclick={onSelectRoot}>Select MO2 folder</button></div>
   </section>
-{/if}
-
-{#if mode === 'context' && state.knowledge.session}
+{:else if mode === 'context' && state.knowledge.session}
   <section class="panel context-summary-panel" aria-labelledby="recognize-title">
     <div class="recognize-header"><div><span class="eyebrow">RECOGNIZE</span>{#if hasConclusion && state.localContext}<h2 id="recognize-title">{contextConclusionLabel(state.localContext.status)}</h2><p class="summary-meta">{state.localContext.candidateIdentity || state.identity.candidateIdentity || state.observation?.title || 'Current page'}</p>{:else if state.observation}<h2 id="recognize-title">Couldn’t recognize this page</h2>{:else}<h2 id="recognize-title">Browse a MOD page</h2>{/if}</div><button class="analysis-lamp" class:analysis-lamp-issue={analysisSummaryStatusClass() === 'analysis-status-different'} class:analysis-lamp-ready={analysisSummaryStatusClass() === 'analysis-status-ready'} disabled={operationBlocksInteraction} title={`Open analysis · ${analysisSummaryStatus()}`} aria-label={`Open analysis · ${analysisSummaryStatus()}`} onclick={onOpenAnalysis}><span class="analysis-lamp-dot" aria-hidden="true"></span><span>{analysisSummaryStatus()}</span></button></div>
     {#if operationBlocksInteraction}
