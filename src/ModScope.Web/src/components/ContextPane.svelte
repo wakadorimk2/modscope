@@ -31,6 +31,7 @@
   export let modSearchMode: 'browse' | 'recognition' = 'browse';
   export let modSearchQuery = '';
   export let modSearchResults: ModCandidateUiState[] = [];
+  export let pendingRecognitionModKey: string | null = null;
   export let onSetContextMode: (mode: ContextMode) => void;
   export let onDiscoverSources: () => void;
   export let onSelectRoot: () => void;
@@ -43,7 +44,8 @@
   export let onOpenModSearch: (mode?: 'browse' | 'recognition') => void;
   export let onCloseModSearch: () => void;
   export let onOpenModPage: (candidate: ModCandidateUiState) => void;
-  export let onChooseModForRecognition: (candidate: ModCandidateUiState) => void;
+  export let onChooseModForRecognition: (modKey: string) => void;
+  export let onClearRecognitionSelection: () => void;
   export let onConfirmIdentity: (localModKey: string | null) => void;
   export let onStartStaticAnalysis: () => void;
   export let onSelectBaseData: () => void;
@@ -77,6 +79,9 @@
     : null;
   $: localContextPageUrl = localContextCandidate ? resolveModWebsite(localContextCandidate).url : null;
   $: canOpenLocalInspector = state.localContext?.status === 'installed' && Boolean(state.localContext?.localModKey);
+  $: pendingRecognitionCandidate = pendingRecognitionModKey
+    ? state.knowledge.candidates.find((candidate) => candidate.modKey === pendingRecognitionModKey) ?? null
+    : null;
 
   type DiagnosticGroup = { diagnostic: DiagnosticUiState; count: number };
 
@@ -154,6 +159,14 @@
   function openLocalModPage() {
     if (!localContextCandidate || !localContextPageUrl) return;
     onOpenModPage(localContextCandidate);
+  }
+
+  function candidateForMatch(modKey: string): ModCandidateUiState | null {
+    return state.knowledge.candidates.find((candidate) => candidate.modKey === modKey) ?? null;
+  }
+
+  function confirmPendingRecognition() {
+    if (pendingRecognitionModKey) onConfirmIdentity(pendingRecognitionModKey);
   }
 
   function contextConclusionLabel(status: string | null | undefined): string {
@@ -290,24 +303,51 @@
         </div>
       {/if}
     {:else if state.observation}
-      <p class="subtle">Identity confirmation is required. Choose a local MOD or mark this page as not installed.</p>
+      <p class="subtle">Identity confirmation is required. Select a local MOD, confirm the page identity, or mark this page as not installed.</p>
+      {#if pendingRecognitionModKey}
+        <article class="recognition-selection-card" aria-live="polite">
+          <div class="recognition-selection-heading"><div><span class="eyebrow">SELECTED CANDIDATE</span><strong>{pendingRecognitionCandidate?.displayName || pendingRecognitionCandidate?.directoryName || pendingRecognitionModKey}</strong></div><span class="status-chip status-ready">Selection pending</span></div>
+          <div class="recognition-candidate-details">
+            <span>Directory · {pendingRecognitionCandidate?.directoryName || 'Unknown'}</span>
+            <span>MOD key · {pendingRecognitionModKey}</span>
+            <span>Version · {pendingRecognitionCandidate?.version || 'Unknown'}</span>
+            <span>Profile · {formatLabel(pendingRecognitionCandidate?.profileState)}</span>
+            <span>Enabled · {formatLabel(pendingRecognitionCandidate?.enabledState)}</span>
+            <span>Priority · {pendingRecognitionCandidate?.priority ?? 'Unknown'}</span>
+          </div>
+          <p class="analysis-meta">Candidate selection does not confirm page identity.</p>
+          <div class="action-row">
+            <button class="primary-button" type="button" disabled={operationBlocksInteraction} onclick={confirmPendingRecognition}>Confirm page identity</button>
+            <button class="secondary-button" type="button" disabled={operationBlocksInteraction} onclick={onClearRecognitionSelection}>Clear selection</button>
+          </div>
+        </article>
+      {/if}
       {#if state.identity.matches.length > 0}
         <div class="recognition-candidate-list" aria-label="Local MOD recognition candidates">
           {#each state.identity.matches.slice(0, 6) as match}
-            <article class="recognition-candidate">
+            {@const candidate = candidateForMatch(match.modKey)}
+            <article class="recognition-candidate" class:recognition-candidate-selected={pendingRecognitionModKey === match.modKey}>
               <button
                 type="button"
                 class="recognition-candidate-action"
                 disabled={operationBlocksInteraction}
-                aria-label={`Use ${match.displayName || match.directoryName || match.modKey} as the local MOD`}
-                onclick={() => onConfirmIdentity(match.modKey)}
+                aria-label={`Select ${match.displayName || match.directoryName || match.modKey} as the local MOD candidate`}
+                onclick={() => onChooseModForRecognition(match.modKey)}
               >
                 <span class="recognition-candidate-heading">
                   <strong>{match.displayName || match.directoryName || match.modKey}</strong>
                   <span class="status-chip {recognitionStrengthClass(match.strength)}">{formatLabel(match.strength)}</span>
                 </span>
+                <span class="recognition-candidate-details">
+                  <span>Directory · {match.directoryName || 'Unknown'}</span>
+                  <span>MOD key · {match.modKey}</span>
+                  <span>Version · {candidate?.version || 'Unknown'}</span>
+                  <span>Profile · {formatLabel(candidate?.profileState || match.profileState)}</span>
+                  <span>Enabled · {formatLabel(candidate?.enabledState || match.enabledState)}</span>
+                  <span>Priority · {candidate?.priority ?? 'Unknown'}</span>
+                </span>
                 <span class="analysis-meta">Match evidence · {match.evidence}</span>
-                <span class="recognition-candidate-action-label">Use this MOD</span>
+                <span class="recognition-candidate-action-label">{pendingRecognitionModKey === match.modKey ? 'Selected candidate' : 'Select candidate'}</span>
               </button>
             </article>
           {/each}
@@ -389,7 +429,7 @@
 {#if modSearchOpen}
   <button type="button" class="drawer-backdrop" aria-label="Close MOD search" onclick={onCloseModSearch}></button>
   <aside class="mod-search-drawer" aria-labelledby="mod-search-title"><div class="drawer-heading"><div><span class="eyebrow">MOD CATALOG</span><h2 id="mod-search-title">{modSearchMode === 'recognition' ? 'Choose a local MOD' : 'Search all MODs'}</h2></div><button class="icon-button" type="button" title="Close MOD search" aria-label="Close MOD search" onclick={onCloseModSearch}>×</button></div><p class="subtle mod-search-description">Search by display name, directory name, or MOD key. Website links use exact package identity, source Website, or inferred Nexus destinations.</p><label class="mod-search-field"><span>Search MODs</span><input bind:value={modSearchQuery} aria-label="Search MODs" placeholder="e.g. Alpha Mod" /></label>
-    {#if modSearchQuery.trim().length === 0}<p class="empty-state mod-search-empty">Enter a search term to show matching MODs.</p>{:else if modSearchResults.length === 0}<p class="empty-state mod-search-empty">No matching MODs were found.</p>{:else}<div class="mod-search-results" aria-live="polite"><p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>{#each modSearchResults as candidate (candidate.modKey)}<article class="mod-search-card"><button type="button" class="mod-card-main" aria-label={`Inspect ${candidate.displayName || candidate.modKey}`} onclick={() => onOpenModPage(candidate)}><strong>{candidate.displayName || candidate.directoryName || candidate.modKey}</strong><span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span></button><div class="mod-card-meta"><span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span><span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span><span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span></div>{#if modSearchMode === 'recognition'}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onChooseModForRecognition(candidate)}>Use for recognition</button>{/if}<button type="button" class="secondary-button mod-recognition-button" onclick={() => onOpenInspectorForMod(candidate.modKey)}>Inspect evidence</button></article>{/each}</div>{/if}
+    {#if modSearchQuery.trim().length === 0}<p class="empty-state mod-search-empty">Enter a search term to show matching MODs.</p>{:else if modSearchResults.length === 0}<p class="empty-state mod-search-empty">No matching MODs were found.</p>{:else}<div class="mod-search-results" aria-live="polite"><p class="mod-search-result-count">{modSearchResults.length} matching MODs</p>{#each modSearchResults as candidate (candidate.modKey)}<article class="mod-search-card" class:recognition-candidate-selected={pendingRecognitionModKey === candidate.modKey}><button type="button" class="mod-card-main" aria-label={`Inspect ${candidate.displayName || candidate.modKey}`} onclick={() => onOpenModPage(candidate)}><strong>{candidate.displayName || candidate.directoryName || candidate.modKey}</strong><span>{candidate.version ? `v${candidate.version}` : 'Version unknown'}</span></button><div class="mod-card-identity"><span>Directory · {candidate.directoryName || 'Unknown'}</span><span>MOD key · {candidate.modKey}</span></div><div class="mod-card-meta"><span class="status-chip {statusClass(candidate.profileState)}">{formatLabel(candidate.profileState)}</span><span class="status-chip {statusClass(candidate.enabledState)}">{formatLabel(candidate.enabledState)}</span><span class="subtle">Priority {candidate.priority ?? 'Unknown'}</span></div>{#if modSearchMode === 'recognition'}<button type="button" class="secondary-button mod-recognition-button" disabled={operationBlocksInteraction} onclick={() => onChooseModForRecognition(candidate.modKey)}>{pendingRecognitionModKey === candidate.modKey ? 'Selected candidate' : 'Select candidate'}</button>{/if}<button type="button" class="secondary-button mod-recognition-button" disabled={operationBlocksInteraction} onclick={() => onOpenInspectorForMod(candidate.modKey)}>Inspect evidence</button></article>{/each}</div>{/if}
   </aside>
 {/if}
 
