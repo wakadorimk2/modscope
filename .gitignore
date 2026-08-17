@@ -7,3 +7,4 @@ TestResults/
 src/ModScope.Web/node_modules/
 src/ModScope.Web/dist/
 src/ModScope.Desktop/bin/WebAssets/
+artifacts/release/
