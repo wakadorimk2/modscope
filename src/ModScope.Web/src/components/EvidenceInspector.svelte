@@ -188,6 +188,7 @@
         <p><span>Release match</span> {inspector.conclusion?.releaseAssociationReason || 'Release association was not assessed.'}</p>
         {#if inspector.conclusion?.releaseAssociationEvidence}<p><span>Release evidence</span> {inspector.conclusion.releaseAssociationEvidence}</p>{/if}
         {#if inspector.conclusion?.selectedLatestReleaseScopeLine}<p><span>Latest release scope</span> {inspector.conclusion.selectedLatestReleaseScopeLine}</p>{/if}
+        {#if inspector.conclusion?.latestObservedVersion}<p><span>Observed source</span> {inspector.conclusion.latestSourceSite || 'Web'} · {inspector.conclusion.latestSource?.relativePath || inspector.conclusion.latestTargetUrl || 'Locator unknown'} · observed {inspector.conclusion.latestObservedAtUtc || 'Unknown'}</p>{/if}
         {#if inspector.conclusion?.versionReason}<p><span>Version reason</span> {inspector.conclusion.versionReason}</p>{/if}
       </div>
       <div class="inspector-local-summary">
