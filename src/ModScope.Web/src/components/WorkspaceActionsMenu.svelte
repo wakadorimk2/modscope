@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { LayoutUiState } from '../contracts';
+  import type { LayoutUiState, WorkspaceActionAvailabilityUiState } from '../contracts';
 
   import type { ContextMode, ModListMode } from './ui-types';
 
@@ -60,6 +60,14 @@
     onSetModListMode(mode);
     setMenuOpen(false);
   }
+
+  function isActionDisabled(action: WorkspaceActionAvailabilityUiState | null | undefined): boolean {
+    return disabled || action?.isEnabled === false;
+  }
+
+  function actionTitle(action: WorkspaceActionAvailabilityUiState | null | undefined): string | undefined {
+    return action?.isEnabled === false ? `Unavailable: ${action.disabledReason || 'This action is not available.'}` : undefined;
+  }
 </script>
 
 <div class="workspace-actions-menu" bind:this={menuElement}>
@@ -78,30 +86,30 @@
     <div class="workspace-actions-menu-popover" role="menu" aria-label="More workspace actions">
       <div class="workspace-actions-menu-group">
         <span class="workspace-actions-menu-label">Browser</span>
-        <button type="button" role="menuitem" disabled={disabled} onclick={() => { onOpenHistory(); setMenuOpen(false); }}>
-          History <span>{historyCount}</span>
+        <button type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.history)} title={actionTitle(layout.actions?.history)} onclick={() => { onOpenHistory(); setMenuOpen(false); }}>
+          <span>History</span><span>{historyCount}</span>
         </button>
       </div>
 
       <div class="workspace-actions-menu-group">
         <span class="workspace-actions-menu-label">Context mode</span>
-        <button class:active={layout.contextMode === 'context'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseContextMode('context')}>Context</button>
-        <button class:active={layout.contextMode === 'settings'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseContextMode('settings')}>Settings</button>
-        <button class:active={layout.contextMode === 'debug'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseContextMode('debug')}>Debug</button>
-        <button class:active={layout.contextMode === 'analysis'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseContextMode('analysis')}>Analysis</button>
+        <button class:active={layout.contextMode === 'context'} type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.contextMode)} title={actionTitle(layout.actions?.contextMode)} onclick={() => chooseContextMode('context')}>Context</button>
+        <button class:active={layout.contextMode === 'settings'} type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.settingsMode)} title={actionTitle(layout.actions?.settingsMode)} onclick={() => chooseContextMode('settings')}>Settings</button>
+        <button class:active={layout.contextMode === 'debug'} type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.debugMode)} title={actionTitle(layout.actions?.debugMode)} onclick={() => chooseContextMode('debug')}>Debug</button>
+        <button class:active={layout.contextMode === 'analysis'} type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.analysisMode)} title={actionTitle(layout.actions?.analysisMode)} onclick={() => chooseContextMode('analysis')}>Analysis{#if layout.actions?.analysisMode?.isEnabled === false}<span class="workspace-actions-menu-reason">{layout.actions.analysisMode.disabledReason}</span>{/if}</button>
       </div>
 
       <div class="workspace-actions-menu-group">
         <span class="workspace-actions-menu-label">Mod Library</span>
-        <button class:active={layout.modListMode === 'browse'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseModListMode('browse')}>Browse</button>
-        <button class:active={layout.modListMode === 'deployment-edit'} type="button" role="menuitem" disabled={disabled} onclick={() => chooseModListMode('deployment-edit')}>Edit profile</button>
+        <button class:active={layout.modListMode === 'browse'} type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.browseModList)} title={actionTitle(layout.actions?.browseModList)} onclick={() => chooseModListMode('browse')}>Browse</button>
+        <button class:active={layout.modListMode === 'deployment-edit'} type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.editProfile)} title={actionTitle(layout.actions?.editProfile)} onclick={() => chooseModListMode('deployment-edit')}>Edit profile{#if layout.actions?.editProfile?.isEnabled === false}<span class="workspace-actions-menu-reason">{layout.actions.editProfile.disabledReason}</span>{/if}</button>
       </div>
 
       <div class="workspace-actions-menu-divider" aria-hidden="true"></div>
-      <button type="button" role="menuitem" disabled={disabled} onclick={() => { onToggleModList(); setMenuOpen(false); }}>
+      <button type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.toggleModList)} title={actionTitle(layout.actions?.toggleModList)} onclick={() => { onToggleModList(); setMenuOpen(false); }}>
         {layout.modListVisible ? 'Hide' : 'Show'} Mod Library
       </button>
-      <button type="button" role="menuitem" disabled={disabled} onclick={() => { onToggleContext(); setMenuOpen(false); }}>
+      <button type="button" role="menuitem" disabled={isActionDisabled(layout.actions?.toggleContext)} title={actionTitle(layout.actions?.toggleContext)} onclick={() => { onToggleContext(); setMenuOpen(false); }}>
         {layout.contextVisible ? 'Hide' : 'Show'} Context
       </button>
     </div>
@@ -177,6 +185,15 @@
     color: #bdc1c6;
     font-size: 11px;
     text-align: left;
+  }
+
+  .workspace-actions-menu-reason {
+    max-width: 125px;
+    margin-left: 8px;
+    color: #9aa0a6;
+    font-size: 9px;
+    line-height: 1.25;
+    text-align: right;
   }
 
   .workspace-actions-menu-popover button:hover:not(:disabled),

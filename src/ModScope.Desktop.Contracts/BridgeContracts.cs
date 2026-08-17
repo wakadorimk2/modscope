@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ModScope.Desktop.Contracts;
 
@@ -328,7 +329,9 @@ public sealed record BrowserUiState(
     bool CanGoForward,
     IReadOnlyList<BrowserTabUiState>? Tabs = null,
     string? ActiveTabId = null,
-    IReadOnlyList<BrowserHistoryEntryUiState>? History = null);
+    IReadOnlyList<BrowserHistoryEntryUiState>? History = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? InternalPage = null);
 
 public sealed record SourceReferenceUiState(
     string Kind,
@@ -812,13 +815,30 @@ public sealed record DeploymentUiState(
     IReadOnlyList<DeploymentJunctionChangeUiState> JunctionChanges,
     IReadOnlyList<DiagnosticUiState> Diagnostics);
 
+public sealed record WorkspaceActionAvailabilityUiState(
+    bool IsEnabled,
+    string? DisabledReason = null);
+
+public sealed record WorkspaceActionsUiState(
+    WorkspaceActionAvailabilityUiState History,
+    WorkspaceActionAvailabilityUiState ContextMode,
+    WorkspaceActionAvailabilityUiState SettingsMode,
+    WorkspaceActionAvailabilityUiState DebugMode,
+    WorkspaceActionAvailabilityUiState AnalysisMode,
+    WorkspaceActionAvailabilityUiState BrowseModList,
+    WorkspaceActionAvailabilityUiState EditProfile,
+    WorkspaceActionAvailabilityUiState ToggleModList,
+    WorkspaceActionAvailabilityUiState ToggleContext);
+
 public sealed record LayoutUiState(
     bool ContextVisible,
     bool ModListVisible,
     string ContextMode = "context",
     string ModListMode = "browse",
     bool MoreOpen = false,
-    bool ModSearchOpen = false);
+    bool ModSearchOpen = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    WorkspaceActionsUiState? Actions = null);
 
 public sealed record UiState(
     BrowserUiState Browser,

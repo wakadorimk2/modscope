@@ -54,13 +54,23 @@ internal sealed class BrowserStateStore
             }
 
             var tabs = value.Tabs
-                .Where(tab => IsPersistableUrl(tab.Url))
+                .Select(tab => BrowserHistoryMetadataPolicy.TryNormalizePersistedUrl(
+                        tab.Url,
+                        out var normalizedUrl)
+                    ? tab with { Url = normalizedUrl }
+                    : null)
+                .OfType<BrowserTabRestoreState>()
                 .Take(MaxRestoredTabs)
                 .ToList()
                 .AsReadOnly();
             var tabIds = tabs.Select(tab => tab.TabId).ToHashSet(StringComparer.Ordinal);
             var history = value.History
-                .Where(entry => IsPersistableUrl(entry.Url))
+                .Select(entry => BrowserHistoryMetadataPolicy.TryNormalizeHistoryUrl(
+                        entry.Url,
+                        out var normalizedUrl)
+                    ? entry with { Url = normalizedUrl }
+                    : null)
+                .OfType<BrowserHistoryEntryUiState>()
                 .Take(MaxHistoryEntries)
                 .ToList()
                 .AsReadOnly();
@@ -84,14 +94,23 @@ internal sealed class BrowserStateStore
         try
         {
             var persistedTabs = tabs
-                .Where(tab => IsPersistableUrl(tab.Url))
+                .Select(tab => BrowserHistoryMetadataPolicy.TryNormalizePersistedUrl(
+                        tab.Url,
+                        out var normalizedUrl)
+                    ? new BrowserTabRestoreState(tab.TabId, tab.Title, normalizedUrl)
+                    : null)
+                .OfType<BrowserTabRestoreState>()
                 .Take(MaxRestoredTabs)
-                .Select(tab => new BrowserTabRestoreState(tab.TabId, tab.Title, tab.Url))
                 .ToList()
                 .AsReadOnly();
             var persistedTabIds = persistedTabs.Select(tab => tab.TabId).ToHashSet(StringComparer.Ordinal);
             var persistedHistory = history
-                .Where(entry => IsPersistableUrl(entry.Url))
+                .Select(entry => BrowserHistoryMetadataPolicy.TryNormalizeHistoryUrl(
+                        entry.Url,
+                        out var normalizedUrl)
+                    ? entry with { Url = normalizedUrl }
+                    : null)
+                .OfType<BrowserHistoryEntryUiState>()
                 .Take(MaxHistoryEntries)
                 .ToList()
                 .AsReadOnly();
@@ -123,19 +142,4 @@ internal sealed class BrowserStateStore
             Array.Empty<BrowserHistoryEntryUiState>());
     }
 
-    private static bool IsPersistableUrl(string? value)
-    {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
-        {
-            return false;
-        }
-
-        if (uri.Scheme is "http" or "https")
-        {
-            return !string.Equals(uri.Host, "appassets.modscope", StringComparison.OrdinalIgnoreCase);
-        }
-
-        return uri.Scheme == "about"
-            && string.Equals(uri.AbsoluteUri, "about:history", StringComparison.OrdinalIgnoreCase);
-    }
 }

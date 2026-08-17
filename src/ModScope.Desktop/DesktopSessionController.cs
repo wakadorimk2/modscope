@@ -724,6 +724,22 @@ public sealed class DesktopSessionController
         RefreshPageRecognition();
     }
 
+    public void ClearObservation()
+    {
+        _observation = null;
+        _sessionWebVersionObservation = null;
+        _sessionNexusFileVersionObservations.Clear();
+        _pendingWebVersionObservation = null;
+        _sessionWebCompatibilityObservations = Array.Empty<CompatibilityObservationReadModel>();
+        _sessionWebCompatibilityDiagnostics = Array.Empty<DiagnosticReadModel>();
+        _pendingWebCompatibilityObservation = null;
+        _candidateIdentity = string.Empty;
+        _selectedLocalModKey = null;
+        _localContext = null;
+        _inspector = null;
+        RefreshPageRecognition();
+    }
+
     public void SetDetectedWebVersionObservation(
         WebVersionObservationResult result,
         Uri targetUrl,
@@ -894,7 +910,39 @@ public sealed class DesktopSessionController
             _modListVisible,
             _contextMode,
             _modListMode,
-            ModSearchOpen: _modSearchOpen);
+            ModSearchOpen: _modSearchOpen,
+            Actions: BuildWorkspaceActions());
+    }
+
+    private WorkspaceActionsUiState BuildWorkspaceActions()
+    {
+        var hasSession = _session is not null;
+        var foregroundKnowledgeBusy = _operation.IsBusy && !_operation.IsBackground;
+        var analysisBusy = _analysisOperation.IsBusy;
+        var editProfileReason = foregroundKnowledgeBusy
+            ? "Wait for the current profile operation to finish."
+            : analysisBusy
+                ? "Wait for analysis to finish."
+                : !hasSession
+                    ? "Load a local profile first."
+                    : _profileEditEntries.Count == 0
+                        ? "No profile entries are available."
+                        : null;
+
+        return new WorkspaceActionsUiState(
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(
+                hasSession,
+                hasSession ? null : "Load a local profile first."),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(
+                editProfileReason is null,
+                editProfileReason),
+            new WorkspaceActionAvailabilityUiState(true),
+            new WorkspaceActionAvailabilityUiState(true));
     }
 
     public UiState BuildState(BrowserUiState browser)

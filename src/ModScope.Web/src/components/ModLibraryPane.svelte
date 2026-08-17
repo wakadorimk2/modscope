@@ -34,6 +34,8 @@
   $: enabledCount = profileCandidates.filter((candidate) => candidate.enabledState === 'enabled').length;
   $: disabledCount = profileCandidates.filter((candidate) => candidate.enabledState === 'disabled').length;
   $: unresolvedCount = profileCandidates.filter((candidate) => candidate.profileState === 'unresolved').length;
+  $: editableEntryCount = deploymentDraftEntries.filter((entry) => entry.isEditable).length;
+  $: separatorEntryCount = deploymentDraftEntries.filter((entry) => entry.isSeparator).length;
   $: deploymentEditMode = modListMode === 'deployment-edit';
 
   $: {
@@ -314,12 +316,14 @@
       </label>
 
       <p class="mod-list-compact-summary" aria-label="Profile MOD status">
-        {profileCandidates.length} in profile · {enabledCount} enabled · {disabledCount} disabled · {unresolvedCount} unresolved
+        {profileCandidates.length} Local MOD records · {enabledCount} enabled · {disabledCount} disabled · {unresolvedCount} unresolved
       </p>
+      <p class="subtle mod-list-count-note">This summary counts Local MOD records. The editor counts profile rows, including separators.</p>
 
       {#if deploymentEditMode}
         <div class="mod-list-scroll" aria-label="Edit active profile MOD list">
-          <div class="mod-list-section-label">EDIT PROFILE ORDER · {deploymentDraftEntries.length}</div>
+          <div class="mod-list-section-label">EDIT PROFILE ORDER · {deploymentDraftEntries.length} profile rows</div>
+          <p class="subtle mod-list-count-note">{editableEntryCount} editable · {separatorEntryCount} separators.</p>
           <p class="subtle deployment-help">Drag to reorder. Use + or − to change the enabled state.</p>
           <div class="mod-list-items deployment-edit-list">
             {#each deploymentDraftEntries as entry (entry.entryId)}

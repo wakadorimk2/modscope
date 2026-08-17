@@ -108,6 +108,28 @@ public sealed class LocalKnowledgeQueryTests
     }
 
     [Fact]
+    public void KeepsProfileRowsSeparateFromLocalModRecordsForSeparatorFixture()
+    {
+        var fixtureRoot = Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "mod-identity",
+            "separator-with-selection-constraint");
+        var query = CreateQuery();
+
+        query.Load(CreateSource(fixtureRoot));
+
+        var profileEntries = query.GetCurrentProfileEntries();
+        var candidates = query.GetModCandidates();
+
+        Assert.Equal(7, profileEntries.Count);
+        Assert.Equal(4, profileEntries.Count(entry => entry.IsSeparator));
+        Assert.Equal(3, profileEntries.Count(entry => !entry.IsSeparator));
+        Assert.Equal(3, candidates.Count);
+        Assert.DoesNotContain(candidates, candidate => candidate.DirectoryName.EndsWith("_separator", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void InfersBaseDataConfigFromMo2GamePath()
     {
         var query = CreateQuery();

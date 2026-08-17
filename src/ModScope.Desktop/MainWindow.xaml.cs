@@ -833,6 +833,11 @@ public partial class MainWindow : Window
 
     private void NavigateHome(BrowserTabHostState tab)
     {
+        if (ReferenceEquals(tab, ActiveBrowserTab))
+        {
+            _controller.ClearObservation();
+        }
+
         _controller.SetModSearchOpen(false);
         tab.InternalPage = "home";
         tab.PendingNexusSearchNames = Array.Empty<string>();
@@ -844,6 +849,11 @@ public partial class MainWindow : Window
 
     private void NavigateHistory(BrowserTabHostState tab)
     {
+        if (ReferenceEquals(tab, ActiveBrowserTab))
+        {
+            _controller.ClearObservation();
+        }
+
         _controller.SetModSearchOpen(false);
         tab.InternalPage = "history";
         tab.PendingNexusSearchNames = Array.Empty<string>();
@@ -858,6 +868,11 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(_webAssetsPath))
         {
             throw new InvalidOperationException("The Web UI assets are not initialized.");
+        }
+
+        if (ReferenceEquals(tab, ActiveBrowserTab))
+        {
+            _controller.ClearObservation();
         }
 
         tab.InternalPage = "deployment-preview";
@@ -939,10 +954,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!BrowserHistoryMetadataPolicy.TryNormalizeHistoryUrl(uri.ToString(), out var normalizedUrl))
+        {
+            return;
+        }
+
         var entry = new BrowserHistoryEntryUiState(
             Guid.NewGuid().ToString("N"),
             string.IsNullOrWhiteSpace(tab.Title) ? uri.Host : tab.Title,
-            uri.ToString(),
+            normalizedUrl,
             DateTimeOffset.UtcNow);
         _browserHistory = new[] { entry }
             .Concat(_browserHistory.Where(item => !string.Equals(item.Url, entry.Url, StringComparison.OrdinalIgnoreCase)))
@@ -1388,6 +1408,17 @@ public partial class MainWindow : Window
         SetMorePopupButtonState(
             MoreModListModeEditButton,
             layout.ModListMode == "deployment-edit");
+
+        var actions = layout.Actions;
+        SetMorePopupButtonAvailability(MoreHistoryButton, actions?.History);
+        SetMorePopupButtonAvailability(MoreContextModeContextButton, actions?.ContextMode);
+        SetMorePopupButtonAvailability(MoreContextModeSettingsButton, actions?.SettingsMode);
+        SetMorePopupButtonAvailability(MoreContextModeDebugButton, actions?.DebugMode);
+        SetMorePopupButtonAvailability(MoreContextModeAnalysisButton, actions?.AnalysisMode);
+        SetMorePopupButtonAvailability(MoreModListModeBrowseButton, actions?.BrowseModList);
+        SetMorePopupButtonAvailability(MoreModListModeEditButton, actions?.EditProfile);
+        SetMorePopupButtonAvailability(MoreModListVisibilityButton, actions?.ToggleModList);
+        SetMorePopupButtonAvailability(MoreContextVisibilityButton, actions?.ToggleContext);
     }
 
     private static void SetMorePopupButtonState(
@@ -1396,6 +1427,16 @@ public partial class MainWindow : Window
     {
         button.FontWeight = active ? FontWeights.Bold : FontWeights.Normal;
         button.Opacity = active ? 1.0 : 0.78;
+    }
+
+    private static void SetMorePopupButtonAvailability(
+        System.Windows.Controls.Button button,
+        WorkspaceActionAvailabilityUiState? availability)
+    {
+        button.IsEnabled = availability?.IsEnabled ?? true;
+        button.ToolTip = availability is { IsEnabled: false }
+            ? availability.DisabledReason
+            : null;
     }
 
     private void ConfigurePanelLayoutConstraints()
@@ -2260,8 +2301,13 @@ public partial class MainWindow : Window
         AddBrowserHistory(tab);
         SaveBrowserState();
 
-        if (tab.InternalPage is "history" or "deployment-preview")
+        if (IsInternalBrowserPage(tab.InternalPage))
         {
+            if (ReferenceEquals(tab, ActiveBrowserTab))
+            {
+                _controller.ClearObservation();
+            }
+
             SendState(requestId, targetWebView);
             return;
         }
@@ -2385,6 +2431,14 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (IsInternalBrowserPage(tab.InternalPage))
+            {
+                _controller.ClearObservation();
+                _controller.SetStatus($"Internal page navigation failed: {e.WebErrorStatus}.");
+                SendState();
+                return;
+            }
+
             _controller.SetObservation(new PageObservation(
                 tab.InternalPage == "history"
                     ? new Uri("about:history")
@@ -2481,7 +2535,8 @@ public partial class MainWindow : Window
                     string.Equals(tab.TabId, _activeBrowserTabId, StringComparison.Ordinal)))
                 .ToList(),
             _activeBrowserTabId,
-            _browserHistory);
+            _browserHistory,
+            browserTab.InternalPage);
         var state = _controller.BuildState(browserState);
         if (IsForegroundLoading())
         {
