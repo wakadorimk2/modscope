@@ -703,6 +703,13 @@ public sealed class DesktopSessionController
     public void SetObservation(PageObservation observation)
     {
         ArgumentNullException.ThrowIfNull(observation);
+
+        if (_observation is not null && _observation.IsSamePageAs(observation))
+        {
+            _observation = observation;
+            return;
+        }
+
         _observation = observation;
         _sessionWebVersionObservation = null;
         _pendingWebVersionObservation = null;

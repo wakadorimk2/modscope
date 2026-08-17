@@ -34,6 +34,7 @@
   let inspectorOpen = false;
   let inspectorModKey: string | null = null;
   let pendingInspectorModKey: string | null = null;
+  let pendingRecognitionModKey: string | null = null;
   let inspectorFilesOpen = false;
   let modSearchOpen = initialState.layout.modSearchOpen;
   let modSearchMode: 'browse' | 'recognition' = 'browse';
@@ -73,6 +74,7 @@
   $: inspectorRuntimeItems = state.inspector && state.analysis.runtimeComparison
     ? state.analysis.runtimeComparison.items.filter((item) => item.observations.some((observation) => observation.modKey === state.inspector?.modKey))
     : [];
+  let recognitionPageUrl = externalPageUrl(initialState.browser.url);
 
   onMount(() => {
     bridge = createBridge(handleHostMessage);
@@ -127,6 +129,15 @@
     return value === 'deployment-edit' ? value : 'browse';
   }
 
+  function isTransientSurfaceUrl(url: string): boolean {
+    return url.trim() === 'about:deployment-preview';
+  }
+
+  function externalPageUrl(url: string): string | null {
+    const trimmed = url.trim();
+    return trimmed && !isTransientSurfaceUrl(trimmed) ? trimmed : null;
+  }
+
   function handleHostMessage(message: HostMessage) {
     if (message.kind === 'state') {
       const addressIsBeingEdited = document.activeElement instanceof HTMLInputElement
@@ -135,6 +146,13 @@
       const pageChanged = previousState.browser.url !== message.payload.browser.url
         || previousState.browser.activeTabId !== message.payload.browser.activeTabId;
       const profileChanged = previousState.knowledge.session?.profileName !== message.payload.knowledge.session?.profileName;
+      const knowledgeContextChanged = previousState.knowledge.session?.snapshotId !== message.payload.knowledge.session?.snapshotId
+        || profileChanged;
+      const nextExternalPageUrl = externalPageUrl(message.payload.browser.url);
+      const recognitionPageChanged = nextExternalPageUrl !== null
+        && recognitionPageUrl !== null
+        && nextExternalPageUrl !== recognitionPageUrl;
+      if (nextExternalPageUrl !== null) recognitionPageUrl = nextExternalPageUrl;
       const identityChanged = previousState.identity.candidateIdentity !== message.payload.identity.candidateIdentity
         || previousState.identity.selectedLocalModKey !== message.payload.identity.selectedLocalModKey
         || previousState.localContext?.localModKey !== message.payload.localContext?.localModKey;
@@ -169,6 +187,10 @@
       } else if (!state.deployment.canApply) {
         deploymentApplyConfirmOpen = false;
         deploymentApplyPending = false;
+      }
+
+      if (recognitionPageChanged || knowledgeContextChanged || identityChanged) {
+        pendingRecognitionModKey = null;
       }
 
       if (!inspectorTransitionPending && (pageChanged || profileChanged || identityChanged) && inspectorOpen) {
@@ -446,9 +468,13 @@
     });
   }
 
-  function chooseModForRecognition(candidate: ModCandidateUiState) {
-    confirmIdentity(candidate.modKey);
-    if (!lastError) closeModSearch();
+  function chooseModForRecognition(modKey: string) {
+    pendingRecognitionModKey = modKey;
+    closeModSearch();
+  }
+
+  function clearRecognitionSelection() {
+    pendingRecognitionModKey = null;
   }
 
   function searchCandidates(candidates: ModCandidateUiState[], query: string): ModCandidateUiState[] {
@@ -551,6 +577,7 @@
       {modSearchOpen}
       {modSearchMode}
       {modSearchResults}
+      {pendingRecognitionModKey}
       onSetContextMode={setContextMode}
       onDiscoverSources={discoverSources}
       onSelectRoot={selectRoot}
@@ -564,6 +591,7 @@
       onCloseModSearch={closeModSearch}
       onOpenModPage={openModPage}
       onChooseModForRecognition={chooseModForRecognition}
+      onClearRecognitionSelection={clearRecognitionSelection}
       onConfirmIdentity={confirmIdentity}
       onStartStaticAnalysis={startStaticAnalysis}
       onSelectBaseData={() => send('analysis.selectBaseData')}
